@@ -1,7 +1,9 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Direction, Lead
+from accounts.serializers import UserSerializer
+
+from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
 
 
 class DirectionSerializer(serializers.ModelSerializer):
@@ -30,3 +32,86 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         validated_data['source'] = Lead.Source.SITE_FORM
         validated_data['consent_personal_data_at'] = timezone.now()
         return super().create(validated_data)
+
+
+# --- Мини-CRM (внутренняя панель, ТЗ 5) ---
+
+
+class LeadCommentSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+
+    class Meta:
+        model = LeadComment
+        fields = ['id', 'author', 'text', 'created_at']
+        read_only_fields = ['id', 'author', 'created_at']
+
+
+class LeadStatusHistorySerializer(serializers.ModelSerializer):
+    changed_by = UserSerializer(read_only=True)
+    old_status_display = serializers.CharField(source='get_old_status_display', read_only=True)
+    new_status_display = serializers.CharField(source='get_new_status_display', read_only=True)
+
+    class Meta:
+        model = LeadStatusHistory
+        fields = [
+            'id', 'old_status', 'old_status_display', 'new_status', 'new_status_display',
+            'changed_by', 'changed_at',
+        ]
+
+
+class LeadAttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = LeadAttachment
+        fields = ['id', 'file', 'uploaded_by', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_by', 'uploaded_at']
+
+
+class LeadTaskSerializer(serializers.Serializer):
+    """Лёгкое read-only представление связанной канбан-задачи для карточки заявки (ТЗ 5.4)."""
+
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    column = serializers.CharField(source='column.name')
+    deadline = serializers.DateTimeField()
+
+
+class LeadListSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
+    assigned_manager = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Lead
+        fields = [
+            'id', 'name', 'phone', 'email', 'status', 'status_display', 'source', 'source_display',
+            'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission', 'created_at',
+        ]
+
+
+class LeadDetailSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
+    assigned_manager = UserSerializer(read_only=True)
+    comments = LeadCommentSerializer(many=True, read_only=True)
+    status_history = LeadStatusHistorySerializer(many=True, read_only=True)
+    attachments = LeadAttachmentSerializer(many=True, read_only=True)
+    tasks = LeadTaskSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Lead
+        fields = [
+            'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
+            'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission', 'uon_ticket_id',
+            'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
+            'comments', 'status_history', 'attachments', 'tasks',
+        ]
+
+
+class LeadUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lead
+        fields = ['status', 'assigned_manager', 'deal_amount', 'commission']

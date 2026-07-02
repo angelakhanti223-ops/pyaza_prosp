@@ -55,6 +55,7 @@ export default function ConnectSection() {
               src="https://picsum.photos/seed/sletat-office/400/260"
               alt="Наш офис в Пензе"
               fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover"
             />
           </div>

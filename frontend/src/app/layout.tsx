@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import { LeadFormProvider } from "@/components/lead-form/LeadFormContext";
-import LeadFormModal from "@/components/lead-form/LeadFormModal";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -25,12 +21,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white text-foreground">
-        <LeadFormProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <LeadFormModal />
-        </LeadFormProvider>
+        {children}
       </body>
     </html>
   );

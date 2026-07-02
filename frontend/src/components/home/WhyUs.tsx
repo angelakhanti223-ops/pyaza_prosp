@@ -46,6 +46,7 @@ export default function WhyUs() {
                 src={`https://picsum.photos/seed/${card.seed}/400/300`}
                 alt={card.title}
                 fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 20vw"
                 className="object-cover"
               />
             </div>
