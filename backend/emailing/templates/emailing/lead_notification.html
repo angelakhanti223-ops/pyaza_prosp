@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<body style="margin:0;padding:0;background:#eef4fc;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;">
+        <tr><td style="background:#0f2c5c;padding:20px 28px;">
+          <span style="color:#ffffff;font-size:18px;font-weight:bold;">Новая заявка №{{ lead.id }}</span>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="font-size:14px;color:#12233f;">
+            <tr><td style="color:#94a3b8;">Имя</td><td>{{ lead.name }}</td></tr>
+            <tr><td style="color:#94a3b8;">Телефон</td><td>{{ lead.phone }}</td></tr>
+            <tr><td style="color:#94a3b8;">Email</td><td>{{ lead.email|default:"—" }}</td></tr>
+            <tr><td style="color:#94a3b8;">Направление</td><td>{{ lead.direction.name|default:"—" }}</td></tr>
+            <tr><td style="color:#94a3b8;">Источник</td><td>{{ lead.get_source_display }}</td></tr>
+            <tr><td style="color:#94a3b8;">Комментарий</td><td>{{ lead.initial_comment|default:"—" }}</td></tr>
+          </table>
+          <p style="margin:20px 0 0;">
+            <a href="{{ crm_url }}" style="background:#0f2c5c;color:#ffffff;padding:10px 20px;border-radius:999px;text-decoration:none;font-size:14px;">Открыть в CRM</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

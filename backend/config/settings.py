@@ -163,12 +163,16 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 
-# Email — see emailing/adapters.py. In mock mode (default until an SMTP account
-# exists) messages are logged instead of sent over the network.
+# Email (ТЗ 9). In mock mode (default until an SMTP account exists — see
+# emailing/emails.py) messages are printed to the console instead of sent
+# over the network. EMAIL_MOCK_MODE is the single switch: it picks the
+# Django email backend itself, so there's no separate setting that could
+# be left out of sync with it.
 EMAIL_MOCK_MODE = env.bool('EMAIL_MOCK_MODE', default=True)
-EMAIL_BACKEND = env(
-    'DJANGO_EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend',
+EMAIL_BACKEND = (
+    'django.core.mail.backends.console.EmailBackend'
+    if EMAIL_MOCK_MODE
+    else 'django.core.mail.backends.smtp.EmailBackend'
 )
 EMAIL_HOST = env('EMAIL_HOST', default='')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
@@ -177,6 +181,13 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@sletat.ru')
 SALES_NOTIFICATION_EMAIL = env('SALES_NOTIFICATION_EMAIL', default='sales@sletat.ru')
+
+# ТЗ 3.2 / 16: whether to auto-email the client a confirmation on lead creation
+# is an open question for the client — off by default, ready to flip on.
+SEND_LEAD_CONFIRMATION_EMAIL = env.bool('SEND_LEAD_CONFIRMATION_EMAIL', default=False)
+
+SITE_URL = env('NEXT_PUBLIC_SITE_URL', default='http://localhost:3000')
+BACKEND_URL = env('BACKEND_URL', default='http://localhost:8000')
 
 
 # U-ON CRM integration — see integrations/adapters.py. Mock mode is used until

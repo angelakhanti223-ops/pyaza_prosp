@@ -29,13 +29,21 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from django.conf import settings
+
+        from emailing.tasks import send_lead_confirmation_task, send_lead_notification_task
         from integrations.tasks import sync_lead_to_uon
 
         validated_data.pop('consent')
         validated_data['source'] = Lead.Source.SITE_FORM
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
+
         sync_lead_to_uon.delay(lead.id)
+        send_lead_notification_task.delay(lead.id)
+        if settings.SEND_LEAD_CONFIRMATION_EMAIL:
+            send_lead_confirmation_task.delay(lead.id)
+
         return lead
 
 

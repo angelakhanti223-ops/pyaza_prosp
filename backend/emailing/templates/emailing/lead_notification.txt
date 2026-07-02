@@ -1,0 +1,10 @@
+Новая заявка №{{ lead.id }}
+
+Имя: {{ lead.name }}
+Телефон: {{ lead.phone }}
+Email: {{ lead.email|default:"—" }}
+Направление: {{ lead.direction.name|default:"—" }}
+Источник: {{ lead.get_source_display }}
+Комментарий: {{ lead.initial_comment|default:"—" }}
+
+Открыть в CRM: {{ crm_url }}

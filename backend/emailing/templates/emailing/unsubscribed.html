@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>Отписка — Слетать.ру</title></head>
+<body style="margin:0;padding:40px 16px;background:#eef4fc;font-family:Arial,Helvetica,sans-serif;text-align:center;">
+  <div style="max-width:420px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">
+    <p style="font-size:18px;font-weight:bold;color:#0f2c5c;margin:0 0 12px;">
+      Слетать<span style="color:#d9a441;">.ру</span>
+    </p>
+    {% if already %}
+      <p style="font-size:14px;color:#4a5568;">Этот адрес уже отписан от рассылки.</p>
+    {% else %}
+      <p style="font-size:14px;color:#4a5568;">Вы успешно отписались от рассылки. Больше писем с предложениями мы отправлять не будем.</p>
+    {% endif %}
+  </div>
+</body>
+</html>
