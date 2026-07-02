@@ -142,7 +142,7 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchMe(): Promise<CrmUser | null> {
-  const res = await apiFetch("/api/auth/me/");
+  const res = await apiFetch("/api/auth/me/", { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
