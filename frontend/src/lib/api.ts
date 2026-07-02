@@ -1,0 +1,65 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+export type Direction = {
+  id: number;
+  name: string;
+};
+
+export type LeadPayload = {
+  name: string;
+  phone: string;
+  email?: string;
+  direction?: number | null;
+  initial_comment?: string;
+  consent: boolean;
+};
+
+export type SubscribePayload = {
+  email: string;
+  name?: string;
+  consent: boolean;
+};
+
+class ApiError extends Error {
+  fieldErrors: Record<string, string[]>;
+
+  constructor(fieldErrors: Record<string, string[]>) {
+    super("Ошибка отправки формы");
+    this.fieldErrors = fieldErrors;
+  }
+}
+
+async function postJson<T>(path: string, payload: T): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(data);
+  }
+}
+
+export async function fetchDirections(): Promise<Direction[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/directions/`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export function createLead(payload: LeadPayload) {
+  return postJson("/api/leads/", payload);
+}
+
+export function subscribe(payload: SubscribePayload) {
+  return postJson("/api/subscribe/", payload);
+}
+
+export { ApiError };
