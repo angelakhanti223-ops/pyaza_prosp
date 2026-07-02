@@ -38,11 +38,11 @@ export default function Header() {
 
         <div className="hidden items-center gap-4 lg:flex">
           <a
-            href="tel:+78002502555"
+            href="tel:+79502302555"
             className="flex items-center gap-2 text-sm font-semibold text-navy"
           >
             <Phone size={18} className="text-gold" />
-            8-800-250-25-55
+            8-950-230-25-55
           </a>
           <OpenLeadFormButton className="rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-navy-dark transition-colors hover:bg-gold-dark">
             Подобрать тур
@@ -74,9 +74,9 @@ export default function Header() {
             ))}
           </nav>
           <div className="mt-4 flex flex-col gap-3">
-            <a href="tel:+78002502555" className="flex items-center gap-2 text-sm font-semibold text-navy">
+            <a href="tel:+79502302555" className="flex items-center gap-2 text-sm font-semibold text-navy">
               <Phone size={18} className="text-gold" />
-              8-800-250-25-55
+              8-950-230-25-55
             </a>
             <OpenLeadFormButton className="rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-navy-dark">
               Подобрать тур

@@ -27,9 +27,9 @@ export default function Footer() {
           <div>
             <h4 className="mb-3 text-sm font-semibold text-white/90">Телефоны</h4>
             <div className="flex flex-col gap-1.5 text-sm text-white/60">
-              <a href="tel:+78002502555" className="flex items-center gap-2 hover:text-white">
+              <a href="tel:+79502302555" className="flex items-center gap-2 hover:text-white">
                 <Phone size={16} className="text-gold" />
-                8-800-250-25-55
+                8-950-230-25-55
               </a>
               <a href="tel:+79991104188" className="flex items-center gap-2 hover:text-white">
                 <Phone size={16} className="text-gold" />

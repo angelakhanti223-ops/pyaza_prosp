@@ -25,7 +25,7 @@ export default function Hero() {
               <ArrowRight size={17} />
             </OpenLeadFormButton>
             <a
-              href="tel:+78002502555"
+              href="tel:+79502302555"
               className="flex items-center gap-2 rounded-full border border-navy/20 px-6 py-3.5 text-sm font-semibold text-navy transition-colors hover:bg-navy/5"
             >
               <Phone size={17} />
