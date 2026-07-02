@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { fetchArticle, mediaUrl } from "@/lib/articlesApi";
 import ArticleCard from "@/components/blog/ArticleCard";
 import ShareButtons from "@/components/blog/ShareButtons";
+import ImageCarousel from "@/components/blog/ImageCarousel";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -97,6 +98,8 @@ export default async function ArticlePage({ params }: Props) {
         className="prose prose-sm mt-8 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue"
         dangerouslySetInnerHTML={{ __html: article.content }}
       />
+
+      <ImageCarousel images={article.gallery_images} />
 
       {article.tags.length > 0 && (
         <div className="mt-8 flex flex-wrap gap-2">

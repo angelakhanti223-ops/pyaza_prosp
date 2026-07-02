@@ -70,3 +70,18 @@ class Article(models.Model):
         if self.status == self.Status.PUBLISHED and self.published_at is None:
             self.published_at = timezone.now()
         super().save(*args, **kwargs)
+
+
+class ArticleGalleryImage(models.Model):
+    """Карусель изображений статьи — отдельный блок, отображается после текста статьи."""
+
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='gallery_images')
+    image = models.ImageField(upload_to='articles/gallery/%Y/%m/')
+    caption = models.CharField(max_length=255, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return self.caption or f'Изображение #{self.pk} — {self.article.title}'

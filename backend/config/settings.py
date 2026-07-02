@@ -118,11 +118,19 @@ CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 CKEDITOR_5_CONFIGS = {
     'default': {
         'toolbar': [
+            'heading', '|',
             'bold', 'italic', 'underline', '|',
             'bulletedList', 'numberedList', 'blockQuote', '|',
             'link', 'imageUpload', 'insertTable', '|',
             'undo', 'redo',
         ],
+        'heading': {
+            'options': [
+                {'model': 'paragraph', 'title': 'Обычный текст', 'class': 'ck-heading_paragraph'},
+                {'model': 'heading2', 'view': 'h2', 'title': 'Заголовок 2', 'class': 'ck-heading_heading2'},
+                {'model': 'heading3', 'view': 'h3', 'title': 'Заголовок 3', 'class': 'ck-heading_heading3'},
+            ],
+        },
     },
 }
 

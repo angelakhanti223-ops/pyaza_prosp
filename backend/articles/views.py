@@ -10,7 +10,7 @@ from .serializers import ArticleDetailSerializer, ArticleListSerializer, Categor
 def published_articles():
     return Article.objects.filter(
         status=Article.Status.PUBLISHED, published_at__lte=timezone.now(),
-    ).select_related('category')
+    ).select_related('category').prefetch_related('tags', 'gallery_images')
 
 
 class CategoryListView(generics.ListAPIView):

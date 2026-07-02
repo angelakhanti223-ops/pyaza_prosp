@@ -25,16 +25,24 @@ export type ArticleListItem = {
   excerpt: string;
   featured_image: string | null;
   category: ArticleCategory | null;
+  tags: ArticleTag[];
   published_at: string;
+};
+
+export type ArticleGalleryImage = {
+  id: number;
+  image: string;
+  caption: string;
+  order: number;
 };
 
 export type ArticleDetail = ArticleListItem & {
   content: string;
-  tags: ArticleTag[];
   seo_title: string;
   seo_description: string;
   og_image: string | null;
   related_articles: ArticleListItem[];
+  gallery_images: ArticleGalleryImage[];
 };
 
 export type ArticleListPage = {
@@ -44,9 +52,20 @@ export type ArticleListPage = {
   results: ArticleListItem[];
 };
 
+// Media URLs end up in the browser (as <img src>), so they must always resolve
+// against the public-facing host — never the Docker-internal one, even though
+// the API fetch that produced them may have run server-side over the internal
+// network. DRF builds absolute media URLs from whatever Host the request came
+// in on, so a server-side fetch yields "http://backend:8000/media/..." — rewrite
+// that origin to the public API base URL.
+const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
 export function mediaUrl(path: string | null): string | null {
   if (!path) return null;
-  return path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  if (path.startsWith("http")) {
+    return path.replace(/^https?:\/\/[^/]+/, PUBLIC_API_BASE_URL);
+  }
+  return `${PUBLIC_API_BASE_URL}${path}`;
 }
 
 export async function fetchArticles(params: { category?: string; page?: number } = {}): Promise<ArticleListPage> {

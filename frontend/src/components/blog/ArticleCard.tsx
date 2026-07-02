@@ -32,6 +32,15 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
         <p className="mt-2 text-xs text-foreground/40">
           {new Date(article.published_at).toLocaleDateString("ru-RU")}
         </p>
+        {article.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {article.tags.map((tag) => (
+              <span key={tag.id} className="text-[11px] text-blue">
+                #{tag.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   );
