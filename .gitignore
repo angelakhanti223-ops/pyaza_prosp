@@ -1,0 +1,21 @@
+# Env / secrets
+.env
+
+# Python / Django
+__pycache__/
+*.pyc
+backend/staticfiles/
+backend/media/
+backend/db.sqlite3
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json
+
+*.log
