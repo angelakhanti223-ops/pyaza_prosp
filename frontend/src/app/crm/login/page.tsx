@@ -15,7 +15,7 @@ export default function CrmLoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/crm/leads");
+      router.replace("/crm/dashboard");
     }
   }, [status, router]);
 
@@ -26,7 +26,7 @@ export default function CrmLoginPage() {
     try {
       await apiLogin(username, password);
       await refresh();
-      router.replace("/crm/leads");
+      router.replace("/crm/dashboard");
     } catch {
       setError("Неверный логин или пароль");
     } finally {
