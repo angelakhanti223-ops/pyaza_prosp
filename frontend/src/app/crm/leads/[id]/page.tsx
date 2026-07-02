@@ -325,6 +325,28 @@ export default function CrmLeadDetailPage() {
               )}
             </ul>
           </div>
+
+          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+            <h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2>
+            <ul className="flex flex-col gap-2">
+              {lead.uon_sync_logs.map((log) => (
+                <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm">
+                  <p className="font-medium text-navy">
+                    Попытка {log.attempt_number} — {log.status_display}
+                  </p>
+                  {log.error_message && (
+                    <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>
+                  )}
+                  <p className="mt-1 text-xs text-foreground/40">
+                    {new Date(log.created_at).toLocaleString("ru-RU")}
+                  </p>
+                </li>
+              ))}
+              {lead.uon_sync_logs.length === 0 && (
+                <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>
+              )}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

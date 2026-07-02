@@ -75,6 +75,15 @@ export type LeadTask = {
   deadline: string | null;
 };
 
+export type LeadUonSyncLog = {
+  id: number;
+  status: "pending" | "success" | "failed";
+  status_display: string;
+  attempt_number: number;
+  error_message: string;
+  created_at: string;
+};
+
 export type LeadDetail = LeadListItem & {
   uon_ticket_id: string;
   initial_comment: string;
@@ -84,6 +93,7 @@ export type LeadDetail = LeadListItem & {
   status_history: LeadStatusHistoryEntry[];
   attachments: LeadAttachment[];
   tasks: LeadTask[];
+  uon_sync_logs: LeadUonSyncLog[];
 };
 
 function getCookie(name: string): string | null {

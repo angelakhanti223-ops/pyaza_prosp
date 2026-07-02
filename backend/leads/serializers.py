@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
+from integrations.models import UonSyncLog
 
 from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
 
@@ -28,10 +29,14 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from integrations.tasks import sync_lead_to_uon
+
         validated_data.pop('consent')
         validated_data['source'] = Lead.Source.SITE_FORM
         validated_data['consent_personal_data_at'] = timezone.now()
-        return super().create(validated_data)
+        lead = super().create(validated_data)
+        sync_lead_to_uon.delay(lead.id)
+        return lead
 
 
 # --- Мини-CRM (внутренняя панель, ТЗ 5) ---
@@ -68,6 +73,14 @@ class LeadAttachmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'uploaded_by', 'uploaded_at']
 
 
+class LeadUonSyncLogSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = UonSyncLog
+        fields = ['id', 'status', 'status_display', 'attempt_number', 'error_message', 'created_at']
+
+
 class LeadTaskSerializer(serializers.Serializer):
     """Лёгкое read-only представление связанной канбан-задачи для карточки заявки (ТЗ 5.4)."""
 
@@ -100,6 +113,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     status_history = LeadStatusHistorySerializer(many=True, read_only=True)
     attachments = LeadAttachmentSerializer(many=True, read_only=True)
     tasks = LeadTaskSerializer(many=True, read_only=True)
+    uon_sync_logs = LeadUonSyncLogSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lead
@@ -107,7 +121,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission', 'uon_ticket_id',
             'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
-            'comments', 'status_history', 'attachments', 'tasks',
+            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs',
         ]
 
 

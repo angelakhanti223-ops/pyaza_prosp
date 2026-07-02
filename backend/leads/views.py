@@ -1,5 +1,5 @@
 from django.db.models import Q
-from rest_framework import generics, viewsets
+from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -39,11 +39,18 @@ class LeadCreateView(generics.CreateAPIView):
     throttle_scope = 'lead_create'
 
 
-class LeadViewSet(viewsets.ModelViewSet):
+class LeadViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
     """Мини-CRM (ТЗ 5): список/карточка заявки, смена статуса, комментарии, файлы.
 
     Менеджер видит и ведёт только свои заявки; руководитель/администратор — все
-    заявки и может переназначать ответственного (ТЗ 5.3).
+    заявки и может переназначать ответственного (ТЗ 5.3). Leads are only ever
+    created via the public LeadCreateView or (later) a manual-entry flow — this
+    viewset intentionally has no create/destroy actions.
     """
 
     permission_classes = [IsAuthenticated]
@@ -53,7 +60,10 @@ class LeadViewSet(viewsets.ModelViewSet):
         user = self.request.user
         qs = (
             Lead.objects.select_related('assigned_manager', 'direction')
-            .prefetch_related('comments__author', 'status_history__changed_by', 'attachments__uploaded_by', 'tasks__column')
+            .prefetch_related(
+                'comments__author', 'status_history__changed_by', 'attachments__uploaded_by',
+                'tasks__column', 'uon_sync_logs',
+            )
         )
         if not is_head(user):
             qs = qs.filter(assigned_manager=user)

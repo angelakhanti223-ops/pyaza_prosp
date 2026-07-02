@@ -170,3 +170,16 @@ SALES_NOTIFICATION_EMAIL = env('SALES_NOTIFICATION_EMAIL', default='sales@sletat
 UON_MOCK_MODE = env.bool('UON_MOCK_MODE', default=True)
 UON_API_BASE_URL = env('UON_API_BASE_URL', default='https://api.u-on.ru')
 UON_API_KEY = env('UON_API_KEY', default='')
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
