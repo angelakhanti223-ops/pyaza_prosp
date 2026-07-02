@@ -11,10 +11,12 @@ def health(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('ckeditor5/', include('django_ckeditor_5.urls')),
     path('api/health/', health, name='health'),
     path('api/', include('leads.urls')),
     path('api/', include('emailing.urls')),
     path('api/', include('accounts.urls')),
+    path('api/', include('articles.urls')),
 ]
 
 if settings.DEBUG:

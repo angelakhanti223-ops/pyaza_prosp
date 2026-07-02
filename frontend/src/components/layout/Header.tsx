@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/directions", label: "Направления" },
   { href: "/cruises", label: "Круизы" },
   { href: "/promotions", label: "Акции" },
+  { href: "/blog", label: "Блог" },
   { href: "/about", label: "О нас" },
   { href: "/contacts", label: "Контакты" },
 ];

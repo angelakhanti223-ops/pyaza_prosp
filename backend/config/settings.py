@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'corsheaders',
+    'django_ckeditor_5',
 
     'accounts',
     'leads',
@@ -111,6 +112,19 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# WYSIWYG editor for article content (ТЗ 4.1) — images uploaded through it land in MEDIA_ROOT.
+CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+CKEDITOR_5_CONFIGS = {
+    'default': {
+        'toolbar': [
+            'bold', 'italic', 'underline', '|',
+            'bulletedList', 'numberedList', 'blockQuote', '|',
+            'link', 'imageUpload', 'insertTable', '|',
+            'undo', 'redo',
+        ],
+    },
+}
 
 
 # CORS — the Next.js frontend calls this API from a different origin in dev.
