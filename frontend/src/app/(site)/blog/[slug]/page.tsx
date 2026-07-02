@@ -90,7 +90,7 @@ export default async function ArticlePage({ params }: Props) {
 
       {image && (
         <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
-          <Image src={image} alt={article.title} fill sizes="768px" className="object-cover" unoptimized />
+          <Image src={image} alt={article.title} fill sizes="768px" className="object-cover" unoptimized priority />
         </div>
       )}
 

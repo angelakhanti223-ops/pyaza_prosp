@@ -30,17 +30,20 @@ const STAGES = [
 
 export default function SupportStages() {
   return (
-    <section className="bg-blue-light">
+    <section className="bg-cream">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <h2 className="text-center text-2xl font-bold text-navy sm:text-3xl">
           Мы рядом на каждом этапе путешествия
         </h2>
 
-        <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
-          {STAGES.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-blue shadow-sm">
-                <Icon size={22} />
+        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          {STAGES.map(({ icon: Icon, title, text }, i) => (
+            <div
+              key={title}
+              className={`rounded-2xl bg-white p-5 text-center shadow-sm ${i % 2 === 1 ? "lg:mt-6" : ""}`}
+            >
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-navy text-gold">
+                <Icon size={20} />
               </div>
               <p className="mt-3 text-sm font-semibold text-navy">{title}</p>
               <p className="mt-1 text-xs leading-relaxed text-foreground/60">{text}</p>

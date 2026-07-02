@@ -30,10 +30,15 @@ export default function BookingSteps() {
         Как забронировать путешествие
       </h2>
 
-      <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="relative mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          aria-hidden
+          className="absolute left-0 right-0 top-7 hidden border-t-2 border-dashed border-gold/40 lg:block"
+          style={{ marginInline: "12.5%" }}
+        />
         {STEPS.map(({ icon: Icon, title, text }, i) => (
           <div key={title} className="relative text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold/40 text-gold">
+            <div className="relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold/40 bg-white text-gold">
               <Icon size={24} />
             </div>
             <p className="mt-3 text-xs font-semibold text-gold">{i + 1}</p>
