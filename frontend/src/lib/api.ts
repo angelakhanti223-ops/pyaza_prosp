@@ -12,6 +12,7 @@ export type LeadPayload = {
   direction?: number | null;
   initial_comment?: string;
   consent: boolean;
+  source?: "site_form" | "chatbot";
 };
 
 export type SubscribePayload = {

@@ -15,10 +15,15 @@ class DirectionSerializer(serializers.ModelSerializer):
 
 class LeadCreateSerializer(serializers.ModelSerializer):
     consent = serializers.BooleanField(write_only=True)
+    # Only site_form (default) or chatbot are reachable from this public endpoint —
+    # phone_call/other are entered manually by staff, never by an anonymous request.
+    source = serializers.ChoiceField(
+        choices=[Lead.Source.SITE_FORM, Lead.Source.CHATBOT], required=False,
+    )
 
     class Meta:
         model = Lead
-        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'consent']
+        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'consent', 'source']
         read_only_fields = ['id']
 
     def validate_consent(self, value):
@@ -35,7 +40,7 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         from integrations.tasks import sync_lead_to_uon
 
         validated_data.pop('consent')
-        validated_data['source'] = Lead.Source.SITE_FORM
+        validated_data.setdefault('source', Lead.Source.SITE_FORM)
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
 
