@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, LogOut } from "lucide-react";
+import { Columns3, Inbox, LogOut } from "lucide-react";
 import { useCrmAuth } from "./CrmAuthProvider";
 
-const NAV = [{ href: "/crm/leads", label: "Заявки", icon: Inbox }];
+const NAV = [
+  { href: "/crm/leads", label: "Заявки", icon: Inbox },
+  { href: "/crm/kanban", label: "Канбан", icon: Columns3 },
+];
 
 export default function CrmShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useCrmAuth();
