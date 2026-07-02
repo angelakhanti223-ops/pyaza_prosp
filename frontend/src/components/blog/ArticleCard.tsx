@@ -3,7 +3,8 @@ import Link from "next/link";
 import { mediaUrl, type ArticleListItem } from "@/lib/articlesApi";
 
 export default function ArticleCard({ article }: { article: ArticleListItem }) {
-  const image = mediaUrl(article.featured_image) ?? `https://picsum.photos/seed/article-${article.id}/500/340`;
+  const backendImage = mediaUrl(article.featured_image);
+  const image = backendImage ?? `https://picsum.photos/seed/article-${article.id}/500/340`;
 
   return (
     <Link
@@ -17,6 +18,11 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover"
+          // The Next.js image optimizer refuses to fetch from private/loopback IPs
+          // (SSRF protection) — our own backend is unreachable from the frontend
+          // container via the public "localhost" hostname it must use for the
+          // browser's sake, so skip optimization for our own media.
+          unoptimized={Boolean(backendImage)}
         />
       </div>
       <div className="p-4">

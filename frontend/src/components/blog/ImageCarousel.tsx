@@ -23,6 +23,7 @@ export default function ImageCarousel({ images }: { images: ArticleGalleryImage[
           fill
           sizes="768px"
           className="object-cover"
+          unoptimized
         />
 
         {images.length > 1 && (
