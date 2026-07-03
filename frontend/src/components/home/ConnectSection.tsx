@@ -2,11 +2,19 @@ import Image from "next/image";
 import { Send } from "lucide-react";
 import ReviewsCarousel from "./ReviewsCarousel";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { siteImageUrl } from "@/lib/siteImagesApi";
 
 const OFFICE_MAP_SRC =
   "https://www.google.com/maps?q=%D0%9F%D0%B5%D0%BD%D0%B7%D0%B0,%20%D0%9F%D1%80%D0%BE%D1%81%D0%BF%D0%B5%D0%BA%D1%82%20%D0%A1%D1%82%D1%80%D0%BE%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%2049%D0%90&output=embed";
 
-export default function ConnectSection() {
+type Props = {
+  officeImage?: string | null;
+};
+
+export default function ConnectSection({ officeImage }: Props) {
+  const managedOfficeImage = siteImageUrl(officeImage ?? null);
+  const officePhoto = managedOfficeImage ?? "https://picsum.photos/seed/sletat-office/400/260";
+
   return (
     <section className="bg-blue-light/50 py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -57,9 +65,10 @@ export default function ConnectSection() {
           <div className="flex flex-col overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm">
             <div className="relative aspect-[16/10]">
               <Image
-                src="https://picsum.photos/seed/sletat-office/400/260"
+                src={officePhoto}
                 alt="Наш офис в Пензе"
                 fill
+                unoptimized={Boolean(managedOfficeImage)}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 className="object-cover"
               />

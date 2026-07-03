@@ -1,8 +1,15 @@
 import Image from "next/image";
 import { ArrowRight, Phone } from "lucide-react";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { siteImageUrl } from "@/lib/siteImagesApi";
 
-export default function Hero() {
+type Props = {
+  image?: string | null;
+};
+
+export default function Hero({ image }: Props) {
+  const heroImage = siteImageUrl(image ?? null) ?? "https://picsum.photos/seed/sletat-hero/1000/760";
+
   return (
     <section className="overflow-hidden bg-gradient-to-b from-blue-light to-white">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-20">
@@ -55,10 +62,11 @@ export default function Hero() {
         <div className="relative">
           <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem]">
             <Image
-              src="https://picsum.photos/seed/sletat-hero/1000/760"
+              src={heroImage}
               alt="Отдых у моря"
               fill
               priority
+              unoptimized={Boolean(image)}
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />

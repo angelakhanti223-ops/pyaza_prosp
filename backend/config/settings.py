@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'kanban',
     'integrations',
     'emailing',
+    'sitecontent',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

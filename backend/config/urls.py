@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/', include('accounts.urls')),
     path('api/', include('articles.urls')),
     path('api/', include('kanban.urls')),
+    path('api/', include('sitecontent.urls')),
 ]
 
 if settings.DEBUG:

@@ -6,15 +6,18 @@ import ConnectSection from "@/components/home/ConnectSection";
 import BookingSteps from "@/components/home/BookingSteps";
 import SupportStages from "@/components/home/SupportStages";
 import NewsletterCTA from "@/components/home/NewsletterCTA";
+import { fetchSiteImages } from "@/lib/siteImagesApi";
 
-export default function Home() {
+export default async function Home() {
+  const siteImages = await fetchSiteImages();
+
   return (
     <>
-      <Hero />
+      <Hero image={siteImages.hero_background} />
       <Advantages />
       <StatsBand />
-      <WhyUs />
-      <ConnectSection />
+      <WhyUs images={siteImages} />
+      <ConnectSection officeImage={siteImages.office_photo} />
       <BookingSteps />
       <SupportStages />
       <NewsletterCTA />
