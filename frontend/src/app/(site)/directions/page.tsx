@@ -4,8 +4,9 @@ import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import { fetchDirections } from "@/lib/api";
 
 export const metadata: Metadata = {
-  title: "Направления — Слетать.ру",
-  description: "Актуальные направления для отдыха от сети туристических агентств Слетать.ру.",
+  title: "Направления для отдыха — куда поехать | Слетать.ру",
+  description:
+    "Популярные направления для туров и путёвок от туристического агентства Слетать.ру: пляжный отдых, экскурсии и круизы по России и за рубежом.",
 };
 
 export default async function DirectionsPage() {
@@ -14,10 +15,14 @@ export default async function DirectionsPage() {
   return (
     <div>
       <PageHero
-        title="Направления"
-        text="Собрали популярные у наших клиентов направления. Не нашли своё — расскажите, куда хотите, и мы подберём вариант."
+        title="Куда поехать: направления для отдыха"
+        text="Собрали направления, которые чаще всего выбирают наши клиенты — от пляжного отдыха до экскурсионных туров. Не нашли своё? Расскажите, куда хотите, и мы подберём вариант."
       />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        <p className="mx-auto mb-10 max-w-2xl text-center text-sm leading-relaxed text-foreground/70">
+          Ниже — актуальный список направлений, с которыми мы работаем. Для каждого подбираем
+          отели, авиаперелёт и трансфер под ваш бюджет и даты.
+        </p>
         {directions.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {directions.map((d) => (

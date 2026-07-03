@@ -3,8 +3,9 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import PageHero from "@/components/ui/PageHero";
 
 export const metadata: Metadata = {
-  title: "Контакты — Слетать.ру",
-  description: "Контакты сети туристических агентств Слетать.ру: адрес офиса в Пензе, телефоны, режим работы.",
+  title: "Контакты турагентства в Пензе — адрес, телефон | Слетать.ру",
+  description:
+    "Адрес офиса турагентства Слетать.ру: г. Пенза, Пр-т Строителей, 49А, ТЦ «Проспект». Телефоны, режим работы и мессенджеры для связи.",
 };
 
 const OFFICE_MAP_SRC =

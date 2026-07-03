@@ -4,8 +4,9 @@ import { fetchArticleCategories, fetchArticles } from "@/lib/articlesApi";
 import ArticleCard from "@/components/blog/ArticleCard";
 
 export const metadata: Metadata = {
-  title: "Блог — Слетать.ру",
-  description: "Полезные статьи и новости о путешествиях от сети туристических агентств Слетать.ру.",
+  title: "Блог о путешествиях — советы и направления | Слетать.ру",
+  description:
+    "Статьи и советы о путешествиях от туристического агентства Слетать.ру: куда поехать, как выбрать тур, лайфхаки для отдыха и новости компании.",
 };
 
 type Props = {

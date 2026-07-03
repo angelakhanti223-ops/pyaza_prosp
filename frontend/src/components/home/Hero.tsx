@@ -15,15 +15,17 @@ export default function Hero({ image }: Props) {
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-20">
         <div>
           <h1 className="text-4xl font-bold leading-tight text-navy sm:text-5xl">
-            Подберём путешествие
+            Туры и путёвки
             <br />
-            под ваш бюджет
-            <br />и стиль отдыха
+            от туристического
+            <br />
+            агентства в Пензе
           </h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-foreground/70">
-            Пляжный отдых, экскурсионные туры, круизы и авторские маршруты.
-            Подберём идеальное путешествие и возьмём на себя все заботы — до,
-            во время и после поездки.
+            Слетать.ру подбирает пляжный отдых, горящие туры, экскурсионные программы,
+            семейные поездки и круизы по России и за рубежом — уже больше 20 лет.
+            Берём на себя оформление документов, бронирование и поддержку 24/7:
+            до, во время и после поездки.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-3">
@@ -46,7 +48,7 @@ export default function Hero({ image }: Props) {
                 <Image
                   key={seed}
                   src={`https://picsum.photos/seed/sletat-avatar-${seed}/64/64`}
-                  alt="Довольный клиент"
+                  alt="Клиент турагентства Слетать.ру, вернувшийся из путешествия"
                   width={40}
                   height={40}
                   className="rounded-full border-2 border-white object-cover"
@@ -63,7 +65,7 @@ export default function Hero({ image }: Props) {
           <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem]">
             <Image
               src={heroImage}
-              alt="Отдых у моря"
+              alt="Пляжный отдых — тур, подобранный агентством Слетать.ру"
               fill
               priority
               unoptimized={Boolean(image)}

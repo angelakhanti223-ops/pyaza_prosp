@@ -3,15 +3,16 @@ import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 
 export const metadata: Metadata = {
-  title: "Акции — Слетать.ру",
-  description: "Актуальные акции и специальные предложения от сети туристических агентств Слетать.ру.",
+  title: "Акции и горящие туры — Слетать.ру",
+  description:
+    "Актуальные акции, горящие туры и сезонные скидки от туристического агентства Слетать.ру в Пензе. Оставьте заявку — пришлём подборку под ваши даты.",
 };
 
 export default function PromotionsPage() {
   return (
     <div>
       <PageHero
-        title="Акции"
+        title="Акции и горящие туры"
         text="Собираем актуальные предложения от туроператоров — эта страница пополняется. Оставьте заявку, и мы пришлём вам подборку лучших вариантов на ваши даты."
       />
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
