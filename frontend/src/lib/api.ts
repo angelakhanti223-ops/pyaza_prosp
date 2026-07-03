@@ -1,4 +1,11 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Client components always run in the browser, where API_BASE_URL must be the
+// public-facing host. Server components (e.g. fetchDirections called from a
+// page.tsx) run inside the frontend container and need the Docker-internal
+// host instead — see articlesApi.ts for the same split.
+const API_BASE_URL =
+  typeof window === "undefined"
+    ? process.env.INTERNAL_API_BASE_URL ?? "http://backend:8000"
+    : process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export type Direction = {
   id: number;
