@@ -1,9 +1,11 @@
+from django.db.models import Q
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import is_head
+from leads.models import Lead
 
 from .models import KanbanColumn, Task
 from .serializers import KanbanColumnSerializer, TaskMoveSerializer, TaskSerializer, TaskUpdateSerializer
@@ -41,6 +43,15 @@ class TaskViewSet(
         assignee_id = self.request.query_params.get('assignee')
         if assignee_id and is_head(self.request.user):
             qs = qs.filter(assignee_id=assignee_id)
+
+        # Обращения (задачи, пришедшие из синхронизации напоминаний U-ON) актуальны
+        # на доске только пока связанная заявка ещё новая/в работе — как только сделка
+        # продвинулась дальше, показывать их незачем. Задачи-заявки (созданные вручную
+        # по Lead в нашей CRM) остаются видимыми в любом статусе заявки.
+        qs = qs.exclude(
+            Q(uon_reminder_id__isnull=False)
+            & ~Q(lead__status__in=[Lead.Status.NEW, Lead.Status.IN_PROGRESS]),
+        )
 
         return qs
 
