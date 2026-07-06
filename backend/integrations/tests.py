@@ -6,12 +6,13 @@ from django.test import TestCase, override_settings
 from kanban.models import KanbanColumn, Task
 from leads.models import Direction, Lead
 
-from .adapters import MockUonAdapter, RealUonAdapter
+from .adapters import MockUonAdapter, RealUonAdapter, UonAdapterError, build_ticket_payload
 from .models import UonClient, UonRequestRecord, UonWebhookLog
 from .tasks import (
     pull_uon_reminders_for_lead,
     sync_all_uon_reminders,
     sync_all_uon_requests,
+    sync_lead_to_uon,
     sync_uon_request,
 )
 
@@ -24,6 +25,26 @@ class MockAdapterTests(TestCase):
 
     def test_get_request_none(self):
         self.assertIsNone(MockUonAdapter().get_request('61'))
+
+    def test_create_ticket_returns_success_shape(self):
+        result = MockUonAdapter().create_ticket({'u_name': 'x'})
+        self.assertEqual(result['result'], 200)
+        self.assertTrue(result['id'].startswith('MOCK-'))
+
+
+class BuildTicketPayloadTests(TestCase):
+    def test_maps_lead_fields_to_confirmed_uon_field_names(self):
+        direction = Direction.objects.create(name='Турция')
+        lead = Lead.objects.create(
+            name='Иван Иванов', phone='+79990000000', email='ivan@example.com',
+            initial_comment='Хочу тур', direction=direction,
+        )
+        payload = build_ticket_payload(lead)
+        self.assertEqual(payload['u_name'], 'Иван Иванов')
+        self.assertEqual(payload['u_phone'], '+79990000000')
+        self.assertEqual(payload['u_email'], 'ivan@example.com')
+        self.assertEqual(payload['note'], 'Хочу тур')
+        self.assertEqual(payload['source'], lead.get_source_display())
 
 
 class RealAdapterTests(TestCase):
@@ -56,6 +77,54 @@ class RealAdapterTests(TestCase):
 
         adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
         self.assertIsNone(adapter.get_request('999'))
+
+    @patch('integrations.adapters.requests.post')
+    def test_create_ticket_calls_expected_url_and_body(self, mock_post):
+        mock_post.return_value.json.return_value = {'result': 200, 'id': '200', 'comment': 'ok'}
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        payload = {'source': 'Сайт', 'u_name': 'Иван', 'u_phone': '+79990000000', 'u_email': '', 'note': ''}
+        result = adapter.create_ticket(payload)
+
+        mock_post.assert_called_once_with(
+            'https://api.u-on.ru/KEY123/lead/create.json', data=payload, timeout=10,
+        )
+        self.assertEqual(result['id'], '200')
+
+    @patch('integrations.adapters.requests.post')
+    def test_create_ticket_raises_on_non_200_result(self, mock_post):
+        mock_post.return_value.json.return_value = {'result': 400, 'comment': 'bad request'}
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        with self.assertRaises(UonAdapterError):
+            adapter.create_ticket({'u_name': 'Иван'})
+
+
+class SyncLeadToUonTests(TestCase):
+    def setUp(self):
+        self.direction = Direction.objects.create(name='Турция')
+        self.lead = Lead.objects.create(name='Иван', phone='+79990000000', direction=self.direction)
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_saves_returned_id_as_uon_ticket_id(self, mock_get_adapter):
+        mock_get_adapter.return_value.create_ticket.return_value = {'result': 200, 'id': '200'}
+
+        sync_lead_to_uon(self.lead.id)
+
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.uon_ticket_id, '200')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_failure_raises_and_logs(self, mock_get_adapter):
+        mock_get_adapter.return_value.create_ticket.side_effect = UonAdapterError('boom')
+
+        with self.assertRaises(UonAdapterError):
+            sync_lead_to_uon(self.lead.id)
+
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.uon_ticket_id, '')
 
 
 class PullUonRemindersTests(TestCase):

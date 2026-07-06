@@ -35,12 +35,21 @@ def _parse_uon_datetime(value):
     max_retries=MAX_RETRIES,
 )
 def sync_lead_to_uon(self, lead_id: int):
-    """Отправляет заявку в U-ON и сохраняет ID обращения на заявке (ТЗ 8).
+    """Отправляет заявку в U-ON и сохраняет полученный ID на заявке (ТЗ 8).
 
     Каждая попытка пишет отдельную запись в UonSyncLog. При сбое Celery
     автоматически ставит задачу в очередь повтора с экспоненциальной
     задержкой (до MAX_RETRIES раз), чтобы временная недоступность U-ON
     не приводила к потере заявки.
+
+    ВАЖНОЕ ОГРАНИЧЕНИЕ (подтверждено на живом API): POST /lead/create.json
+    создаёт запись именно в сущности «лид» — она ещё НЕ равна «заявке»
+    (/request), к которой относятся list_reminders()/get_request(). ID,
+    который здесь сохраняется в lead.uon_ticket_id, живёт в ID-пространстве
+    lead, а не request — get_request(этот id) вернёт None, пока менеджер
+    вручную не проработает лид в самом U-ON и тот не превратится в заявку
+    (request) с отдельным ID. До этого момента синхронизация напоминаний/
+    зеркала для только что созданной заявки не найдёт данных — это ожидаемо.
     """
     from leads.models import Lead
 
@@ -69,10 +78,10 @@ def sync_lead_to_uon(self, lead_id: int):
     log.response_payload = response
     log.save(update_fields=['status', 'response_payload'])
 
-    ticket_id = response.get('ticket_id', '')
+    ticket_id = str(response.get('id', ''))
     lead.uon_ticket_id = ticket_id
     lead.save(update_fields=['uon_ticket_id'])
-    logger.info('U-ON sync: заявка #%s синхронизирована, ticket_id=%s', lead_id, ticket_id)
+    logger.info('U-ON sync: заявка #%s синхронизирована, lead_id в U-ON=%s', lead_id, ticket_id)
 
 
 @shared_task(

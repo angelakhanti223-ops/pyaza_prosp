@@ -32,7 +32,8 @@ class MockUonAdapter(BaseUonAdapter):
 
     def create_ticket(self, payload: dict) -> dict:
         return {
-            'ticket_id': f'MOCK-{uuid.uuid4().hex[:10]}',
+            'result': 200,
+            'id': f'MOCK-{uuid.uuid4().hex[:10]}',
             'mock': True,
             'echo': payload,
         }
@@ -52,23 +53,32 @@ class RealUonAdapter(BaseUonAdapter):
         self.base_url = base_url.rstrip('/')
 
     def create_ticket(self, payload: dict) -> dict:
-        # UNVERIFIED against the live API, and now suspect: get_request()'s confirmed
-        # shape (GET /{key}/request/{id}.json, key embedded in the path, no Bearer
-        # header) contradicts the Bearer-auth /api/deal/create shape assumed here —
-        # and a bare "deal" resource doesn't exist in this API at all (GET /{key}/deal.json
-        # 404s). This almost certainly needs the same /{key}/... path style once the real
-        # request-creation endpoint is confirmed — do not rely on this in production yet.
+        # Confirmed against the live API: POST /{key}/lead/create.json (key in the
+        # URL path, same as every other endpoint here — not the Bearer-auth
+        # /api/deal/create this used to hit, which 404s because "deal" isn't a
+        # real resource in this API). Form-urlencoded body, response shape is
+        # {"result": 200, "id": "<new lead id>", "comment": "..."}.
+        #
+        # KNOWN ISSUE: Cyrillic values in u_name/note come back corrupted (stored
+        # as literal "?" characters) regardless of whether the request body is
+        # sent as UTF-8 or Windows-1251 — tested against the live API with both.
+        # ASCII-only values (phone numbers, English names) round-trip fine. This
+        # looks like a bug/quirk on U-ON's side; ask their support what encoding
+        # u_name/note actually expect before relying on this for real (Cyrillic)
+        # customer names.
         try:
             response = requests.post(
-                f'{self.base_url}/api/deal/create',
-                headers={'Authorization': f'Bearer {self.api_key}'},
-                json=payload,
+                f'{self.base_url}/{self.api_key}/lead/create.json',
+                data=payload,
                 timeout=10,
             )
             response.raise_for_status()
         except requests.RequestException as exc:
             raise UonAdapterError(str(exc)) from exc
-        return response.json()
+        data = response.json()
+        if str(data.get('result')) != '200':
+            raise UonAdapterError(f'U-ON lead/create.json вернул ошибку: {data}')
+        return data
 
     def list_reminders(self, request_id: str) -> list:
         # U-ON embeds the API key directly in the URL path (confirmed against
@@ -107,11 +117,14 @@ def get_uon_adapter() -> BaseUonAdapter:
 
 
 def build_ticket_payload(lead) -> dict:
+    # Field names confirmed against the live /lead/create.json response for
+    # source/u_name/u_phone/note — u_email follows the same "u_"-prefixed
+    # naming convention seen on client_email in /request and /lead reads, but
+    # hasn't been individually confirmed as an accepted input field.
     return {
-        'name': lead.name,
-        'phone': lead.phone,
-        'email': lead.email,
-        'comment': lead.initial_comment,
         'source': lead.get_source_display(),
-        'direction': lead.direction.name if lead.direction_id else None,
+        'u_name': lead.name,
+        'u_phone': lead.phone,
+        'u_email': lead.email,
+        'note': lead.initial_comment,
     }
