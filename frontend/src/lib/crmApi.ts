@@ -1,4 +1,4 @@
-import type { UonDealRecord } from "./uonApi";
+import type { UonRequestRecord } from "./uonApi";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -96,7 +96,7 @@ export type LeadDetail = LeadListItem & {
   attachments: LeadAttachment[];
   tasks: LeadTask[];
   uon_sync_logs: LeadUonSyncLog[];
-  uon_deal: UonDealRecord | null;
+  uon_request: UonRequestRecord | null;
 };
 
 function getCookie(name: string): string | null {

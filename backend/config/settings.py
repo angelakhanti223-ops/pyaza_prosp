@@ -226,6 +226,10 @@ BACKEND_URL = env('BACKEND_URL', default='http://localhost:8000')
 UON_MOCK_MODE = env.bool('UON_MOCK_MODE', default=True)
 UON_API_BASE_URL = env('UON_API_BASE_URL', default='https://api.u-on.ru')
 UON_API_KEY = env('UON_API_KEY', default='')
+# Optional shared secret checked against ?token= on the webhook receiver (integrations.views.UonWebhookView).
+# U-ON's webhook config hasn't confirmed whether it supports a custom token in the URL —
+# leave empty to accept all requests until that's verified.
+UON_WEBHOOK_SECRET = env('UON_WEBHOOK_SECRET', default='')
 
 
 # Telegram bot (менеджерские команды и уведомления о назначении задач/заявок —

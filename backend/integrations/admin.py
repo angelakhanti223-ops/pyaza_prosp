@@ -1,13 +1,11 @@
 from django.contrib import admin
 
-from .models import UonClient, UonDeal, UonRequest, UonSyncLog
+from .models import UonClient, UonRequestRecord, UonSyncLog, UonWebhookLog
 
 
 class UonMirrorAdmin(admin.ModelAdmin):
     """Общие настройки для read-only админок зеркал U-ON — данные приходят только
     синхронизацией, редактирование/добавление/удаление вручную не имеет смысла."""
-
-    search_fields = ('uon_id', 'name', 'phone', 'email')
 
     def has_add_permission(self, request):
         return False
@@ -19,21 +17,34 @@ class UonMirrorAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 
-@admin.register(UonRequest)
-class UonRequestAdmin(UonMirrorAdmin):
-    list_display = ('name', 'phone', 'status_name', 'manager_name', 'uon_created_at')
-    list_filter = ('status_name',)
-
-
-@admin.register(UonDeal)
-class UonDealAdmin(UonMirrorAdmin):
-    list_display = ('name', 'status_name', 'manager_name', 'amount', 'uon_created_at')
-    list_filter = ('status_name',)
+@admin.register(UonRequestRecord)
+class UonRequestRecordAdmin(UonMirrorAdmin):
+    list_display = ('client_name', 'client_phone', 'status_name', 'manager_name', 'is_archive', 'uon_created_at')
+    list_filter = ('status_name', 'is_archive')
+    search_fields = ('uon_id', 'client_name', 'client_phone', 'client_email', 'reservation_number')
 
 
 @admin.register(UonClient)
 class UonClientAdmin(UonMirrorAdmin):
-    list_display = ('name', 'phone', 'email', 'uon_created_at')
+    list_display = ('name', 'phone', 'email', 'synced_at')
+    search_fields = ('uon_id', 'name', 'phone', 'email')
+
+
+@admin.register(UonWebhookLog)
+class UonWebhookLogAdmin(admin.ModelAdmin):
+    list_display = ('type_id', 'request_id', 'received_at')
+    list_filter = ('type_id',)
+    search_fields = ('request_id',)
+    readonly_fields = ('payload', 'type_id', 'request_id', 'received_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
 
 @admin.register(UonSyncLog)

@@ -1,27 +1,21 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+// В API U-ON нет отдельного ресурса "сделка" — вся воронка (status_id/status) и
+// данные клиента уже находятся прямо в объекте заявки (подтверждено на живом API).
 export type UonRequestRecord = {
   id: number;
   uon_id: string;
-  name: string;
-  phone: string;
-  email: string;
+  reservation_number: string;
+  client_id: string;
+  client_name: string;
+  client_phone: string;
+  client_email: string;
+  status_id: string;
   status_name: string;
   manager_name: string;
   source_name: string;
-  comment: string;
-  uon_created_at: string | null;
-  synced_at: string;
-};
-
-export type UonDealRecord = {
-  id: number;
-  uon_id: string;
-  name: string;
-  status_name: string;
-  manager_name: string;
-  amount: string | null;
-  request_uon_id: string;
+  notes: string;
+  is_archive: boolean;
   uon_created_at: string | null;
   synced_at: string;
 };
@@ -32,7 +26,6 @@ export type UonClientRecord = {
   name: string;
   phone: string;
   email: string;
-  uon_created_at: string | null;
   synced_at: string;
 };
 
@@ -50,12 +43,9 @@ async function listAll<T>(path: string): Promise<T[]> {
   return Array.isArray(data) ? data : data.results;
 }
 
-export function listUonRequests(): Promise<UonRequestRecord[]> {
-  return listAll<UonRequestRecord>("/api/crm/uon/requests/");
-}
-
-export function listUonDeals(): Promise<UonDealRecord[]> {
-  return listAll<UonDealRecord>("/api/crm/uon/deals/");
+export function listUonRequests(params: { isArchive?: boolean } = {}): Promise<UonRequestRecord[]> {
+  const qs = params.isArchive === undefined ? "" : `?is_archive=${params.isArchive ? "1" : "0"}`;
+  return listAll<UonRequestRecord>(`/api/crm/uon/requests/${qs}`);
 }
 
 export function listUonClients(): Promise<UonClientRecord[]> {

@@ -27,8 +27,9 @@ export default function CrmClientsPage() {
         <div>
           <h1 className="text-xl font-bold text-navy">Клиенты</h1>
           <p className="mt-1 text-xs text-foreground/50">
-            Read-only зеркало клиентов из U-ON. Данные редактируются в U-ON, здесь только просмотр — обновляются
-            кнопкой «Синхронизировать с U-ON» вверху страницы.
+            Read-only зеркало клиентов из U-ON (собирается из данных заявок — в API U-ON нет отдельного
+            /client-эндпоинта). Данные редактируются в U-ON, здесь только просмотр — обновляются кнопкой
+            «Синхронизировать с U-ON» вверху страницы или мгновенно вебхуком при изменении в U-ON.
           </p>
         </div>
       </div>
@@ -40,7 +41,7 @@ export default function CrmClientsPage() {
               <th className="px-4 py-3 font-medium">Имя</th>
               <th className="px-4 py-3 font-medium">Телефон</th>
               <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">Создан</th>
+              <th className="px-4 py-3 font-medium">Обновлён</th>
             </tr>
           </thead>
           <tbody>
@@ -50,7 +51,7 @@ export default function CrmClientsPage() {
                 <td className="px-4 py-3 text-foreground/70">{client.phone || "—"}</td>
                 <td className="px-4 py-3 text-foreground/70">{client.email || "—"}</td>
                 <td className="px-4 py-3 text-foreground/50">
-                  {client.uon_created_at ? new Date(client.uon_created_at).toLocaleDateString("ru-RU") : "—"}
+                  {new Date(client.synced_at).toLocaleDateString("ru-RU")}
                 </td>
               </tr>
             ))}
