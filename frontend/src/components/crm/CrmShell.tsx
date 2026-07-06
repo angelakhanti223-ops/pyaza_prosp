@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Columns3, Inbox, LayoutDashboard, LogOut } from "lucide-react";
+import { Columns3, Inbox, LayoutDashboard, LogOut, RefreshCw } from "lucide-react";
+import { triggerUonSync } from "@/lib/crmApi";
 import { useCrmAuth } from "./CrmAuthProvider";
 
 const NAV = [
@@ -15,10 +17,26 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useCrmAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   async function handleLogout() {
     await logout();
     router.replace("/crm/login");
+  }
+
+  async function handleUonSync() {
+    setSyncing(true);
+    setSyncMessage("");
+    try {
+      await triggerUonSync();
+      setSyncMessage("Синхронизация запущена");
+    } catch {
+      setSyncMessage("Не удалось запустить синхронизацию");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMessage(""), 4000);
+    }
   }
 
   return (
@@ -53,6 +71,19 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center justify-between border-b border-black/5 bg-white px-6 py-3">
           <div />
           <div className="flex items-center gap-4">
+            {user?.is_head && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleUonSync}
+                  disabled={syncing}
+                  className="flex items-center gap-2 rounded-full border border-navy/15 px-4 py-2 text-xs font-semibold text-navy transition-colors hover:bg-blue-light disabled:opacity-60"
+                >
+                  <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+                  {syncing ? "Синхронизация…" : "Синхронизировать с U-ON"}
+                </button>
+                {syncMessage && <span className="text-xs text-foreground/50">{syncMessage}</span>}
+              </div>
+            )}
             <div className="text-right">
               <p className="text-sm font-semibold text-navy">{user?.full_name}</p>
               <p className="text-[11px] text-foreground/50">

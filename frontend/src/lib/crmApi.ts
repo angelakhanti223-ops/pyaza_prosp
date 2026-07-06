@@ -203,3 +203,7 @@ export async function uploadLeadAttachment(id: number, file: File): Promise<Lead
 export function mediaUrl(path: string): string {
   return path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
 }
+
+export async function triggerUonSync(): Promise<{ detail: string }> {
+  return apiJson<{ detail: string }>("/api/crm/integrations/uon-sync/", { method: "POST" });
+}

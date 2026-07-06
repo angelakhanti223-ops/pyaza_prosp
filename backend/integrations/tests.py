@@ -100,3 +100,35 @@ class SyncAllUonRemindersTests(TestCase):
         sync_all_uon_reminders()
 
         mock_delay.assert_called_once_with(with_ticket.id)
+
+
+class UonSyncTriggerViewTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='manager', password='x', role=User.Role.MANAGER)
+        self.head = User.objects.create_user(username='head', password='x', role=User.Role.HEAD)
+        self.admin = User.objects.create_superuser(username='admin', password='x', email='a@a.com')
+
+    @patch('integrations.views.sync_all_uon_reminders.delay')
+    def test_manager_forbidden(self, mock_delay):
+        self.client.force_login(self.manager)
+        response = self.client.post('/api/crm/integrations/uon-sync/')
+        self.assertEqual(response.status_code, 403)
+        mock_delay.assert_not_called()
+
+    @patch('integrations.views.sync_all_uon_reminders.delay')
+    def test_head_can_trigger_sync(self, mock_delay):
+        self.client.force_login(self.head)
+        response = self.client.post('/api/crm/integrations/uon-sync/')
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once()
+
+    @patch('integrations.views.sync_all_uon_reminders.delay')
+    def test_admin_can_trigger_sync(self, mock_delay):
+        self.client.force_login(self.admin)
+        response = self.client.post('/api/crm/integrations/uon-sync/')
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once()
+
+    def test_anonymous_rejected(self):
+        response = self.client.post('/api/crm/integrations/uon-sync/')
+        self.assertEqual(response.status_code, 403)
