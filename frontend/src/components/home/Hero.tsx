@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default function Hero({ image }: Props) {
-  const heroImage = siteImageUrl(image ?? null) ?? "https://picsum.photos/seed/sletat-hero/1000/760";
+  const heroImage = siteImageUrl(image ?? null) ?? "/placeholders/hero.svg";
 
   return (
     <section className="overflow-hidden bg-gradient-to-b from-blue-light to-white">
@@ -44,10 +44,10 @@ export default function Hero({ image }: Props) {
 
           <div className="mt-8 flex items-center gap-3">
             <div className="flex -space-x-3">
-              {[12, 34, 56].map((seed) => (
+              {[1, 2, 3].map((seed) => (
                 <Image
                   key={seed}
-                  src={`https://picsum.photos/seed/sletat-avatar-${seed}/64/64`}
+                  src={`/placeholders/avatar-${seed}.svg`}
                   alt="Клиент турагентства Слетать.ру, вернувшийся из путешествия"
                   width={40}
                   height={40}

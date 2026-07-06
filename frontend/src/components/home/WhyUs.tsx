@@ -48,7 +48,7 @@ export default function WhyUs({ images }: Props) {
       <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
         {CARDS.map((card) => {
           const managed = siteImageUrl(images?.[card.key] ?? null);
-          const image = managed ?? `https://picsum.photos/seed/${card.seed}/400/300`;
+          const image = managed ?? `/placeholders/why-us/${card.seed.replace("sletat-", "")}.svg`;
           return (
             <div
               key={card.seed}

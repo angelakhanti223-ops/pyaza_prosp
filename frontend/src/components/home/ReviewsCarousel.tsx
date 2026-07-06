@@ -8,19 +8,19 @@ const REVIEWS = [
   {
     name: "Ольга",
     city: "г. Пенза",
-    seed: "sletat-review-1",
+    avatar: 1,
     text: "Брали тур в Турцию через Слетать.ру — идеально подобрали отель, всё чётко организовано. Спасибо за заботу и внимание!",
   },
   {
     name: "Дмитрий",
     city: "г. Пенза",
-    seed: "sletat-review-2",
+    avatar: 2,
     text: "Помогли выбрать круиз для всей семьи — учли все пожелания, ответили на все вопросы. Поедем ещё не раз.",
   },
   {
     name: "Анна",
     city: "г. Пенза",
-    seed: "sletat-review-3",
+    avatar: 3,
     text: "Очень внимательные менеджеры, всегда на связи. Отдых прошёл без единой заминки.",
   },
 ];
@@ -47,7 +47,7 @@ export default function ReviewsCarousel() {
 
       <div className="mt-3 flex flex-1 items-start gap-3">
         <Image
-          src={`https://picsum.photos/seed/${review.seed}/72/72`}
+          src={`/placeholders/avatar-${review.avatar}.svg`}
           alt={review.name}
           width={36}
           height={36}

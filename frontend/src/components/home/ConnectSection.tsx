@@ -13,7 +13,7 @@ type Props = {
 
 export default function ConnectSection({ officeImage }: Props) {
   const managedOfficeImage = siteImageUrl(officeImage ?? null);
-  const officePhoto = managedOfficeImage ?? "https://picsum.photos/seed/sletat-office/400/260";
+  const officePhoto = managedOfficeImage ?? "/placeholders/office.svg";
 
   return (
     <section className="bg-blue-light/50 py-16">

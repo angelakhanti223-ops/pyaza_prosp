@@ -4,7 +4,7 @@ import { mediaUrl, type ArticleListItem } from "@/lib/articlesApi";
 
 export default function ArticleCard({ article }: { article: ArticleListItem }) {
   const backendImage = mediaUrl(article.featured_image);
-  const image = backendImage ?? `https://picsum.photos/seed/article-${article.id}/500/340`;
+  const image = backendImage ?? "/placeholders/article.svg";
 
   return (
     <Link
@@ -19,8 +19,7 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover"
           // The Next.js image optimizer refuses to fetch from private/loopback IPs
-          // (SSRF protection) for our own backend media, and picsum.photos blocks
-          // fetches from datacenter IPs — so skip optimization for both.
+          // (SSRF protection) for our own backend media, so skip optimization for it.
           unoptimized
         />
       </div>
