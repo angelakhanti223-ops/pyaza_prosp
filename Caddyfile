@@ -1,0 +1,32 @@
+{$DOMAIN} {
+	# Django doesn't serve /media itself when DEBUG=False, so Caddy serves it
+	# directly from the shared backend_media volume — faster than proxying
+	# binary files through Gunicorn, and doesn't require Django to do it at all.
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
+
+	# /static is Django admin/DRF/ckeditor assets — WhiteNoise serves these
+	# efficiently from inside the Gunicorn process, so this stays proxied
+	# (full /static prefix preserved, unlike /media above).
+	handle /static/* {
+		reverse_proxy backend:8000
+	}
+	handle /admin* {
+		reverse_proxy backend:8000
+	}
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /ckeditor5/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else: the Next.js site (public pages + /crm).
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	encode gzip
+}
