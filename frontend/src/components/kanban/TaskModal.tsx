@@ -32,6 +32,7 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
   const [leadQuery, setLeadQuery] = useState(task?.lead_name ?? "");
   const [leadResults, setLeadResults] = useState<LeadListItem[]>([]);
   const [leadId, setLeadId] = useState<number | null>(task?.lead ?? null);
+  const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +71,7 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           deadline: deadlineIso,
+          is_recurring: isRecurring,
         });
       } else {
         await createTask({
@@ -79,6 +81,7 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           deadline: deadlineIso,
+          is_recurring: isRecurring,
         });
       }
       onSaved();
@@ -168,6 +171,16 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
             onChange={(e) => setDeadline(e.target.value)}
             className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
           />
+
+          <label className="flex items-center gap-2 text-sm text-foreground/70">
+            <input
+              type="checkbox"
+              checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              className="h-4 w-4 rounded border-black/20"
+            />
+            Ежедневная задача (при переносе в последнюю колонку создаётся копия на завтра)
+          </label>
 
           <div className="relative">
             <input

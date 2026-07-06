@@ -20,14 +20,17 @@ class TaskSerializer(serializers.ModelSerializer):
         source='assignee', queryset=User.objects.all(), write_only=True, required=False, allow_null=True,
     )
     lead_name = serializers.CharField(source='lead.name', read_only=True, default=None)
+    kind = serializers.ReadOnlyField()
+    priority = serializers.ReadOnlyField()
 
     class Meta:
         model = Task
         fields = [
             'id', 'title', 'description', 'column', 'assignee', 'assignee_id',
-            'lead', 'lead_name', 'deadline', 'order', 'created_at', 'updated_at',
+            'lead', 'lead_name', 'deadline', 'is_recurring', 'kind', 'priority',
+            'order', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'order', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'order', 'created_at', 'updated_at', 'kind', 'priority']
 
 
 class TaskUpdateSerializer(serializers.ModelSerializer):
@@ -39,7 +42,7 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'assignee_id', 'lead', 'deadline']
+        fields = ['title', 'description', 'assignee_id', 'lead', 'deadline', 'is_recurring']
 
 
 class TaskMoveSerializer(serializers.Serializer):

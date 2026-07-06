@@ -2,8 +2,8 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Link2 } from "lucide-react";
-import type { KanbanTask } from "@/lib/kanbanApi";
+import { AlertTriangle, Flame, Link2, Repeat } from "lucide-react";
+import type { KanbanTask, TaskKind } from "@/lib/kanbanApi";
 
 function deadlineStatus(deadline: string | null): "overdue" | "soon" | "normal" | null {
   if (!deadline) return null;
@@ -12,6 +12,12 @@ function deadlineStatus(deadline: string | null): "overdue" | "soon" | "normal" 
   if (diffMs < 24 * 60 * 60 * 1000) return "soon";
   return "normal";
 }
+
+const KIND_STYLES: Record<TaskKind, string> = {
+  lead: "border-l-4 border-l-sky-400 bg-sky-50",
+  appeal: "border-l-4 border-l-indigo-400 bg-indigo-50",
+  general: "border-l-4 border-l-yellow-400 bg-yellow-50",
+};
 
 export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -33,7 +39,7 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="cursor-grab rounded-xl border border-black/5 bg-white p-3 text-sm shadow-sm active:cursor-grabbing"
+      className={`cursor-grab rounded-xl border border-black/5 p-3 text-sm shadow-sm active:cursor-grabbing ${KIND_STYLES[task.kind]}`}
     >
       <p className="font-medium text-navy">{task.title}</p>
       {task.lead_name && (
@@ -41,6 +47,18 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
           <Link2 size={12} />
           {task.lead_name}
         </p>
+      )}
+      {task.priority === "urgent_important" && (
+        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+          <Flame size={10} />
+          Срочно · Важно
+        </span>
+      )}
+      {task.priority === "important" && (
+        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+          <Repeat size={10} />
+          Важно · не срочно
+        </span>
       )}
       <div className="mt-2 flex items-center justify-between">
         <span className="text-xs text-foreground/50">{task.assignee?.full_name ?? "Не назначен"}</span>

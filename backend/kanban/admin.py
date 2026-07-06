@@ -11,6 +11,6 @@ class KanbanColumnAdmin(admin.ModelAdmin):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'column', 'assignee', 'lead', 'deadline', 'order')
-    list_filter = ('column', 'assignee')
+    list_display = ('title', 'column', 'assignee', 'lead', 'is_recurring', 'deadline', 'order')
+    list_filter = ('column', 'assignee', 'is_recurring')
     search_fields = ('title', 'description')

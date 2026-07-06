@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.db.models import F
 
@@ -8,6 +10,24 @@ def next_order_in_column(column: KanbanColumn) -> int:
     """Order value that appends a new task to the end of `column`."""
     last = Task.objects.filter(column=column).order_by('-order').first()
     return (last.order + 1) if last else 0
+
+
+def _recreate_recurring_task(task: Task) -> None:
+    """Spawns tomorrow's copy of a daily task once its current instance reaches
+    the last column — keeps the same title/assignee/lead, shifts the deadline by a day."""
+    first_column = KanbanColumn.objects.order_by('order').first()
+    if first_column is None:
+        return
+    Task.objects.create(
+        title=task.title,
+        description=task.description,
+        column=first_column,
+        assignee=task.assignee,
+        lead=task.lead,
+        deadline=(task.deadline + timedelta(days=1)) if task.deadline else None,
+        is_recurring=True,
+        order=next_order_in_column(first_column),
+    )
 
 
 def reposition_task(task: Task, target_column: KanbanColumn, target_order: int):
@@ -33,3 +53,12 @@ def reposition_task(task: Task, target_column: KanbanColumn, target_order: int):
         task.column = target_column
         task.order = target_order
         task.save(update_fields=['column', 'order'])
+
+        last_column = KanbanColumn.objects.order_by('-order').first()
+        if (
+            task.is_recurring
+            and last_column is not None
+            and target_column.id == last_column.id
+            and old_column_id != last_column.id
+        ):
+            _recreate_recurring_task(task)

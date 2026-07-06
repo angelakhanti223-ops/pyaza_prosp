@@ -8,6 +8,9 @@ export type KanbanColumn = {
   order: number;
 };
 
+export type TaskKind = "lead" | "appeal" | "general";
+export type TaskPriority = "urgent_important" | "important" | null;
+
 export type KanbanTask = {
   id: number;
   title: string;
@@ -17,6 +20,9 @@ export type KanbanTask = {
   lead: number | null;
   lead_name: string | null;
   deadline: string | null;
+  is_recurring: boolean;
+  kind: TaskKind;
+  priority: TaskPriority;
   order: number;
   created_at: string;
   updated_at: string;
@@ -29,6 +35,7 @@ export type TaskInput = {
   assignee_id?: number | null;
   lead?: number | null;
   deadline?: string | null;
+  is_recurring?: boolean;
 };
 
 function getCookie(name: string): string | null {

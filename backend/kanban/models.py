@@ -29,6 +29,10 @@ class Task(models.Model):
         'ID напоминания U-ON', max_length=64, unique=True, null=True, blank=True,
         help_text='Заполняется автоматически при синхронизации напоминаний из U-ON — не редактировать вручную.',
     )
+    is_recurring = models.BooleanField(
+        'Ежедневная (повторяющаяся)', default=False,
+        help_text='При переносе в последнюю колонку доски автоматически создаётся копия на завтра.',
+    )
     deadline = models.DateTimeField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -39,3 +43,22 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def kind(self) -> str:
+        """Тип задачи для цветовой маркировки доски: заявка / обращение / общая."""
+        if self.uon_reminder_id:
+            return 'appeal'
+        if self.lead_id:
+            return 'lead'
+        return 'general'
+
+    @property
+    def priority(self) -> str | None:
+        """Автоматическая бирка срочности — заявки и обращения всегда горят, ежедневные
+        задачи важны, но не срочны, остальные общие задачи без метки."""
+        if self.kind in ('lead', 'appeal'):
+            return 'urgent_important'
+        if self.is_recurring:
+            return 'important'
+        return None
