@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'integrations',
     'emailing',
     'sitecontent',
+    'telegrambot',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -171,6 +172,14 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
+# Периодические задачи (Celery Beat) — сейчас только подтяжка напоминаний из U-ON.
+CELERY_BEAT_SCHEDULE = {
+    'sync-uon-reminders': {
+        'task': 'integrations.tasks.sync_all_uon_reminders',
+        'schedule': 600.0,  # каждые 10 минут
+    },
+}
+
 
 # Email (ТЗ 9). In mock mode (default until an SMTP account exists — see
 # emailing/emails.py) messages are printed to the console instead of sent
@@ -204,6 +213,14 @@ BACKEND_URL = env('BACKEND_URL', default='http://localhost:8000')
 UON_MOCK_MODE = env.bool('UON_MOCK_MODE', default=True)
 UON_API_BASE_URL = env('UON_API_BASE_URL', default='https://api.u-on.ru')
 UON_API_KEY = env('UON_API_KEY', default='')
+
+
+# Telegram bot (менеджерские команды и уведомления о назначении задач/заявок —
+# см. telegrambot/). Отключён по умолчанию — бот безопасно отсутствует, пока
+# не создан токен через @BotFather (см. TELEGRAM_BOT_TOKEN в .env).
+TELEGRAM_BOT_ENABLED = env.bool('TELEGRAM_BOT_ENABLED', default=False)
+TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_API_BASE_URL = env('TELEGRAM_API_BASE_URL', default='https://api.telegram.org')
 
 
 LOGGING = {

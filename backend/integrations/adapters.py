@@ -18,6 +18,10 @@ class BaseUonAdapter:
     def create_ticket(self, payload: dict) -> dict:
         raise NotImplementedError
 
+    def list_reminders(self, request_id: str) -> list:
+        """Напоминания/дела по заявке (U-ON: GET /{key}/reminder/{request_id}.json)."""
+        raise NotImplementedError
+
 
 class MockUonAdapter(BaseUonAdapter):
     """Used until a real U-ON API key is issued. Simulates a successful ticket creation."""
@@ -28,6 +32,9 @@ class MockUonAdapter(BaseUonAdapter):
             'mock': True,
             'echo': payload,
         }
+
+    def list_reminders(self, request_id: str) -> list:
+        return []
 
 
 class RealUonAdapter(BaseUonAdapter):
@@ -49,6 +56,21 @@ class RealUonAdapter(BaseUonAdapter):
         except requests.RequestException as exc:
             raise UonAdapterError(str(exc)) from exc
         return response.json()
+
+    def list_reminders(self, request_id: str) -> list:
+        # U-ON embeds the API key directly in the URL path (confirmed against
+        # the live API), not as a Bearer header — unlike create_ticket above,
+        # which was written before a real key existed and hasn't been verified
+        # against the live API yet.
+        try:
+            response = requests.get(
+                f'{self.base_url}/{self.api_key}/reminder/{request_id}.json',
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        return response.json().get('reminder', [])
 
 
 def get_uon_adapter() -> BaseUonAdapter:

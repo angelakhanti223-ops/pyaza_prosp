@@ -56,6 +56,34 @@ services:
       redis:
         condition: service_healthy
 
+  celery_beat:
+    build: ./backend
+    restart: unless-stopped
+    command: celery -A config beat -l info
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  telegram_bot:
+    build: ./backend
+    restart: unless-stopped
+    command: python manage.py run_telegram_bot
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   frontend:
     build: ./frontend
     restart: unless-stopped

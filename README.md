@@ -36,13 +36,31 @@ backend/            Django-проект
   leads/            заявки и воронка (мини-CRM)
   articles/         модуль статей (CMS/блог)
   kanban/           канбан-доска задач
-  integrations/     адаптер интеграции с U-ON
+  integrations/     адаптер интеграции с U-ON, подтяжка напоминаний в канбан
   emailing/         транзакционные письма и рассылки
+  telegrambot/      Telegram-бот для менеджеров (задачи/заявки, уведомления)
+  sitecontent/      управляемые изображения сайта
 frontend/           Next.js приложение (публичный сайт)
 docs/               исходное ТЗ
 docker-compose.yml
 .env.example
 ```
+
+## Telegram-бот для менеджеров
+
+Бот даёт менеджеру команды `/tasks`, `/newtask`, `/done`, `/lead`, `/sync_uon` прямо в Telegram
+и присылает уведомления о назначении задачи или заявки. Отключён по умолчанию
+(`TELEGRAM_BOT_ENABLED=False`) — сервис `telegram_bot` при этом просто спит, не пытаясь
+переподключаться. Чтобы включить:
+
+1. Создайте бота через [@BotFather](https://t.me/BotFather), получите токен.
+2. В `.env` укажите `TELEGRAM_BOT_ENABLED=True` и `TELEGRAM_BOT_TOKEN=<токен>`.
+3. Перезапустите сервис: `docker compose up -d --build telegram_bot`.
+4. В Django admin создайте `TelegramAccount` для менеджера (без `chat_id`) — система
+   сгенерирует `link_code`; менеджер отправляет боту `/start <код>`, чтобы привязать аккаунт.
+
+Периодическая синхронизация напоминаний из U-ON в канбан (`celery_beat`, каждые 10 минут)
+работает независимо от бота — не требует включённого `TELEGRAM_BOT_ENABLED`.
 
 ## Персональные данные и 152-ФЗ
 

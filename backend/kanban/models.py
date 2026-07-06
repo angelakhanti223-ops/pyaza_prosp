@@ -25,6 +25,10 @@ class Task(models.Model):
     lead = models.ForeignKey(
         'leads.Lead', on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks',
     )
+    uon_reminder_id = models.CharField(
+        'ID напоминания U-ON', max_length=64, unique=True, null=True, blank=True,
+        help_text='Заполняется автоматически при синхронизации напоминаний из U-ON — не редактировать вручную.',
+    )
     deadline = models.DateTimeField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.permissions import is_head
+from telegrambot.tasks import notify_lead_assignment
 
 from .models import Direction, Lead, LeadStatusHistory
 from .serializers import (
@@ -92,6 +93,7 @@ class LeadViewSet(
     def partial_update(self, request, *args, **kwargs):
         lead = self.get_object()
         old_status = lead.status
+        old_assigned_manager_id = lead.assigned_manager_id
 
         serializer = self.get_serializer(lead, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -106,6 +108,9 @@ class LeadViewSet(
             LeadStatusHistory.objects.create(
                 lead=lead, old_status=old_status, new_status=new_status, changed_by=request.user,
             )
+
+        if lead.assigned_manager_id and lead.assigned_manager_id != old_assigned_manager_id:
+            notify_lead_assignment.delay(lead.id)
 
         # get_object() ran against a queryset with prefetch_related, so the cached
         # related objects (status_history, comments, ...) are stale after the write above.

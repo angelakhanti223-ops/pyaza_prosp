@@ -10,3 +10,4 @@ Pillow>=10.4,<10.5
 django-ckeditor-5>=0.2.15,<0.3
 gunicorn>=22.0,<22.1
 whitenoise>=6.7,<6.8
+python-telegram-bot>=21.0,<21.1
