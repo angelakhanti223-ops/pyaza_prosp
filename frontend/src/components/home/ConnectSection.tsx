@@ -68,7 +68,7 @@ export default function ConnectSection({ officeImage }: Props) {
                 src={officePhoto}
                 alt="Наш офис в Пензе"
                 fill
-                unoptimized={Boolean(managedOfficeImage)}
+                unoptimized
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 className="object-cover"
               />

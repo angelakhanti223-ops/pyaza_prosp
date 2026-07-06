@@ -19,10 +19,9 @@ export default function ArticleCard({ article }: { article: ArticleListItem }) {
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover"
           // The Next.js image optimizer refuses to fetch from private/loopback IPs
-          // (SSRF protection) — our own backend is unreachable from the frontend
-          // container via the public "localhost" hostname it must use for the
-          // browser's sake, so skip optimization for our own media.
-          unoptimized={Boolean(backendImage)}
+          // (SSRF protection) for our own backend media, and picsum.photos blocks
+          // fetches from datacenter IPs — so skip optimization for both.
+          unoptimized
         />
       </div>
       <div className="p-4">

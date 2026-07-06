@@ -51,6 +51,7 @@ export default function Hero({ image }: Props) {
                   alt="Клиент турагентства Слетать.ру, вернувшийся из путешествия"
                   width={40}
                   height={40}
+                  unoptimized
                   className="rounded-full border-2 border-white object-cover"
                 />
               ))}
@@ -68,7 +69,7 @@ export default function Hero({ image }: Props) {
               alt="Пляжный отдых — тур, подобранный агентством Слетать.ру"
               fill
               priority
-              unoptimized={Boolean(image)}
+              unoptimized
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />

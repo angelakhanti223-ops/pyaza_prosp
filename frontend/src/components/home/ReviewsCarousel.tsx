@@ -51,6 +51,7 @@ export default function ReviewsCarousel() {
           alt={review.name}
           width={36}
           height={36}
+          unoptimized
           className="rounded-full object-cover"
         />
         <div>
