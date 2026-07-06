@@ -15,7 +15,14 @@ MAX_RETRIES = 5
 def _parse_uon_datetime(value):
     if not value:
         return None
-    naive = dt.strptime(value, '%Y-%m-%d %H:%M')
+    try:
+        naive = dt.strptime(value, '%Y-%m-%d %H:%M')
+    except ValueError:
+        # Список-эндпоинты (request/deal/client) не проверялись на живом API — формат
+        # даты в них может отличаться от подтверждённого формата reminder. Не роняем
+        # синхронизацию из-за одного нераспознанного поля.
+        logger.warning('U-ON: не удалось разобрать дату %r', value)
+        return None
     return timezone.make_aware(naive, timezone.get_current_timezone())
 
 
@@ -143,3 +150,88 @@ def sync_all_uon_reminders():
     for lead_id in lead_ids:
         pull_uon_reminders_for_lead.delay(lead_id)
     logger.info('U-ON reminders: запущена синхронизация для %s заявок', len(lead_ids))
+
+
+def _uon_item_id(item: dict) -> str:
+    return str(item.get('id') or item.get('u_id') or '')
+
+
+@shared_task
+def sync_uon_requests():
+    """Полная синхронизация read-only зеркала заявок из U-ON (раздел «Заявки» в CRM)."""
+    from .models import UonRequest
+
+    items = get_uon_adapter().list_requests()
+    synced = 0
+    for item in items:
+        uon_id = _uon_item_id(item)
+        if not uon_id:
+            continue
+        UonRequest.objects.update_or_create(
+            uon_id=uon_id,
+            defaults={
+                'name': item.get('name') or item.get('u_name', ''),
+                'phone': item.get('phone', ''),
+                'email': item.get('email', ''),
+                'status_name': item.get('status_name') or item.get('status', ''),
+                'manager_name': item.get('manager_name') or item.get('manager', ''),
+                'source_name': item.get('source_name') or item.get('source', ''),
+                'comment': item.get('comment', ''),
+                'uon_created_at': _parse_uon_datetime(item.get('u_add_date') or item.get('created_at')),
+                'raw_data': item,
+            },
+        )
+        synced += 1
+    logger.info('U-ON: синхронизировано заявок — %s', synced)
+
+
+@shared_task
+def sync_uon_deals():
+    """Полная синхронизация read-only зеркала обращений/сделок из U-ON (раздел «Обращения»)."""
+    from .models import UonDeal
+
+    items = get_uon_adapter().list_deals()
+    synced = 0
+    for item in items:
+        uon_id = _uon_item_id(item)
+        if not uon_id:
+            continue
+        UonDeal.objects.update_or_create(
+            uon_id=uon_id,
+            defaults={
+                'name': item.get('name', ''),
+                'status_name': item.get('status_name') or item.get('status', ''),
+                'manager_name': item.get('manager_name') or item.get('manager', ''),
+                'amount': item.get('amount') or None,
+                'request_uon_id': str(item.get('request_id') or item.get('u_request_id') or ''),
+                'uon_created_at': _parse_uon_datetime(item.get('u_add_date') or item.get('created_at')),
+                'raw_data': item,
+            },
+        )
+        synced += 1
+    logger.info('U-ON: синхронизировано обращений — %s', synced)
+
+
+@shared_task
+def sync_uon_clients():
+    """Полная синхронизация read-only зеркала клиентов из U-ON (раздел «Клиенты»)."""
+    from .models import UonClient
+
+    items = get_uon_adapter().list_clients()
+    synced = 0
+    for item in items:
+        uon_id = _uon_item_id(item)
+        if not uon_id:
+            continue
+        UonClient.objects.update_or_create(
+            uon_id=uon_id,
+            defaults={
+                'name': item.get('name', ''),
+                'phone': item.get('phone', ''),
+                'email': item.get('email', ''),
+                'uon_created_at': _parse_uon_datetime(item.get('u_add_date') or item.get('created_at')),
+                'raw_data': item,
+            },
+        )
+        synced += 1
+    logger.info('U-ON: синхронизировано клиентов — %s', synced)

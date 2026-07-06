@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Columns3, Inbox, LayoutDashboard, LogOut, RefreshCw } from "lucide-react";
+import { Columns3, Inbox, LayoutDashboard, LogOut, MessageSquare, RefreshCw, Users } from "lucide-react";
 import { triggerUonSync } from "@/lib/crmApi";
 import { useCrmAuth } from "./CrmAuthProvider";
 
 const NAV = [
   { href: "/crm/dashboard", label: "Дашборд", icon: LayoutDashboard },
   { href: "/crm/leads", label: "Заявки", icon: Inbox },
+  { href: "/crm/appeals", label: "Обращения", icon: MessageSquare },
+  { href: "/crm/clients", label: "Клиенты", icon: Users },
   { href: "/crm/kanban", label: "Канбан", icon: Columns3 },
 ];
 

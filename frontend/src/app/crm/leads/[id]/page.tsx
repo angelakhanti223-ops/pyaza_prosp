@@ -326,6 +326,29 @@ export default function CrmLeadDetailPage() {
             </ul>
           </div>
 
+          {lead.uon_deal && (
+            <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+              <h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2>
+              <dl className="flex flex-col gap-2 text-sm">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-foreground/50">Статус в U-ON</dt>
+                  <dd className="font-medium text-navy">{lead.uon_deal.status_name || "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-foreground/50">Менеджер в U-ON</dt>
+                  <dd className="text-navy">{lead.uon_deal.manager_name || "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-foreground/50">Сумма</dt>
+                  <dd className="text-navy">{lead.uon_deal.amount ? `${lead.uon_deal.amount} ₽` : "—"}</dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-xs text-foreground/40">
+                Обновлено: {new Date(lead.uon_deal.synced_at).toLocaleString("ru-RU")}
+              </p>
+            </div>
+          )}
+
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2>
             <ul className="flex flex-col gap-2">

@@ -22,6 +22,18 @@ class BaseUonAdapter:
         """Напоминания/дела по заявке (U-ON: GET /{key}/reminder/{request_id}.json)."""
         raise NotImplementedError
 
+    def list_requests(self) -> list:
+        """Список заявок (U-ON: GET /{key}/request.json)."""
+        raise NotImplementedError
+
+    def list_deals(self) -> list:
+        """Список обращений/сделок (U-ON: GET /{key}/deal.json)."""
+        raise NotImplementedError
+
+    def list_clients(self) -> list:
+        """Список клиентов (U-ON: GET /{key}/client.json)."""
+        raise NotImplementedError
+
 
 class MockUonAdapter(BaseUonAdapter):
     """Used until a real U-ON API key is issued. Simulates a successful ticket creation."""
@@ -34,6 +46,15 @@ class MockUonAdapter(BaseUonAdapter):
         }
 
     def list_reminders(self, request_id: str) -> list:
+        return []
+
+    def list_requests(self) -> list:
+        return []
+
+    def list_deals(self) -> list:
+        return []
+
+    def list_clients(self) -> list:
         return []
 
 
@@ -71,6 +92,30 @@ class RealUonAdapter(BaseUonAdapter):
         except requests.RequestException as exc:
             raise UonAdapterError(str(exc)) from exc
         return response.json().get('reminder', [])
+
+    def _list_resource(self, resource: str) -> list:
+        # Same URL shape confirmed for /reminder/{id}.json — the per-id endpoint
+        # for /request/{id} is confirmed to exist too, but the plain list form
+        # used here (no id) hasn't been tried against the live API yet. Adjust
+        # the path/response key below once a real response comes back.
+        try:
+            response = requests.get(f'{self.base_url}/{self.api_key}/{resource}.json', timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        return data.get(resource, [])
+
+    def list_requests(self) -> list:
+        return self._list_resource('request')
+
+    def list_deals(self) -> list:
+        return self._list_resource('deal')
+
+    def list_clients(self) -> list:
+        return self._list_resource('client')
 
 
 def get_uon_adapter() -> BaseUonAdapter:
