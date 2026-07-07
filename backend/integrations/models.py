@@ -45,11 +45,40 @@ class UonRequestRecord(UonMirrorRecord):
         return f'{self.client_name} ({self.client_phone})' if self.client_name else f'Заявка U-ON #{self.uon_id}'
 
 
+class UonLeadRecord(UonMirrorRecord):
+    """Обращение — в терминах U-ON это «лид» (/lead), самая ранняя стадия контакта
+    (подтверждено на живом API: GET /{key}/lead/{id}.json). Отдельная сущность от
+    «заявки» (/request) со своей последовательностью ID — не путать: id и id_system
+    у лида расходятся (смещение не постоянное), у заявки обычно совпадают.
+    Один лид может позже превратиться в заявку (когда менеджер начинает её вести
+    в U-ON) — это уже другой ID в /request, однозначной связи между ними в API нет."""
+
+    client_id = models.CharField('ID клиента в U-ON', max_length=64, blank=True)
+    client_name = models.CharField('Имя клиента', max_length=255, blank=True)
+    client_phone = models.CharField('Телефон', max_length=32, blank=True)
+    client_email = models.EmailField('Email', blank=True)
+    status_id = models.CharField('ID статуса в U-ON', max_length=20, blank=True)
+    status_name = models.CharField('Статус в U-ON', max_length=100, blank=True)
+    manager_name = models.CharField('Менеджер в U-ON', max_length=255, blank=True)
+    source_name = models.CharField('Источник', max_length=100, blank=True)
+    notes = models.TextField('Заметки', blank=True)
+    is_archive = models.BooleanField('В архиве', default=False)
+    uon_created_at = models.DateTimeField('Создано в U-ON', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'обращение U-ON'
+        verbose_name_plural = 'обращения U-ON'
+        ordering = ['-uon_created_at', '-synced_at']
+
+    def __str__(self):
+        return f'{self.client_name} ({self.client_phone})' if self.client_name else f'Обращение U-ON #{self.uon_id}'
+
+
 class UonClient(UonMirrorRecord):
     """Карточка клиента — в этом API нет отдельного /client-эндпоинта, поэтому
-    запись собирается из client_*-полей, уже вложенных в объект заявки, при
-    каждой синхронизации UonRequestRecord (см. integrations.tasks.sync_uon_request).
-    `uon_id` здесь — это client_id из U-ON, а не id заявки."""
+    запись собирается из client_*-полей, уже вложенных в объект заявки/обращения,
+    при каждой синхронизации UonRequestRecord/UonLeadRecord. `uon_id` здесь —
+    это client_id из U-ON, а не id заявки/обращения."""
 
     name = models.CharField('Имя', max_length=255, blank=True)
     phone = models.CharField('Телефон', max_length=32, blank=True)

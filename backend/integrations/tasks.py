@@ -181,7 +181,7 @@ def sync_uon_request(self, request_id: str):
     data = get_uon_adapter().get_request(request_id)
     if not data:
         logger.warning('U-ON: заявка %s не найдена при синхронизации', request_id)
-        return
+        return False
 
     client_name = f"{data.get('client_surname', '')} {data.get('client_name', '')}".strip()
     client_phone = data.get('client_phone_mobile') or data.get('client_phone', '')
@@ -219,18 +219,78 @@ def sync_uon_request(self, request_id: str):
         )
 
     logger.info('U-ON: заявка %s синхронизирована', request_id)
+    return True
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(UonAdapterError,),
+    retry_backoff=60,
+    retry_backoff_max=3600,
+    retry_jitter=True,
+    max_retries=MAX_RETRIES,
+)
+def sync_uon_lead(self, lead_id: str):
+    """Подтягивает/обновляет одно обращение (лид) из U-ON по его ID — источник
+    для read-only зеркала «Обращения» в CRM и для карточки клиента.
+
+    Вызывается либо вебхуком U-ON, либо вручную через sync_all_uon_leads."""
+    from .models import UonClient, UonLeadRecord
+
+    data = get_uon_adapter().get_lead(lead_id)
+    if not data:
+        logger.warning('U-ON: обращение %s не найдено при синхронизации', lead_id)
+        return False
+
+    client_name = f"{data.get('client_surname', '')} {data.get('client_name', '')}".strip()
+    client_phone = data.get('client_phone_mobile') or data.get('client_phone', '')
+    client_email = data.get('client_email', '')
+
+    UonLeadRecord.objects.update_or_create(
+        uon_id=str(data['id']),
+        defaults={
+            'client_id': str(data.get('client_id') or ''),
+            'client_name': client_name,
+            'client_phone': client_phone,
+            'client_email': client_email,
+            'status_id': str(data.get('status_id') or ''),
+            'status_name': data.get('status') or '',
+            'manager_name': data.get('manager_name') or '',
+            'source_name': data.get('source') or '',
+            'notes': data.get('notes') or '',
+            'is_archive': bool(data.get('is_archive')),
+            'uon_created_at': _parse_uon_datetime(data.get('dat_lead') or data.get('created_at')),
+            'raw_data': data,
+        },
+    )
+
+    client_id = data.get('client_id')
+    if client_id:
+        UonClient.objects.update_or_create(
+            uon_id=str(client_id),
+            defaults={
+                'name': client_name,
+                'phone': client_phone,
+                'email': client_email,
+                'raw_data': {k: v for k, v in data.items() if k.startswith('client_')},
+            },
+        )
+
+    logger.info('U-ON: обращение %s синхронизировано', lead_id)
+    return True
 
 
 @shared_task
-def sync_all_uon_requests():
-    """Ручная/периодическая синхронизация зеркала заявок — в API U-ON нет списочного
-    эндпоинта (GET /{key}/request.json отдаёт 404), поэтому обходим уже известные нам
-    ID (Lead.uon_ticket_id). Заявки, заведённые вручную прямо в U-ON и никогда не
-    привязанные к нашему Lead, этим способом не подтянуть — для них нужен вебхук
-    (UonWebhookView), который сработает при следующем изменении такой заявки."""
+def sync_all_uon_leads():
+    """Ручная/периодическая синхронизация зеркала обращений — в API U-ON нет
+    списочного эндпоинта, поэтому обходим уже известные нам ID (Lead.uon_ticket_id
+    — это ID именно U-ON-обращения/лида, см. docstring sync_lead_to_uon). Обращения,
+    заведённые вручную прямо в U-ON и никогда не привязанные к нашему Lead, этим
+    способом не подтянуть — для них нужен вебхук либо разовый импорт по диапазону
+    ID (management-команда backfill_uon)."""
     from leads.models import Lead
 
     ticket_ids = list(Lead.objects.exclude(uon_ticket_id='').values_list('uon_ticket_id', flat=True))
     for ticket_id in ticket_ids:
-        sync_uon_request.delay(ticket_id)
-    logger.info('U-ON: запущена синхронизация заявок для %s ID', len(ticket_ids))
+        sync_uon_lead.delay(ticket_id)
+    logger.info('U-ON: запущена синхронизация обращений для %s ID', len(ticket_ids))

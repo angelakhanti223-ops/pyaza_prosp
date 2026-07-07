@@ -1,11 +1,30 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-// В API U-ON нет отдельного ресурса "сделка" — вся воронка (status_id/status) и
-// данные клиента уже находятся прямо в объекте заявки (подтверждено на живом API).
+// "Заявка" в U-ON (/request) — рабочая сделка с полным пайплайном (статус,
+// бронирование, ...), появляется, когда менеджер начинает вести обращение.
 export type UonRequestRecord = {
   id: number;
   uon_id: string;
   reservation_number: string;
+  client_id: string;
+  client_name: string;
+  client_phone: string;
+  client_email: string;
+  status_id: string;
+  status_name: string;
+  manager_name: string;
+  source_name: string;
+  notes: string;
+  is_archive: boolean;
+  uon_created_at: string | null;
+  synced_at: string;
+};
+
+// "Обращение" в U-ON (/lead) — самая ранняя стадия контакта, отдельная сущность
+// от заявки со своей последовательностью ID.
+export type UonLeadRecord = {
+  id: number;
+  uon_id: string;
   client_id: string;
   client_name: string;
   client_phone: string;
@@ -43,9 +62,12 @@ async function listAll<T>(path: string): Promise<T[]> {
   return Array.isArray(data) ? data : data.results;
 }
 
-export function listUonRequests(params: { isArchive?: boolean } = {}): Promise<UonRequestRecord[]> {
-  const qs = params.isArchive === undefined ? "" : `?is_archive=${params.isArchive ? "1" : "0"}`;
-  return listAll<UonRequestRecord>(`/api/crm/uon/requests/${qs}`);
+export function listUonRequests(): Promise<UonRequestRecord[]> {
+  return listAll<UonRequestRecord>("/api/crm/uon/requests/");
+}
+
+export function listUonLeads(): Promise<UonLeadRecord[]> {
+  return listAll<UonLeadRecord>("/api/crm/uon/leads/");
 }
 
 export function listUonClients(): Promise<UonClientRecord[]> {

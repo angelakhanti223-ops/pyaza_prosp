@@ -326,29 +326,29 @@ export default function CrmLeadDetailPage() {
             </ul>
           </div>
 
-          {lead.uon_request && (
+          {lead.uon_lead && (
             <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-              <h2 className="mb-3 text-sm font-semibold text-navy">Заявка в U-ON</h2>
+              <h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2>
               <dl className="flex flex-col gap-2 text-sm">
                 <div className="flex justify-between gap-2">
                   <dt className="text-foreground/50">Статус в U-ON</dt>
-                  <dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd>
+                  <dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt className="text-foreground/50">Менеджер в U-ON</dt>
-                  <dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd>
+                  <dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-foreground/50">Номер брони</dt>
-                  <dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd>
+                  <dt className="text-foreground/50">Источник</dt>
+                  <dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt className="text-foreground/50">В архиве</dt>
-                  <dd className="text-navy">{lead.uon_request.is_archive ? "Да" : "Нет"}</dd>
+                  <dd className="text-navy">{lead.uon_lead.is_archive ? "Да" : "Нет"}</dd>
                 </div>
               </dl>
               <p className="mt-3 text-xs text-foreground/40">
-                Обновлено: {new Date(lead.uon_request.synced_at).toLocaleString("ru-RU")}
+                Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}
               </p>
             </div>
           )}

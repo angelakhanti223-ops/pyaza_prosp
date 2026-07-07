@@ -2,8 +2,8 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
-from integrations.models import UonRequestRecord, UonSyncLog
-from integrations.serializers import UonRequestRecordSerializer
+from integrations.models import UonLeadRecord, UonSyncLog
+from integrations.serializers import UonLeadRecordSerializer
 
 from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
 
@@ -128,7 +128,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     attachments = LeadAttachmentSerializer(many=True, read_only=True)
     tasks = LeadTaskSerializer(many=True, read_only=True)
     uon_sync_logs = LeadUonSyncLogSerializer(many=True, read_only=True)
-    uon_request = serializers.SerializerMethodField()
+    uon_lead = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -136,18 +136,19 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission', 'uon_ticket_id',
             'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
-            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_request',
+            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead',
         ]
 
-    def get_uon_request(self, obj):
-        """Данные заявки из U-ON-зеркала — если заявка уже синхронизирована (панель
+    def get_uon_lead(self, obj):
+        """Данные обращения из U-ON-зеркала — если заявка уже синхронизирована (панель
         на карточке заявки, не заменяет существующий рабочий процесс редактирования
-        Lead — см. integrations.models.UonRequestRecord про то, почему это тот же
-        объект, что и «обращение»/«сделка» в терминах U-ON)."""
+        Lead). Lead.uon_ticket_id — это ID обращения (lead) в U-ON, полученный при
+        отправке через sync_lead_to_uon/create_ticket (POST /lead/create.json), а
+        не ID заявки (request) — это разные сущности с разными ID в этом API."""
         if not obj.uon_ticket_id:
             return None
-        record = UonRequestRecord.objects.filter(uon_id=obj.uon_ticket_id).first()
-        return UonRequestRecordSerializer(record).data if record else None
+        record = UonLeadRecord.objects.filter(uon_id=obj.uon_ticket_id).first()
+        return UonLeadRecordSerializer(record).data if record else None
 
 
 class LeadUpdateSerializer(serializers.ModelSerializer):

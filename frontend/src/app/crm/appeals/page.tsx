@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listUonRequests, type UonRequestRecord } from "@/lib/uonApi";
+import { listUonLeads, type UonLeadRecord } from "@/lib/uonApi";
 
 export default function CrmAppealsPage() {
-  const [requests, setRequests] = useState<UonRequestRecord[]>([]);
+  const [leads, setLeads] = useState<UonLeadRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    listUonRequests({ isArchive: true })
+    listUonLeads()
       .then((data) => {
-        if (active) setRequests(data);
+        if (active) setLeads(data);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -27,9 +27,9 @@ export default function CrmAppealsPage() {
         <div>
           <h1 className="text-xl font-bold text-navy">Обращения</h1>
           <p className="mt-1 text-xs text-foreground/50">
-            Read-only зеркало архивных заявок из U-ON (в API U-ON нет отдельного ресурса «сделка» — вся воронка
-            хранится прямо в объекте заявки). Данные редактируются в U-ON, здесь только просмотр — обновляются
-            кнопкой «Синхронизировать с U-ON» вверху страницы или мгновенно вебхуком при изменении в U-ON.
+            Read-only зеркало обращений (лидов) из U-ON — самая ранняя стадия контакта, до того как менеджер начнёт
+            вести полноценную заявку. Данные редактируются в U-ON, здесь только просмотр — обновляются кнопкой
+            «Синхронизировать с U-ON» вверху страницы или мгновенно вебхуком при изменении в U-ON.
           </p>
         </div>
       </div>
@@ -42,24 +42,24 @@ export default function CrmAppealsPage() {
               <th className="px-4 py-3 font-medium">Телефон</th>
               <th className="px-4 py-3 font-medium">Статус в U-ON</th>
               <th className="px-4 py-3 font-medium">Менеджер</th>
-              <th className="px-4 py-3 font-medium">Номер брони</th>
+              <th className="px-4 py-3 font-medium">Источник</th>
               <th className="px-4 py-3 font-medium">Создано</th>
             </tr>
           </thead>
           <tbody>
-            {requests.map((req) => (
-              <tr key={req.id} className="border-b border-black/5 last:border-0 hover:bg-blue-light/20">
-                <td className="px-4 py-3 font-medium text-navy">{req.client_name || `#${req.uon_id}`}</td>
-                <td className="px-4 py-3 text-foreground/70">{req.client_phone || "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{req.status_name || "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{req.manager_name || "—"}</td>
-                <td className="px-4 py-3 text-foreground/50">{req.reservation_number || "—"}</td>
+            {leads.map((lead) => (
+              <tr key={lead.id} className="border-b border-black/5 last:border-0 hover:bg-blue-light/20">
+                <td className="px-4 py-3 font-medium text-navy">{lead.client_name || `#${lead.uon_id}`}</td>
+                <td className="px-4 py-3 text-foreground/70">{lead.client_phone || "—"}</td>
+                <td className="px-4 py-3 text-foreground/70">{lead.status_name || "—"}</td>
+                <td className="px-4 py-3 text-foreground/70">{lead.manager_name || "—"}</td>
+                <td className="px-4 py-3 text-foreground/50">{lead.source_name || "—"}</td>
                 <td className="px-4 py-3 text-foreground/50">
-                  {req.uon_created_at ? new Date(req.uon_created_at).toLocaleDateString("ru-RU") : "—"}
+                  {lead.uon_created_at ? new Date(lead.uon_created_at).toLocaleDateString("ru-RU") : "—"}
                 </td>
               </tr>
             ))}
-            {!loading && requests.length === 0 && (
+            {!loading && leads.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-sm text-foreground/40">
                   Обращений пока нет — нажмите «Синхронизировать с U-ON» вверху страницы

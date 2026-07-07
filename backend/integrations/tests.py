@@ -7,12 +7,13 @@ from kanban.models import KanbanColumn, Task
 from leads.models import Direction, Lead
 
 from .adapters import MockUonAdapter, RealUonAdapter, UonAdapterError, build_ticket_payload
-from .models import UonClient, UonRequestRecord, UonWebhookLog
+from .models import UonClient, UonLeadRecord, UonRequestRecord, UonWebhookLog
 from .tasks import (
     pull_uon_reminders_for_lead,
+    sync_all_uon_leads,
     sync_all_uon_reminders,
-    sync_all_uon_requests,
     sync_lead_to_uon,
+    sync_uon_lead,
     sync_uon_request,
 )
 
@@ -25,6 +26,9 @@ class MockAdapterTests(TestCase):
 
     def test_get_request_none(self):
         self.assertIsNone(MockUonAdapter().get_request('61'))
+
+    def test_get_lead_none(self):
+        self.assertIsNone(MockUonAdapter().get_lead('61'))
 
     def test_create_ticket_returns_success_shape(self):
         result = MockUonAdapter().create_ticket({'u_name': 'x'})
@@ -77,6 +81,25 @@ class RealAdapterTests(TestCase):
 
         adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
         self.assertIsNone(adapter.get_request('999'))
+
+    @patch('integrations.adapters.requests.get')
+    def test_get_lead_calls_expected_url(self, mock_get):
+        mock_get.return_value.json.return_value = {'result': 200, 'lead': [{'id': 199, 'client_name': 'Иван'}]}
+        mock_get.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        result = adapter.get_lead('199')
+
+        mock_get.assert_called_once_with('https://api.u-on.ru/KEY123/lead/199.json', timeout=10)
+        self.assertEqual(result, {'id': 199, 'client_name': 'Иван'})
+
+    @patch('integrations.adapters.requests.get')
+    def test_get_lead_returns_none_when_empty(self, mock_get):
+        mock_get.return_value.json.return_value = {'result': 404, 'lead': []}
+        mock_get.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        self.assertIsNone(adapter.get_lead('999'))
 
     @patch('integrations.adapters.requests.post')
     def test_create_ticket_calls_expected_url_and_body(self, mock_post):
@@ -199,7 +222,7 @@ class SyncAllUonRemindersTests(TestCase):
         mock_delay.assert_called_once_with(with_ticket.id)
 
 
-@patch('integrations.views.sync_all_uon_requests.delay')
+@patch('integrations.views.sync_all_uon_leads.delay')
 @patch('integrations.views.sync_all_uon_reminders.delay')
 class UonSyncTriggerViewTests(TestCase):
     def setUp(self):
@@ -207,27 +230,27 @@ class UonSyncTriggerViewTests(TestCase):
         self.head = User.objects.create_user(username='head', password='x', role=User.Role.HEAD)
         self.admin = User.objects.create_superuser(username='admin', password='x', email='a@a.com')
 
-    def test_manager_forbidden(self, mock_reminders, mock_requests):
+    def test_manager_forbidden(self, mock_reminders, mock_leads):
         self.client.force_login(self.manager)
         response = self.client.post('/api/crm/integrations/uon-sync/')
         self.assertEqual(response.status_code, 403)
         mock_reminders.assert_not_called()
-        mock_requests.assert_not_called()
+        mock_leads.assert_not_called()
 
-    def test_head_can_trigger_sync(self, mock_reminders, mock_requests):
+    def test_head_can_trigger_sync(self, mock_reminders, mock_leads):
         self.client.force_login(self.head)
         response = self.client.post('/api/crm/integrations/uon-sync/')
         self.assertEqual(response.status_code, 200)
         mock_reminders.assert_called_once()
-        mock_requests.assert_called_once()
+        mock_leads.assert_called_once()
 
-    def test_admin_can_trigger_sync(self, mock_reminders, mock_requests):
+    def test_admin_can_trigger_sync(self, mock_reminders, mock_leads):
         self.client.force_login(self.admin)
         response = self.client.post('/api/crm/integrations/uon-sync/')
         self.assertEqual(response.status_code, 200)
         mock_reminders.assert_called_once()
 
-    def test_anonymous_rejected(self, mock_reminders, mock_requests):
+    def test_anonymous_rejected(self, mock_reminders, mock_leads):
         response = self.client.post('/api/crm/integrations/uon-sync/')
         self.assertEqual(response.status_code, 403)
 
@@ -289,16 +312,72 @@ class SyncUonRequestTests(TestCase):
         self.assertEqual(UonRequestRecord.objects.count(), 0)
 
 
-class SyncAllUonRequestsTests(TestCase):
-    @patch('integrations.tasks.sync_uon_request.delay')
+REAL_LEAD_PAYLOAD = {
+    'id': 199,
+    'id_system': 197,
+    'client_id': 250,
+    'client_surname': '',
+    'client_name': 'Тестовая заявка',
+    'client_phone_mobile': '+70000000000',
+    'client_email': '',
+    'status_id': '1',
+    'status': 'Новый',
+    'manager_name': None,
+    'source': 'site_form',
+    'notes': '',
+    'is_archive': 0,
+    'dat_lead': '2026-07-06 20:15',
+}
+
+
+class SyncUonLeadTests(TestCase):
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_upserts_lead_and_derives_client(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_lead.return_value = REAL_LEAD_PAYLOAD
+
+        sync_uon_lead('199')
+
+        record = UonLeadRecord.objects.get(uon_id='199')
+        self.assertEqual(record.client_name, 'Тестовая заявка')
+        self.assertEqual(record.client_phone, '+70000000000')
+        self.assertEqual(record.status_id, '1')
+        self.assertEqual(record.status_name, 'Новый')
+        self.assertFalse(record.is_archive)
+        self.assertIsNotNone(record.uon_created_at)
+
+        client = UonClient.objects.get(uon_id='250')
+        self.assertEqual(client.name, 'Тестовая заявка')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_rerun_updates_without_duplicating(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_lead.return_value = REAL_LEAD_PAYLOAD
+        sync_uon_lead('199')
+
+        updated = dict(REAL_LEAD_PAYLOAD, status='В работе', status_id='2')
+        mock_get_adapter.return_value.get_lead.return_value = updated
+        sync_uon_lead('199')
+
+        self.assertEqual(UonLeadRecord.objects.filter(uon_id='199').count(), 1)
+        record = UonLeadRecord.objects.get(uon_id='199')
+        self.assertEqual(record.status_name, 'В работе')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_skips_when_lead_not_found(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_lead.return_value = None
+        sync_uon_lead('999')
+        self.assertEqual(UonLeadRecord.objects.count(), 0)
+
+
+class SyncAllUonLeadsTests(TestCase):
+    @patch('integrations.tasks.sync_uon_lead.delay')
     def test_dispatches_for_every_lead_with_uon_ticket(self, mock_delay):
         direction = Direction.objects.create(name='Египет')
-        Lead.objects.create(name='С U-ON', direction=direction, uon_ticket_id='61')
+        Lead.objects.create(name='С U-ON', direction=direction, uon_ticket_id='199')
         Lead.objects.create(name='Без U-ON', direction=direction, uon_ticket_id='')
 
-        sync_all_uon_requests()
+        sync_all_uon_leads()
 
-        mock_delay.assert_called_once_with('61')
+        mock_delay.assert_called_once_with('199')
 
 
 class UonWebhookViewTests(TestCase):
@@ -316,15 +395,27 @@ class UonWebhookViewTests(TestCase):
         self.assertEqual(log.request_id, '61')
         self.assertEqual(log.type_id, '1')
 
+    @patch('integrations.views.sync_uon_lead.delay')
+    def test_dispatches_sync_for_lead_id(self, mock_delay):
+        response = self.client.post(
+            '/api/integrations/uon/webhook/',
+            data={'type_id': '2', 'lead_id': 199},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once_with('199')
+
     @patch('integrations.views.sync_uon_request.delay')
-    def test_ignores_payload_without_request_id(self, mock_delay):
+    @patch('integrations.views.sync_uon_lead.delay')
+    def test_ignores_payload_without_ids(self, mock_lead_delay, mock_request_delay):
         response = self.client.post(
             '/api/integrations/uon/webhook/',
             data={'type_id': '30'},
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
-        mock_delay.assert_not_called()
+        mock_lead_delay.assert_not_called()
+        mock_request_delay.assert_not_called()
         self.assertEqual(UonWebhookLog.objects.count(), 1)
 
     @override_settings(UON_WEBHOOK_SECRET='secret123')
@@ -355,21 +446,12 @@ class UonMirrorViewSetTests(TestCase):
 
     def test_lists_are_readable_by_any_authenticated_user(self):
         UonRequestRecord.objects.create(uon_id='1', client_name='Заявка')
+        UonLeadRecord.objects.create(uon_id='2', client_name='Обращение')
         UonClient.objects.create(uon_id='3', name='Клиент')
 
-        for path in ('requests', 'clients'):
+        for path in ('requests', 'leads', 'clients'):
             response = self.client.get(f'/api/crm/uon/{path}/')
             self.assertEqual(response.status_code, 200, path)
-
-    def test_requests_filterable_by_is_archive(self):
-        UonRequestRecord.objects.create(uon_id='1', client_name='Активная', is_archive=False)
-        UonRequestRecord.objects.create(uon_id='2', client_name='Архивная', is_archive=True)
-
-        response = self.client.get('/api/crm/uon/requests/?is_archive=1')
-        data = response.json()
-        items = data if isinstance(data, list) else data['results']
-        names = [item['client_name'] for item in items]
-        self.assertEqual(names, ['Архивная'])
 
     def test_write_methods_not_allowed(self):
         response = self.client.post('/api/crm/uon/requests/', {'uon_id': '99', 'client_name': 'x'})

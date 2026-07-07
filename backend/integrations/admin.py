@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import UonClient, UonRequestRecord, UonSyncLog, UonWebhookLog
+from .models import UonClient, UonLeadRecord, UonRequestRecord, UonSyncLog, UonWebhookLog
 
 
 class UonMirrorAdmin(admin.ModelAdmin):
@@ -22,6 +22,13 @@ class UonRequestRecordAdmin(UonMirrorAdmin):
     list_display = ('client_name', 'client_phone', 'status_name', 'manager_name', 'is_archive', 'uon_created_at')
     list_filter = ('status_name', 'is_archive')
     search_fields = ('uon_id', 'client_name', 'client_phone', 'client_email', 'reservation_number')
+
+
+@admin.register(UonLeadRecord)
+class UonLeadRecordAdmin(UonMirrorAdmin):
+    list_display = ('client_name', 'client_phone', 'status_name', 'manager_name', 'is_archive', 'uon_created_at')
+    list_filter = ('status_name', 'is_archive')
+    search_fields = ('uon_id', 'client_name', 'client_phone', 'client_email')
 
 
 @admin.register(UonClient)

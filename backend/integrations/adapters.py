@@ -26,6 +26,10 @@ class BaseUonAdapter:
         """Полная заявка по ID (U-ON: GET /{key}/request/{id}.json)."""
         raise NotImplementedError
 
+    def get_lead(self, lead_id: str) -> dict | None:
+        """Полное обращение (лид) по ID (U-ON: GET /{key}/lead/{id}.json)."""
+        raise NotImplementedError
+
 
 class MockUonAdapter(BaseUonAdapter):
     """Used until a real U-ON API key is issued. Simulates a successful ticket creation."""
@@ -42,6 +46,9 @@ class MockUonAdapter(BaseUonAdapter):
         return []
 
     def get_request(self, request_id: str) -> dict | None:
+        return None
+
+    def get_lead(self, lead_id: str) -> dict | None:
         return None
 
 
@@ -107,6 +114,21 @@ class RealUonAdapter(BaseUonAdapter):
         except requests.RequestException as exc:
             raise UonAdapterError(str(exc)) from exc
         items = response.json().get('request', [])
+        return items[0] if items else None
+
+    def get_lead(self, lead_id: str) -> dict | None:
+        # Confirmed against the live API: returns {"result": 200|404, "lead": [{...}]}.
+        # "lead" (обращение) and "request" (заявка) are separate resources with
+        # separate ID sequences in this API — a lead's id and id_system diverge
+        # by a variable offset (not constant), unlike a request's, where they
+        # usually match. There's no reliable way to convert between the two
+        # from the API alone.
+        try:
+            response = requests.get(f'{self.base_url}/{self.api_key}/lead/{lead_id}.json', timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        items = response.json().get('lead', [])
         return items[0] if items else None
 
 
