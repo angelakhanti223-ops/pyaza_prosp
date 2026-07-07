@@ -22,6 +22,13 @@ def build_board_url() -> str:
     return f'{settings.SITE_URL}/crm/kanban'
 
 
+def build_uon_record_url(record_kind: str, uon_id: str) -> str:
+    """Ссылка на карточку заявки/обращения из зеркала U-ON (см. kanban.Task.uon_record_kind/
+    uon_record_id) — сами страницы читают ?uon_id= и открывают нужную запись."""
+    path = 'crm/uon-requests' if record_kind == 'request' else 'crm/appeals'
+    return f'{settings.SITE_URL}/{path}?uon_id={uon_id}'
+
+
 def is_local_url(url: str) -> bool:
     """Telegram отклоняет inline-кнопки со ссылкой на localhost/127.0.0.1
     ("wrong http url") — типичная ситуация в dev-окружении, пока сайт не

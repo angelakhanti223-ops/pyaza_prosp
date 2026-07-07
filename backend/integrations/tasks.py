@@ -121,17 +121,29 @@ def _match_manager_user(manager_name: str):
     return User.objects.filter(first_name__iexact=first_token).first()
 
 
-def _sync_tasks_from_reminders(uon_id: str, kind_label: str, client_name: str, client_phone: str, manager_name: str):
+_RECORD_LABELS = {'request': 'Заявка', 'lead': 'Обращение'}
+
+
+def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, client_phone: str, manager_name: str):
     """Создаёт/обновляет задачи на канбане по напоминаниям обращения/заявки из
     U-ON — единый путь для request и lead, т.к. /reminder/{id}.json работает
     для обоих (см. флаги in_lead/in_request в самом ответе). В тексте задачи
     всегда указывается номер записи в U-ON и контакты клиента, чтобы можно
     было сразу связаться, не открывая U-ON. Ответственный подбирается по имени
     менеджера (см. _match_manager_user) — не найдено соответствие, значит
-    задача остаётся без ответственного."""
+    задача остаётся без ответственного.
+
+    Сохраняет uon_record_kind/uon_record_id на самой задаче — по ним строится
+    ссылка «Открыть в U-ON» на конкретную запись (см. kanban.serializers,
+    telegrambot.services.build_uon_record_url), а не просто на доску. При
+    новом назначении ответственного отправляется Telegram-уведомление
+    (notify_task_assignment) — так же, как при ручном назначении в CRM."""
     from kanban.models import Task
     from kanban.services import next_order_in_column, reposition_task
     from telegrambot.services import get_first_column, get_last_column
+    from telegrambot.tasks import notify_task_assignment
+
+    kind_label = _RECORD_LABELS[record_kind]
 
     try:
         reminders = get_uon_adapter().list_reminders(uon_id)
@@ -158,19 +170,29 @@ def _sync_tasks_from_reminders(uon_id: str, kind_label: str, client_name: str, c
 
         task = Task.objects.filter(uon_reminder_id=reminder_id).first()
         if task is None:
-            Task.objects.create(
+            task = Task.objects.create(
                 uon_reminder_id=reminder_id, title=title, description=contact, deadline=deadline,
                 column=target_column, assignee=assignee, order=next_order_in_column(target_column),
+                uon_record_kind=record_kind, uon_record_id=uon_id,
             )
+            if assignee:
+                notify_task_assignment.delay(task.id)
         else:
+            old_assignee_id = task.assignee_id
             if task.column_id != target_column.id:
                 reposition_task(task, target_column, next_order_in_column(target_column))
             task.title = title
             task.description = contact
             task.deadline = deadline
+            task.uon_record_kind = record_kind
+            task.uon_record_id = uon_id
             if assignee:
                 task.assignee = assignee
-            task.save(update_fields=['title', 'description', 'deadline', 'assignee'])
+            task.save(update_fields=[
+                'title', 'description', 'deadline', 'assignee', 'uon_record_kind', 'uon_record_id',
+            ])
+            if assignee and assignee.id != old_assignee_id:
+                notify_task_assignment.delay(task.id)
 
 
 @shared_task(
@@ -373,7 +395,7 @@ def sync_uon_request(self, request_id: str):
             defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
 
-    _sync_tasks_from_reminders(str(data['id']), 'Заявка', client_name, client_phone, _s(data, 'manager_name'))
+    _sync_tasks_from_reminders(str(data['id']), 'request', client_name, client_phone, _s(data, 'manager_name'))
 
     logger.info(
         'U-ON: заявка %s синхронизирована (%s туристов)', request_id, len(synced_client_ids) or int(bool(client_id)),
@@ -430,7 +452,7 @@ def sync_uon_lead(self, lead_id: str):
             defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
 
-    _sync_tasks_from_reminders(str(data['id']), 'Обращение', client_name, client_phone, _s(data, 'manager_name'))
+    _sync_tasks_from_reminders(str(data['id']), 'lead', client_name, client_phone, _s(data, 'manager_name'))
 
     logger.info('U-ON: обращение %s синхронизировано', lead_id)
     return True

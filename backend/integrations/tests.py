@@ -504,6 +504,8 @@ class SyncTasksFromRemindersTests(TestCase):
         self.assertIn('Артамонов Алексей', task.description)
         self.assertIn('+79273789757', task.description)
         self.assertEqual(task.assignee_id, self.ekaterina.id)
+        self.assertEqual(task.uon_record_kind, 'request')
+        self.assertEqual(task.uon_record_id, '61')
 
     @patch('integrations.tasks.get_uon_adapter')
     def test_lead_sync_creates_task_without_assignee_when_no_manager_match(self, mock_get_adapter):
@@ -539,6 +541,55 @@ class SyncTasksFromRemindersTests(TestCase):
         self.assertEqual(Task.objects.filter(uon_reminder_id='902').count(), 1)
         task = Task.objects.get(uon_reminder_id='902')
         self.assertIn('Обновлённый текст', task.title)
+
+    @patch('telegrambot.tasks.notify_task_assignment.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_notifies_on_new_task_with_matched_assignee(self, mock_get_adapter, mock_notify):
+        mock_get_adapter.return_value.get_request.return_value = dict(
+            REAL_REQUEST_PAYLOAD, manager_name='Екатерина Макеева',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 910, 'text': 'Позвонить', 'datetime': '2026-07-08 18:29', 'is_done': 0},
+        ]
+
+        sync_uon_request('61')
+
+        task = Task.objects.get(uon_reminder_id='910')
+        mock_notify.assert_called_once_with(task.id)
+
+    @patch('telegrambot.tasks.notify_task_assignment.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_no_notification_without_assignee_match(self, mock_get_adapter, mock_notify):
+        mock_get_adapter.return_value.get_lead.return_value = dict(
+            REAL_LEAD_PAYLOAD, manager_name='Кто-то Незнакомый',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 911, 'text': 'Уточнить', 'datetime': '2026-07-09 10:00', 'is_done': 0},
+        ]
+
+        sync_uon_lead('199')
+
+        mock_notify.assert_not_called()
+
+    @patch('telegrambot.tasks.notify_task_assignment.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_rerun_with_unchanged_assignee_does_not_renotify(self, mock_get_adapter, mock_notify):
+        mock_get_adapter.return_value.get_request.return_value = dict(
+            REAL_REQUEST_PAYLOAD, manager_name='Екатерина Макеева',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 912, 'text': 'Первый текст', 'datetime': '2026-07-08 18:29', 'is_done': 0},
+        ]
+        sync_uon_request('61')
+        mock_notify.assert_called_once()
+        mock_notify.reset_mock()
+
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 912, 'text': 'Второй текст', 'datetime': '2026-07-08 18:29', 'is_done': 0},
+        ]
+        sync_uon_request('61')
+
+        mock_notify.assert_not_called()
 
 
 class UonWebhookViewTests(TestCase):

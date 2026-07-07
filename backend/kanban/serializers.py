@@ -28,9 +28,12 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'column', 'assignee', 'assignee_id',
             'lead', 'lead_name', 'deadline', 'is_recurring', 'kind', 'priority',
-            'order', 'created_at', 'updated_at',
+            'uon_record_kind', 'uon_record_id', 'order', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'order', 'created_at', 'updated_at', 'kind', 'priority']
+        read_only_fields = [
+            'id', 'order', 'created_at', 'updated_at', 'kind', 'priority',
+            'uon_record_kind', 'uon_record_id',
+        ]
 
 
 class TaskUpdateSerializer(serializers.ModelSerializer):

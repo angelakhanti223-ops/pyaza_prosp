@@ -2,8 +2,9 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Flame, Link2, Repeat } from "lucide-react";
-import type { KanbanTask, TaskKind } from "@/lib/kanbanApi";
+import Link from "next/link";
+import { AlertTriangle, ExternalLink, Flame, Link2, Repeat } from "lucide-react";
+import { uonRecordUrl, type KanbanTask, type TaskKind } from "@/lib/kanbanApi";
 
 function deadlineStatus(deadline: string | null): "overdue" | "soon" | "normal" | null {
   if (!deadline) return null;
@@ -31,6 +32,7 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
   };
 
   const status = deadlineStatus(task.deadline);
+  const recordUrl = uonRecordUrl(task);
 
   return (
     <div
@@ -47,6 +49,16 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
           <Link2 size={12} />
           {task.lead_name}
         </p>
+      )}
+      {recordUrl && (
+        <Link
+          href={recordUrl}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1 flex items-center gap-1 text-xs text-blue hover:underline"
+        >
+          <ExternalLink size={12} />
+          Открыть в U-ON
+        </Link>
       )}
       {task.priority === "urgent_important" && (
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">

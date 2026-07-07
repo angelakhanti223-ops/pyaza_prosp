@@ -5,7 +5,14 @@ from celery import shared_task
 from django.conf import settings
 
 from .models import TelegramAccount, TelegramNotificationLog
-from .services import build_board_url, build_lead_url, format_lead_summary, format_task_line, is_local_url
+from .services import (
+    build_board_url,
+    build_lead_url,
+    build_uon_record_url,
+    format_lead_summary,
+    format_task_line,
+    is_local_url,
+)
 
 logger = logging.getLogger('telegrambot')
 
@@ -82,7 +89,12 @@ def notify_task_assignment(self, task_id: int):
         return
 
     text = f'🆕 Вам назначена задача:\n{format_task_line(task)}'
-    url = build_lead_url(task.lead_id) if task.lead_id else build_board_url()
+    if task.uon_record_kind and task.uon_record_id:
+        url = build_uon_record_url(task.uon_record_kind, task.uon_record_id)
+    elif task.lead_id:
+        url = build_lead_url(task.lead_id)
+    else:
+        url = build_board_url()
     _send_telegram_message(
         account.chat_id, text, TelegramNotificationLog.EventType.TASK_ASSIGNED,
         reply_markup=_link_button('🔗 Открыть в CRM', url),

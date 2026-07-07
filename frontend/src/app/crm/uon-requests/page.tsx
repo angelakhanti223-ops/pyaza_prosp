@@ -1,17 +1,79 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { X } from "lucide-react";
 import { listUonRequests, type UonRequestRecord } from "@/lib/uonApi";
 
-export default function CrmUonRequestsPage() {
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-black/5 py-2 text-sm last:border-0">
+      <dt className="text-foreground/50">{label}</dt>
+      <dd className="text-right text-navy">{value || "—"}</dd>
+    </div>
+  );
+}
+
+function RequestDetailModal({ request, onClose }: { request: UonRequestRecord; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-xl"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Закрыть"
+          className="absolute right-4 top-4 text-foreground/40 hover:text-foreground"
+        >
+          <X size={20} />
+        </button>
+
+        <h3 className="mb-1 text-lg font-bold text-navy">
+          {request.client_name || `Заявка #${request.uon_id}`}
+        </h3>
+        <p className="mb-4 text-xs text-foreground/40">Заявка в U-ON · ID: {request.uon_id}</p>
+
+        <dl>
+          <DetailRow label="Статус в U-ON" value={request.status_name} />
+          <DetailRow label="Менеджер" value={request.manager_name} />
+          <DetailRow label="Телефон" value={request.client_phone} />
+          <DetailRow label="Email" value={request.client_email} />
+          <DetailRow label="Номер брони" value={request.reservation_number} />
+          <DetailRow label="Источник" value={request.source_name} />
+          <DetailRow label="В архиве" value={request.is_archive ? "Да" : "Нет"} />
+          <DetailRow label="Заметки" value={request.notes} />
+          <DetailRow
+            label="Создано в U-ON"
+            value={request.uon_created_at ? new Date(request.uon_created_at).toLocaleString("ru-RU") : ""}
+          />
+        </dl>
+
+        <p className="mt-4 text-xs text-foreground/40">
+          Обновлено: {new Date(request.synced_at).toLocaleString("ru-RU")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CrmUonRequestsContent() {
   const [requests, setRequests] = useState<UonRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<UonRequestRecord | null>(null);
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("uon_id");
 
   useEffect(() => {
     let active = true;
     listUonRequests()
       .then((data) => {
-        if (active) setRequests(data);
+        if (!active) return;
+        setRequests(data);
+        if (highlightId) {
+          const match = data.find((r) => r.uon_id === highlightId);
+          if (match) setSelected(match);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -19,6 +81,7 @@ export default function CrmUonRequestsPage() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -30,7 +93,7 @@ export default function CrmUonRequestsPage() {
             Read-only зеркало заявок из U-ON — полноценные рабочие сделки (статус, бронирование, суммы), которые
             менеджер уже ведёт. Не путать со страницей «Заявки» — там ваши собственные CRM-заявки с сайта. Данные
             редактируются в U-ON, здесь только просмотр — обновляются кнопкой «Синхронизировать с U-ON» вверху
-            страницы или мгновенно вебхуком при изменении в U-ON.
+            страницы или мгновенно вебхуком при изменении в U-ON. Нажмите на строку, чтобы увидеть все поля.
           </p>
         </div>
       </div>
@@ -50,7 +113,13 @@ export default function CrmUonRequestsPage() {
           </thead>
           <tbody>
             {requests.map((req) => (
-              <tr key={req.id} className="border-b border-black/5 last:border-0 hover:bg-blue-light/20">
+              <tr
+                key={req.id}
+                onClick={() => setSelected(req)}
+                className={`cursor-pointer border-b border-black/5 last:border-0 hover:bg-blue-light/20 ${
+                  req.uon_id === highlightId ? "bg-gold/10" : ""
+                }`}
+              >
                 <td className="px-4 py-3 font-medium text-navy">{req.client_name || `#${req.uon_id}`}</td>
                 <td className="px-4 py-3 text-foreground/70">{req.client_phone || "—"}</td>
                 <td className="px-4 py-3 text-foreground/70">{req.status_name || "—"}</td>
@@ -72,6 +141,16 @@ export default function CrmUonRequestsPage() {
           </tbody>
         </table>
       </div>
+
+      {selected && <RequestDetailModal request={selected} onClose={() => setSelected(null)} />}
     </div>
+  );
+}
+
+export default function CrmUonRequestsPage() {
+  return (
+    <Suspense fallback={null}>
+      <CrmUonRequestsContent />
+    </Suspense>
   );
 }

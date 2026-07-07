@@ -10,6 +10,7 @@ export type KanbanColumn = {
 
 export type TaskKind = "lead" | "appeal" | "general";
 export type TaskPriority = "urgent_important" | "important" | null;
+export type UonRecordKind = "request" | "lead" | "";
 
 export type KanbanTask = {
   id: number;
@@ -23,10 +24,18 @@ export type KanbanTask = {
   is_recurring: boolean;
   kind: TaskKind;
   priority: TaskPriority;
+  uon_record_kind: UonRecordKind;
+  uon_record_id: string;
   order: number;
   created_at: string;
   updated_at: string;
 };
+
+export function uonRecordUrl(task: KanbanTask): string | null {
+  if (!task.uon_record_kind || !task.uon_record_id) return null;
+  const path = task.uon_record_kind === "request" ? "/crm/uon-requests" : "/crm/appeals";
+  return `${path}?uon_id=${task.uon_record_id}`;
+}
 
 export type TaskInput = {
   title: string;

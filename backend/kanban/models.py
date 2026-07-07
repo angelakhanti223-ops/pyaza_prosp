@@ -29,6 +29,12 @@ class Task(models.Model):
         'ID напоминания U-ON', max_length=64, unique=True, null=True, blank=True,
         help_text='Заполняется автоматически при синхронизации напоминаний из U-ON — не редактировать вручную.',
     )
+    uon_record_kind = models.CharField(
+        'Тип записи U-ON', max_length=10, blank=True,
+        choices=[('request', 'Заявка'), ('lead', 'Обращение')],
+        help_text='К какой сущности U-ON относится задача — для ссылки «Открыть в U-ON».',
+    )
+    uon_record_id = models.CharField('ID записи U-ON', max_length=64, blank=True)
     is_recurring = models.BooleanField(
         'Ежедневная (повторяющаяся)', default=False,
         help_text='При переносе в последнюю колонку доски автоматически создаётся копия на завтра.',
