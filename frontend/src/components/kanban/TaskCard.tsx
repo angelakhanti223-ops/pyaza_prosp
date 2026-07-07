@@ -2,7 +2,6 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Link from "next/link";
 import { AlertTriangle, ExternalLink, Flame, Link2, Repeat } from "lucide-react";
 import { uonRecordUrl, type KanbanTask, type TaskKind } from "@/lib/kanbanApi";
 
@@ -51,14 +50,16 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
         </p>
       )}
       {recordUrl && (
-        <Link
+        <a
           href={recordUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           className="mt-1 flex items-center gap-1 text-xs text-blue hover:underline"
         >
           <ExternalLink size={12} />
           Открыть в U-ON
-        </Link>
+        </a>
       )}
       {task.priority === "urgent_important" && (
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">

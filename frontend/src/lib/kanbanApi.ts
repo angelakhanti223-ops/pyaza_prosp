@@ -31,10 +31,13 @@ export type KanbanTask = {
   updated_at: string;
 };
 
+const UON_CABINET_URL = process.env.NEXT_PUBLIC_UON_CABINET_URL ?? "https://id62499.u-on.ru";
+
+// Прямая ссылка на карточку заявки/обращения в самом кабинете U-ON (не в нашей CRM) —
+// подтверждено клиентом: один и тот же адрес для заявок и обращений, меняется только r_id.
 export function uonRecordUrl(task: KanbanTask): string | null {
   if (!task.uon_record_kind || !task.uon_record_id) return null;
-  const path = task.uon_record_kind === "request" ? "/crm/uon-requests" : "/crm/appeals";
-  return `${path}?uon_id=${task.uon_record_id}`;
+  return `${UON_CABINET_URL}/request_edit_lead.php?r_id=${task.uon_record_id}`;
 }
 
 export type TaskInput = {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import { listLeads, listManagers, type CrmUser, type LeadListItem } from "@/lib/crmApi";
 import { createTask, deleteTask, updateTask, uonRecordUrl, type KanbanColumn, type KanbanTask } from "@/lib/kanbanApi";
@@ -124,13 +123,15 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
           {isEdit ? "Задача" : "Новая задача"}
         </h3>
         {task && uonRecordUrl(task) && (
-          <Link
+          <a
             href={uonRecordUrl(task) as string}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mb-4 flex items-center gap-1 text-xs font-medium text-blue hover:underline"
           >
             <ExternalLink size={12} />
             Открыть в U-ON
-          </Link>
+          </a>
         )}
 
         <div className="flex flex-col gap-3">

@@ -23,10 +23,11 @@ def build_board_url() -> str:
 
 
 def build_uon_record_url(record_kind: str, uon_id: str) -> str:
-    """Ссылка на карточку заявки/обращения из зеркала U-ON (см. kanban.Task.uon_record_kind/
-    uon_record_id) — сами страницы читают ?uon_id= и открывают нужную запись."""
-    path = 'crm/uon-requests' if record_kind == 'request' else 'crm/appeals'
-    return f'{settings.SITE_URL}/{path}?uon_id={uon_id}'
+    """Прямая ссылка на карточку заявки/обращения в самом кабинете U-ON (не в нашей
+    CRM) — см. kanban.Task.uon_record_kind/uon_record_id. Подтверждено клиентом:
+    один и тот же адрес для заявок и обращений, меняется только r_id."""
+    del record_kind  # пока один и тот же путь для обоих типов, см. docstring
+    return f'{settings.UON_CABINET_URL}/request_edit_lead.php?r_id={uon_id}'
 
 
 def is_local_url(url: str) -> bool:

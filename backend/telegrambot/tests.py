@@ -81,13 +81,16 @@ class ServicesFormattingTests(TestCase):
     def test_board_url(self):
         self.assertTrue(build_board_url().endswith('/crm/kanban'))
 
+    @override_settings(UON_CABINET_URL='https://id62499.u-on.ru')
     def test_uon_record_url_request(self):
         url = build_uon_record_url('request', '61')
-        self.assertTrue(url.endswith('/crm/uon-requests?uon_id=61'))
+        self.assertEqual(url, 'https://id62499.u-on.ru/request_edit_lead.php?r_id=61')
 
-    def test_uon_record_url_lead(self):
+    @override_settings(UON_CABINET_URL='https://id62499.u-on.ru')
+    def test_uon_record_url_lead_same_page(self):
+        # Подтверждено клиентом: тот же адрес для обращений, меняется только r_id.
         url = build_uon_record_url('lead', '199')
-        self.assertTrue(url.endswith('/crm/appeals?uon_id=199'))
+        self.assertEqual(url, 'https://id62499.u-on.ru/request_edit_lead.php?r_id=199')
 
     def test_format_lead_summary_has_no_pii(self):
         text = format_lead_summary(self.lead)
@@ -341,7 +344,10 @@ class NotifyTaskTests(TestCase):
         log = TelegramNotificationLog.objects.get()
         self.assertEqual(log.status, TelegramNotificationLog.Status.SUCCESS)
 
-    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token', SITE_URL='https://sletat.ru')
+    @override_settings(
+        TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token',
+        UON_CABINET_URL='https://id62499.u-on.ru',
+    )
     @patch('telegrambot.tasks.requests.post')
     def test_notify_task_assignment_links_to_uon_record_when_set(self, mock_post):
         mock_post.return_value.raise_for_status = MagicMock()
@@ -353,7 +359,7 @@ class NotifyTaskTests(TestCase):
         notify_task_assignment(task.id)
 
         url = mock_post.call_args.kwargs['json']['reply_markup']['inline_keyboard'][0][0]['url']
-        self.assertTrue(url.endswith('/crm/uon-requests?uon_id=61'))
+        self.assertEqual(url, 'https://id62499.u-on.ru/request_edit_lead.php?r_id=61')
 
     @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token', SITE_URL='http://localhost:3000')
     @patch('telegrambot.tasks.requests.post')

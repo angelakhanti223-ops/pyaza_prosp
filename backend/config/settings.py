@@ -230,6 +230,11 @@ UON_API_KEY = env('UON_API_KEY', default='')
 # U-ON's webhook config hasn't confirmed whether it supports a custom token in the URL —
 # leave empty to accept all requests until that's verified.
 UON_WEBHOOK_SECRET = env('UON_WEBHOOK_SECRET', default='')
+# Client's own U-ON account cabinet (not the API host) — used to build "Открыть в U-ON"
+# links straight to the record's edit page, confirmed by the client:
+# {UON_CABINET_URL}/request_edit_lead.php?r_id={id} — same page for both заявки and
+# обращения (only r_id changes); adjust here if обращения turn out to need a different page.
+UON_CABINET_URL = env('UON_CABINET_URL', default='https://id62499.u-on.ru')
 
 
 # Telegram bot (менеджерские команды и уведомления о назначении задач/заявок —
