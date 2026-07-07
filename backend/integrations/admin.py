@@ -33,8 +33,13 @@ class UonLeadRecordAdmin(UonMirrorAdmin):
 
 @admin.register(UonClient)
 class UonClientAdmin(UonMirrorAdmin):
-    list_display = ('name', 'phone', 'email', 'synced_at')
-    search_fields = ('uon_id', 'name', 'phone', 'email')
+    list_display = (
+        'surname', 'name', 'phone', 'email', 'birthday', 'is_main_contact', 'synced_at',
+    )
+    list_filter = ('is_main_contact', 'sex', 'country')
+    search_fields = (
+        'uon_id', 'name', 'surname', 'phone', 'email', 'passport_number', 'zagran_number',
+    )
 
 
 @admin.register(UonWebhookLog)

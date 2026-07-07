@@ -312,6 +312,48 @@ class SyncUonRequestTests(TestCase):
         self.assertEqual(UonRequestRecord.objects.count(), 0)
 
     @patch('integrations.tasks.get_uon_adapter')
+    def test_syncs_full_client_details_from_tourists(self, mock_get_adapter):
+        """Реальная форма данных туриста из tourists[] (заявка #61 из живого API) —
+        основной клиент (client_id=96) тоже встречается в tourists[], плюс есть
+        сопутствующий турист-ребёнок (id=99). Проверяем, что оба сохраняются с
+        полным набором полей, а не только именем/телефоном/email."""
+        payload = dict(REAL_REQUEST_PAYLOAD, tourists=[
+            {
+                'u_id': 96, 'u_surname': 'Артамонов', 'u_name': 'Алексей', 'u_sname': 'Константинович',
+                'u_name_en': 'ALEKSEI', 'u_surname_en': 'ARTAMONOV', 'u_phone_mobile': '+79273789757',
+                'u_email': 'artpnz@mail.ru', 'u_sex': 1, 'u_birthday': '1983-07-28 00:00',
+                'u_passport_number': '5605545162', 'u_passport_taken': 'ОВД Октябрьского района',
+                'u_passport_date': '2005-12-14 00:00', 'address': 'г. Пенза, ул. Ульяновская, 16',
+                'country': None, 'city': None,
+            },
+            {
+                'u_id': 99, 'u_surname': 'Артамонова', 'u_name': 'Милана', 'u_sname': 'Алексеевна',
+                'u_sex': 2, 'u_birthday': '2020-03-14 00:00', 'u_passport_number': '',
+                'u_passport_date': '0001-01-01 00:00',
+            },
+        ])
+        mock_get_adapter.return_value.get_request.return_value = payload
+
+        sync_uon_request('61')
+
+        main = UonClient.objects.get(uon_id='96')
+        self.assertTrue(main.is_main_contact)
+        self.assertEqual(main.surname, 'Артамонов')
+        self.assertEqual(main.patronymic, 'Константинович')
+        self.assertEqual(main.sex, 'муж')
+        self.assertEqual(str(main.birthday), '1983-07-28')
+        self.assertEqual(main.passport_number, '5605545162')
+        self.assertEqual(main.address, 'г. Пенза, ул. Ульяновская, 16')
+
+        child = UonClient.objects.get(uon_id='99')
+        self.assertFalse(child.is_main_contact)
+        self.assertEqual(child.sex, 'жен')
+        self.assertEqual(str(child.birthday), '2020-03-14')
+        self.assertIsNone(child.passport_date)
+
+        self.assertEqual(UonClient.objects.count(), 2)
+
+    @patch('integrations.tasks.get_uon_adapter')
     def test_handles_explicit_json_null_fields(self, mock_get_adapter):
         """Реальный случай из прода: заявка #2 имела client_phone_mobile/client_phone/
         client_email/manager_name/source равными явному JSON null (не отсутствовали

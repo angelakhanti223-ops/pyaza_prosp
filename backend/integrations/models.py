@@ -75,14 +75,45 @@ class UonLeadRecord(UonMirrorRecord):
 
 
 class UonClient(UonMirrorRecord):
-    """Карточка клиента — в этом API нет отдельного /client-эндпоинта, поэтому
-    запись собирается из client_*-полей, уже вложенных в объект заявки/обращения,
-    при каждой синхронизации UonRequestRecord/UonLeadRecord. `uon_id` здесь —
-    это client_id из U-ON, а не id заявки/обращения."""
+    """Карточка клиента/туриста — в этом API нет отдельного /client-эндпоинта,
+    поэтому запись собирается из данных, уже вложенных в заявку/обращение:
+    основной контакт — из client_*-полей объекта заявки, а каждый турист (в том
+    числе сам основной клиент — он тоже встречается в tourists[]) — из массива
+    tourists[] заявки (у обращений/lead такого массива нет, там только основной
+    контакт). `uon_id` здесь — это u_id туриста или client_id основного контакта
+    из U-ON, а не id заявки/обращения."""
 
     name = models.CharField('Имя', max_length=255, blank=True)
+    surname = models.CharField('Фамилия', max_length=255, blank=True)
+    patronymic = models.CharField('Отчество', max_length=255, blank=True)
+    name_en = models.CharField('Имя (лат.)', max_length=255, blank=True)
+    surname_en = models.CharField('Фамилия (лат.)', max_length=255, blank=True)
     phone = models.CharField('Телефон', max_length=32, blank=True)
+    phone_home = models.CharField('Доп. телефон', max_length=32, blank=True)
     email = models.EmailField('Email', blank=True)
+    sex = models.CharField('Пол', max_length=10, blank=True)
+    birthday = models.DateField('Дата рождения', null=True, blank=True)
+    passport_number = models.CharField('Паспорт (номер)', max_length=64, blank=True)
+    passport_issued_by = models.CharField('Паспорт (кем выдан)', max_length=255, blank=True)
+    passport_date = models.DateField('Паспорт (дата выдачи)', null=True, blank=True)
+    zagran_number = models.CharField('Загранпаспорт (номер)', max_length=64, blank=True)
+    zagran_expire = models.DateField('Загранпаспорт (действителен до)', null=True, blank=True)
+    address = models.CharField('Адрес', max_length=500, blank=True)
+    company = models.CharField('Компания', max_length=255, blank=True)
+    inn = models.CharField('ИНН', max_length=32, blank=True)
+    telegram = models.CharField('Telegram', max_length=100, blank=True)
+    whatsapp = models.CharField('WhatsApp', max_length=32, blank=True)
+    viber = models.CharField('Viber', max_length=32, blank=True)
+    social_vk = models.CharField('ВКонтакте', max_length=255, blank=True)
+    instagram = models.CharField('Instagram', max_length=100, blank=True)
+    country = models.CharField('Страна', max_length=100, blank=True)
+    city = models.CharField('Город', max_length=100, blank=True)
+    nationality = models.CharField('Гражданство', max_length=100, blank=True)
+    notes = models.TextField('Заметки', blank=True)
+    is_main_contact = models.BooleanField(
+        'Основной заказчик', default=False,
+        help_text='True — это тот, кто оформлял заявку (client_id заявки); False — сопутствующий турист.',
+    )
 
     class Meta:
         verbose_name = 'клиент U-ON'
@@ -90,7 +121,8 @@ class UonClient(UonMirrorRecord):
         ordering = ['-synced_at']
 
     def __str__(self):
-        return f'{self.name} ({self.phone})' if self.name else f'Клиент U-ON #{self.uon_id}'
+        full_name = f'{self.surname} {self.name}'.strip()
+        return f'{full_name} ({self.phone})' if full_name else f'Клиент U-ON #{self.uon_id}'
 
 
 class UonWebhookLog(models.Model):

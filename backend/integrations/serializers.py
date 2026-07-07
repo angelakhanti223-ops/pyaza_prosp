@@ -26,4 +26,11 @@ class UonLeadRecordSerializer(serializers.ModelSerializer):
 class UonClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = UonClient
-        fields = ['id', 'uon_id', 'name', 'phone', 'email', 'synced_at']
+        fields = [
+            'id', 'uon_id', 'name', 'surname', 'patronymic', 'name_en', 'surname_en',
+            'phone', 'phone_home', 'email', 'sex', 'birthday',
+            'passport_number', 'passport_issued_by', 'passport_date',
+            'zagran_number', 'zagran_expire', 'address', 'company', 'inn',
+            'telegram', 'whatsapp', 'viber', 'social_vk', 'instagram',
+            'country', 'city', 'nationality', 'notes', 'is_main_contact', 'synced_at',
+        ]

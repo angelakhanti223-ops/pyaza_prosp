@@ -39,6 +39,72 @@ def _parse_uon_datetime(value):
     return timezone.make_aware(naive, timezone.get_current_timezone())
 
 
+def _parse_uon_date(value):
+    """Как _parse_uon_datetime, но для дат без времени (день рождения, паспорт,
+    загранпаспорт) — и отбрасывает "0001-01-01 00:00", которым U-ON заполняет
+    пустую дату вместо null (подтверждено на живых данных туристов)."""
+    if not value or str(value).startswith('0001-01-01'):
+        return None
+    try:
+        return dt.strptime(value, '%Y-%m-%d %H:%M').date()
+    except ValueError:
+        logger.warning('U-ON: не удалось разобрать дату %r', value)
+        return None
+
+
+def _client_defaults_from_tourist(tourist: dict, is_main: bool) -> dict:
+    """Полный набор полей туриста из tourists[] заявки (подтверждено на живом
+    API) — самый богатый источник данных о человеке, доступный в этом API."""
+    sex_map = {1: 'муж', 2: 'жен'}
+    try:
+        sex = sex_map.get(int(tourist.get('u_sex') or 0), '')
+    except (TypeError, ValueError):
+        sex = ''
+    return {
+        'name': _s(tourist, 'u_name'),
+        'surname': _s(tourist, 'u_surname'),
+        'patronymic': _s(tourist, 'u_sname'),
+        'name_en': _s(tourist, 'u_name_en'),
+        'surname_en': _s(tourist, 'u_surname_en'),
+        'phone': _s(tourist, 'u_phone_mobile', 'u_phone'),
+        'phone_home': _s(tourist, 'u_phone_home'),
+        'email': _s(tourist, 'u_email'),
+        'sex': sex,
+        'birthday': _parse_uon_date(tourist.get('u_birthday')),
+        'passport_number': _s(tourist, 'u_passport_number'),
+        'passport_issued_by': _s(tourist, 'u_passport_taken'),
+        'passport_date': _parse_uon_date(tourist.get('u_passport_date')),
+        'zagran_number': _s(tourist, 'u_zagran_number'),
+        'zagran_expire': _parse_uon_date(tourist.get('u_zagran_expire')),
+        'address': _s(tourist, 'address'),
+        'company': _s(tourist, 'u_company'),
+        'inn': _s(tourist, 'u_inn'),
+        'telegram': _s(tourist, 'u_telegram'),
+        'whatsapp': _s(tourist, 'u_whatsapp'),
+        'viber': _s(tourist, 'u_viber'),
+        'social_vk': _s(tourist, 'u_social_vk'),
+        'instagram': _s(tourist, 'u_instagram'),
+        'country': _s(tourist, 'country'),
+        'city': _s(tourist, 'city'),
+        'nationality': _s(tourist, 'nationality'),
+        'notes': _s(tourist, 'u_note'),
+        'is_main_contact': is_main,
+        'raw_data': tourist,
+    }
+
+
+def _client_defaults_basic(data: dict, name: str, phone: str, email: str) -> dict:
+    """Заявки без tourists[] (обращения/lead всегда, заявки/request изредка) —
+    единственное, что есть о клиенте, это client_*-поля самого объекта."""
+    return {
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'is_main_contact': True,
+        'raw_data': {k: v for k, v in data.items() if k.startswith('client_')},
+    }
+
+
 @shared_task(
     bind=True,
     autoretry_for=(UonAdapterError,),
@@ -184,8 +250,10 @@ def sync_all_uon_reminders():
 )
 def sync_uon_request(self, request_id: str):
     """Подтягивает/обновляет одну заявку из U-ON по её ID — источник и для read-only
-    зеркала «Заявки» в CRM, и для карточки клиента (в этом API нет отдельного
-    /client-эндпоинта, данные клиента уже вложены в объект заявки).
+    зеркала «Заявки» в CRM, и для карточек клиентов/туристов (в этом API нет
+    отдельного /client-эндпоинта: основной контакт — из client_*-полей заявки,
+    а каждый турист, включая самого основного клиента, — из tourists[], самого
+    богатого источника данных о человеке, доступного в этом API).
 
     Вызывается либо вебхуком U-ON (UonWebhookView — событие поступает мгновенно
     при создании/изменении заявки), либо вручную через sync_all_uon_requests."""
@@ -219,19 +287,27 @@ def sync_uon_request(self, request_id: str):
         },
     )
 
-    client_id = data.get('client_id')
-    if client_id:
+    client_id = _s(data, 'client_id')
+    synced_client_ids = set()
+    for tourist in (data.get('tourists') or []):
+        tourist_id = _s(tourist, 'u_id')
+        if not tourist_id:
+            continue
         UonClient.objects.update_or_create(
-            uon_id=str(client_id),
-            defaults={
-                'name': client_name,
-                'phone': client_phone,
-                'email': client_email,
-                'raw_data': {k: v for k, v in data.items() if k.startswith('client_')},
-            },
+            uon_id=tourist_id,
+            defaults=_client_defaults_from_tourist(tourist, is_main=(tourist_id == client_id)),
+        )
+        synced_client_ids.add(tourist_id)
+
+    if client_id and client_id not in synced_client_ids:
+        UonClient.objects.update_or_create(
+            uon_id=client_id,
+            defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
 
-    logger.info('U-ON: заявка %s синхронизирована', request_id)
+    logger.info(
+        'U-ON: заявка %s синхронизирована (%s туристов)', request_id, len(synced_client_ids) or int(bool(client_id)),
+    )
     return True
 
 
@@ -277,16 +353,11 @@ def sync_uon_lead(self, lead_id: str):
         },
     )
 
-    client_id = data.get('client_id')
+    client_id = _s(data, 'client_id')
     if client_id:
         UonClient.objects.update_or_create(
-            uon_id=str(client_id),
-            defaults={
-                'name': client_name,
-                'phone': client_phone,
-                'email': client_email,
-                'raw_data': {k: v for k, v in data.items() if k.startswith('client_')},
-            },
+            uon_id=client_id,
+            defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
 
     logger.info('U-ON: обращение %s синхронизировано', lead_id)

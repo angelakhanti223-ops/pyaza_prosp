@@ -39,12 +39,39 @@ export type UonLeadRecord = {
   synced_at: string;
 };
 
+// Собирается из tourists[] заявки (самый полный источник данных о человеке
+// в API U-ON) либо, если туристов нет (обращения/lead), из основных client_*-полей.
 export type UonClientRecord = {
   id: number;
   uon_id: string;
   name: string;
+  surname: string;
+  patronymic: string;
+  name_en: string;
+  surname_en: string;
   phone: string;
+  phone_home: string;
   email: string;
+  sex: string;
+  birthday: string | null;
+  passport_number: string;
+  passport_issued_by: string;
+  passport_date: string | null;
+  zagran_number: string;
+  zagran_expire: string | null;
+  address: string;
+  company: string;
+  inn: string;
+  telegram: string;
+  whatsapp: string;
+  viber: string;
+  social_vk: string;
+  instagram: string;
+  country: string;
+  city: string;
+  nationality: string;
+  notes: string;
+  is_main_contact: boolean;
   synced_at: string;
 };
 
