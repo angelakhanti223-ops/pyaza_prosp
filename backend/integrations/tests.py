@@ -9,6 +9,7 @@ from leads.models import Direction, Lead
 from .adapters import MockUonAdapter, RealUonAdapter, UonAdapterError, build_ticket_payload
 from .models import UonClient, UonLeadRecord, UonRequestRecord, UonWebhookLog
 from .tasks import (
+    _match_manager_user,
     pull_uon_reminders_for_lead,
     sync_all_uon_leads,
     sync_all_uon_reminders,
@@ -451,6 +452,93 @@ class SyncAllUonLeadsTests(TestCase):
         sync_all_uon_leads()
 
         mock_delay.assert_called_once_with('199')
+
+
+class MatchManagerUserTests(TestCase):
+    def setUp(self):
+        User.objects.create_user(username='ekaterina', password='x', first_name='Екатерина', last_name='Макеева')
+        User.objects.create_user(username='elena', password='x', first_name='Елена', role=User.Role.HEAD)
+
+    def test_matches_by_first_name_case_insensitive(self):
+        user = _match_manager_user('екатерина макеева')
+        self.assertEqual(user.username, 'ekaterina')
+
+    def test_matches_single_name(self):
+        user = _match_manager_user('Елена')
+        self.assertEqual(user.username, 'elena')
+
+    def test_no_match_returns_none(self):
+        self.assertIsNone(_match_manager_user('Незнакомый Менеджер'))
+
+    def test_empty_returns_none(self):
+        self.assertIsNone(_match_manager_user(''))
+
+
+class SyncTasksFromRemindersTests(TestCase):
+    """Задачи по обращениям/заявкам из U-ON: подтягиваются через тот же sync,
+    ответственный подбирается по имени менеджера, в тексте всегда номер записи
+    и контакты клиента (ТЗ по требованию клиента)."""
+
+    def setUp(self):
+        self.ekaterina = User.objects.create_user(
+            username='ekaterina', password='x', first_name='Екатерина', last_name='Макеева',
+            role=User.Role.MANAGER,
+        )
+        self.column_new = KanbanColumn.objects.get(name='Новая')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_request_sync_creates_task_with_number_and_contact(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_request.return_value = dict(
+            REAL_REQUEST_PAYLOAD, manager_name='Екатерина Макеева',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 900, 'text': 'Позвонить клиенту', 'datetime': '2026-07-08 18:29', 'is_done': 0},
+        ]
+
+        sync_uon_request('61')
+
+        task = Task.objects.get(uon_reminder_id='900')
+        self.assertIn('№61', task.title)
+        self.assertIn('Позвонить клиенту', task.title)
+        self.assertIn('Заявка №61', task.description)
+        self.assertIn('Артамонов Алексей', task.description)
+        self.assertIn('+79273789757', task.description)
+        self.assertEqual(task.assignee_id, self.ekaterina.id)
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_lead_sync_creates_task_without_assignee_when_no_manager_match(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_lead.return_value = dict(
+            REAL_LEAD_PAYLOAD, manager_name='Кто-то Незнакомый',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 901, 'text': 'Уточнить даты', 'datetime': '2026-07-09 10:00', 'is_done': 0},
+        ]
+
+        sync_uon_lead('199')
+
+        task = Task.objects.get(uon_reminder_id='901')
+        self.assertIn('№199', task.title)
+        self.assertIn('Обращение №199', task.description)
+        self.assertIsNone(task.assignee)
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_rerun_updates_existing_task_without_duplicating(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_request.return_value = dict(
+            REAL_REQUEST_PAYLOAD, manager_name='Екатерина Макеева',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 902, 'text': 'Исходный текст', 'datetime': '2026-07-08 18:29', 'is_done': 0},
+        ]
+        sync_uon_request('61')
+
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 902, 'text': 'Обновлённый текст', 'datetime': '2026-07-08 18:29', 'is_done': 1},
+        ]
+        sync_uon_request('61')
+
+        self.assertEqual(Task.objects.filter(uon_reminder_id='902').count(), 1)
+        task = Task.objects.get(uon_reminder_id='902')
+        self.assertIn('Обновлённый текст', task.title)
 
 
 class UonWebhookViewTests(TestCase):

@@ -105,6 +105,74 @@ def _client_defaults_basic(data: dict, name: str, phone: str, email: str) -> dic
     }
 
 
+def _match_manager_user(manager_name: str):
+    """Сопоставляет ответственного по имени менеджера из U-ON (например
+    «Екатерина Макеева») с пользователем CRM — по первому слову ФИО, без учёта
+    регистра, среди first_name. Если совпадения нет — задача остаётся без
+    ответственного (назначить можно вручную)."""
+    if not manager_name:
+        return None
+    first_token = manager_name.strip().split()[0] if manager_name.strip() else ''
+    if not first_token:
+        return None
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    return User.objects.filter(first_name__iexact=first_token).first()
+
+
+def _sync_tasks_from_reminders(uon_id: str, kind_label: str, client_name: str, client_phone: str, manager_name: str):
+    """Создаёт/обновляет задачи на канбане по напоминаниям обращения/заявки из
+    U-ON — единый путь для request и lead, т.к. /reminder/{id}.json работает
+    для обоих (см. флаги in_lead/in_request в самом ответе). В тексте задачи
+    всегда указывается номер записи в U-ON и контакты клиента, чтобы можно
+    было сразу связаться, не открывая U-ON. Ответственный подбирается по имени
+    менеджера (см. _match_manager_user) — не найдено соответствие, значит
+    задача остаётся без ответственного."""
+    from kanban.models import Task
+    from kanban.services import next_order_in_column, reposition_task
+    from telegrambot.services import get_first_column, get_last_column
+
+    try:
+        reminders = get_uon_adapter().list_reminders(uon_id)
+    except UonAdapterError as exc:
+        logger.warning('U-ON: не удалось получить напоминания для %s %s: %s', kind_label, uon_id, exc)
+        return
+
+    first_column = get_first_column()
+    last_column = get_last_column()
+    if first_column is None:
+        logger.warning('U-ON: на доске не настроено ни одной колонки, пропускаем задачи')
+        return
+
+    assignee = _match_manager_user(manager_name)
+    contact = f'{kind_label} №{uon_id}\nКлиент: {client_name or "—"}\nТелефон: {client_phone or "—"}'
+
+    for reminder in reminders:
+        reminder_id = str(reminder['id'])
+        text = reminder.get('text') or f'Напоминание U-ON #{reminder_id}'
+        title = f'№{uon_id}: {text}'[:255]
+        deadline = _parse_uon_datetime(reminder.get('datetime'))
+        is_done = bool(reminder.get('is_done'))
+        target_column = last_column if (is_done and last_column) else first_column
+
+        task = Task.objects.filter(uon_reminder_id=reminder_id).first()
+        if task is None:
+            Task.objects.create(
+                uon_reminder_id=reminder_id, title=title, description=contact, deadline=deadline,
+                column=target_column, assignee=assignee, order=next_order_in_column(target_column),
+            )
+        else:
+            if task.column_id != target_column.id:
+                reposition_task(task, target_column, next_order_in_column(target_column))
+            task.title = title
+            task.description = contact
+            task.deadline = deadline
+            if assignee:
+                task.assignee = assignee
+            task.save(update_fields=['title', 'description', 'deadline', 'assignee'])
+
+
 @shared_task(
     bind=True,
     autoretry_for=(UonAdapterError,),
@@ -305,6 +373,8 @@ def sync_uon_request(self, request_id: str):
             defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
 
+    _sync_tasks_from_reminders(str(data['id']), 'Заявка', client_name, client_phone, _s(data, 'manager_name'))
+
     logger.info(
         'U-ON: заявка %s синхронизирована (%s туристов)', request_id, len(synced_client_ids) or int(bool(client_id)),
     )
@@ -359,6 +429,8 @@ def sync_uon_lead(self, lead_id: str):
             uon_id=client_id,
             defaults=_client_defaults_basic(data, client_name, client_phone, client_email),
         )
+
+    _sync_tasks_from_reminders(str(data['id']), 'Обращение', client_name, client_phone, _s(data, 'manager_name'))
 
     logger.info('U-ON: обращение %s синхронизировано', lead_id)
     return True

@@ -57,3 +57,13 @@ class TaskVisibilityTests(TestCase):
     def test_general_task_always_visible(self):
         Task.objects.create(title='General task', column=self.column)
         self.assertIn('General task', self._titles())
+
+    def test_appeal_without_local_lead_always_visible(self):
+        """Задачи, подтянутые напрямую по обращениям/заявкам из зеркала U-ON
+        (integrations.tasks.sync_uon_request/sync_uon_lead), не привязаны к
+        нашему Lead (lead=None) — статус-фильтр к ним неприменим, они не должны
+        скрываться (иначе исчезли бы вообще все задачи, подтянутые этим путём)."""
+        Task.objects.create(
+            title='U-ON task without local lead', column=self.column, uon_reminder_id='no-lead-1',
+        )
+        self.assertIn('U-ON task without local lead', self._titles())
