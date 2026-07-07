@@ -12,6 +12,19 @@ logger = logging.getLogger('integrations.uon')
 MAX_RETRIES = 5
 
 
+def _s(data: dict, *keys: str) -> str:
+    """Достаёт первое непустое строковое значение по списку ключей — важно
+    использовать вместо `data.get(key, '')`, т.к. в реальном API поле может
+    быть явным JSON null (не отсутствовать), а не только отсутствовать: в
+    этом случае .get(key, '') всё равно вернёт None, а не '', что роняет
+    сохранение в NOT NULL CharField (подтверждено на живых данных заявки #2)."""
+    for key in keys:
+        value = data.get(key)
+        if value:
+            return str(value)
+    return ''
+
+
 def _parse_uon_datetime(value):
     if not value:
         return None
@@ -183,23 +196,23 @@ def sync_uon_request(self, request_id: str):
         logger.warning('U-ON: заявка %s не найдена при синхронизации', request_id)
         return False
 
-    client_name = f"{data.get('client_surname', '')} {data.get('client_name', '')}".strip()
-    client_phone = data.get('client_phone_mobile') or data.get('client_phone', '')
-    client_email = data.get('client_email', '')
+    client_name = f"{_s(data, 'client_surname')} {_s(data, 'client_name')}".strip()
+    client_phone = _s(data, 'client_phone_mobile', 'client_phone')
+    client_email = _s(data, 'client_email')
 
     UonRequestRecord.objects.update_or_create(
         uon_id=str(data['id']),
         defaults={
-            'reservation_number': data.get('reservation_number') or '',
-            'client_id': str(data.get('client_id') or ''),
+            'reservation_number': _s(data, 'reservation_number'),
+            'client_id': _s(data, 'client_id'),
             'client_name': client_name,
             'client_phone': client_phone,
             'client_email': client_email,
-            'status_id': str(data.get('status_id') or ''),
-            'status_name': data.get('status') or '',
-            'manager_name': data.get('manager_name') or '',
-            'source_name': data.get('source') or '',
-            'notes': data.get('notes') or '',
+            'status_id': _s(data, 'status_id'),
+            'status_name': _s(data, 'status'),
+            'manager_name': _s(data, 'manager_name'),
+            'source_name': _s(data, 'source'),
+            'notes': _s(data, 'notes'),
             'is_archive': bool(data.get('is_archive')),
             'uon_created_at': _parse_uon_datetime(data.get('dat_request') or data.get('created_at')),
             'raw_data': data,
@@ -242,22 +255,22 @@ def sync_uon_lead(self, lead_id: str):
         logger.warning('U-ON: обращение %s не найдено при синхронизации', lead_id)
         return False
 
-    client_name = f"{data.get('client_surname', '')} {data.get('client_name', '')}".strip()
-    client_phone = data.get('client_phone_mobile') or data.get('client_phone', '')
-    client_email = data.get('client_email', '')
+    client_name = f"{_s(data, 'client_surname')} {_s(data, 'client_name')}".strip()
+    client_phone = _s(data, 'client_phone_mobile', 'client_phone')
+    client_email = _s(data, 'client_email')
 
     UonLeadRecord.objects.update_or_create(
         uon_id=str(data['id']),
         defaults={
-            'client_id': str(data.get('client_id') or ''),
+            'client_id': _s(data, 'client_id'),
             'client_name': client_name,
             'client_phone': client_phone,
             'client_email': client_email,
-            'status_id': str(data.get('status_id') or ''),
-            'status_name': data.get('status') or '',
-            'manager_name': data.get('manager_name') or '',
-            'source_name': data.get('source') or '',
-            'notes': data.get('notes') or '',
+            'status_id': _s(data, 'status_id'),
+            'status_name': _s(data, 'status'),
+            'manager_name': _s(data, 'manager_name'),
+            'source_name': _s(data, 'source'),
+            'notes': _s(data, 'notes'),
             'is_archive': bool(data.get('is_archive')),
             'uon_created_at': _parse_uon_datetime(data.get('dat_lead') or data.get('created_at')),
             'raw_data': data,

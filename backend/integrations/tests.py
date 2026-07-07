@@ -311,6 +311,37 @@ class SyncUonRequestTests(TestCase):
         sync_uon_request('999')
         self.assertEqual(UonRequestRecord.objects.count(), 0)
 
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_handles_explicit_json_null_fields(self, mock_get_adapter):
+        """Реальный случай из прода: заявка #2 имела client_phone_mobile/client_phone/
+        client_email/manager_name/source равными явному JSON null (не отсутствовали
+        вовсе) — dict.get(key, '') всё равно возвращает None в этом случае, что
+        роняло сохранение в NOT NULL CharField с IntegrityError."""
+        payload = {
+            'id': 2,
+            'client_id': 3,
+            'client_surname': None,
+            'client_name': None,
+            'client_phone_mobile': None,
+            'client_phone': None,
+            'client_email': None,
+            'status_id': None,
+            'status': 'Отказ',
+            'manager_name': None,
+            'source': None,
+            'notes': None,
+            'is_archive': True,
+            'dat_request': None,
+        }
+        mock_get_adapter.return_value.get_request.return_value = payload
+
+        sync_uon_request('2')
+
+        record = UonRequestRecord.objects.get(uon_id='2')
+        self.assertEqual(record.client_phone, '')
+        self.assertEqual(record.client_email, '')
+        self.assertEqual(record.client_name, '')
+
 
 REAL_LEAD_PAYLOAD = {
     'id': 199,
