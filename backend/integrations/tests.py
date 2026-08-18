@@ -133,6 +133,66 @@ class RealAdapterTests(TestCase):
         with self.assertRaises(UonAdapterError):
             adapter.create_ticket({'u_name': 'Иван'})
 
+    @patch('integrations.adapters.requests.post')
+    def test_create_reminder_calls_expected_url_and_body(self, mock_post):
+        mock_post.return_value.json.return_value = {'result': 200, 'id': '250'}
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        payload = {'r_id': '200', 'type_id': '1', 'text': 'x', 'manager_id': '12', 'created_u_id': '12'}
+        result = adapter.create_reminder(payload)
+
+        mock_post.assert_called_once_with(
+            'https://api.u-on.ru/KEY123/reminder/create.json', data=payload, timeout=10,
+        )
+        self.assertEqual(result['id'], '250')
+
+    @patch('integrations.adapters.requests.post')
+    def test_create_reminder_raises_on_non_200_result(self, mock_post):
+        mock_post.return_value.json.return_value = {'code': 500, 'error': {'message': '500 Server error'}}
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        with self.assertRaises(UonAdapterError):
+            adapter.create_reminder({'r_id': '200'})
+
+    @patch('integrations.adapters.requests.post')
+    def test_close_reminder_calls_expected_url_with_done_u_id(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        adapter.close_reminder('5001', done_u_id='12')
+
+        mock_post.assert_called_once_with(
+            'https://api.u-on.ru/KEY123/reminder/close/5001.json',
+            data={'done': '1', 'done_u_id': '12'}, timeout=10,
+        )
+
+    @patch('integrations.adapters.requests.post')
+    def test_close_reminder_without_done_u_id_omits_it(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        adapter.close_reminder('5001')
+
+        mock_post.assert_called_once_with(
+            'https://api.u-on.ru/KEY123/reminder/close/5001.json',
+            data={'done': '1'}, timeout=10,
+        )
+
+    @patch('integrations.adapters.requests.get')
+    def test_list_request_actions_calls_expected_url(self, mock_get):
+        mock_get.return_value.json.return_value = {'request-action': [{'id': 1, 'text': 'привет'}]}
+        mock_get.return_value.raise_for_status = MagicMock()
+
+        adapter = RealUonAdapter(api_key='KEY123', base_url='https://api.u-on.ru')
+        result = adapter.list_request_actions('200')
+
+        mock_get.assert_called_once_with(
+            'https://api.u-on.ru/KEY123/request-action/200.json', timeout=10,
+        )
+        self.assertEqual(result, [{'id': 1, 'text': 'привет'}])
+
 
 class SyncLeadToUonTests(TestCase):
     def setUp(self):
@@ -813,7 +873,7 @@ class HandleUonStatusChangeTests(TestCase):
             'request_id': '226', 'status_id_old': FOLLOWUP_TRIGGER_STATUS_ID, 'status_id_new': '6',
         })
 
-        mock_get_adapter.return_value.close_reminder.assert_called_once_with('5001')
+        mock_get_adapter.return_value.close_reminder.assert_called_once_with('5001', done_u_id='')
 
     def test_unrelated_status_change_is_noop(self):
         handle_uon_status_change({'request_id': '226', 'status_id_old': '3', 'status_id_new': '4'})
@@ -861,6 +921,7 @@ REAL_LEAD_FOLLOWUP_PAYLOAD = {
     'client_name': 'Мария',
     'client_phone_mobile': '+79991234567',
     'status_id': FOLLOWUP_TRIGGER_STATUS_ID,
+    'manager_id': '12',
     'manager_name': 'Екатерина Макеева',
     'requirements_countries': '4,12',
     'date_from': '2026-07-27',
@@ -906,7 +967,44 @@ class AdvanceFollowupChainsTests(TestCase):
         self.assertIn('Иванова Мария', payload['text'])
         self.assertIn('+79991234567', payload['text'])
         self.assertIn('450000', payload['text'])
+        # manager_id/created_u_id — документация U-ON называет их необязательными,
+        # но их отсутствие подтверждённо роняет reminder/create в 500 на живом API
+        # (18.08.2026); без них создавать напоминание нельзя, см. advance_followup_chains.
+        self.assertEqual(payload['manager_id'], '12')
+        self.assertEqual(payload['created_u_id'], '12')
         mock_sync_delay.assert_called_once_with('226')
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_falls_back_to_default_manager_id_when_lead_has_none(self, mock_get_adapter, mock_sync_delay):
+        with self.settings(UON_DEFAULT_MANAGER_ID='99'):
+            mock_get_adapter.return_value.get_lead.return_value = dict(
+                REAL_LEAD_FOLLOWUP_PAYLOAD, manager_id='', manager_name='',
+            )
+            mock_get_adapter.return_value.list_request_actions.return_value = []
+            mock_get_adapter.return_value.create_reminder.return_value = {'result': 200, 'id': '5002'}
+
+            advance_followup_chains()
+
+        payload = mock_get_adapter.return_value.create_reminder.call_args.args[0]
+        self.assertEqual(payload['manager_id'], '99')
+        self.assertEqual(payload['created_u_id'], '99')
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_skips_reminder_when_no_manager_id_resolvable(self, mock_get_adapter, mock_sync_delay):
+        with self.settings(UON_DEFAULT_MANAGER_ID=''):
+            mock_get_adapter.return_value.get_lead.return_value = dict(
+                REAL_LEAD_FOLLOWUP_PAYLOAD, manager_id='', manager_name='',
+            )
+
+            advance_followup_chains()
+
+        mock_get_adapter.return_value.create_reminder.assert_not_called()
+        mock_sync_delay.assert_not_called()
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.state, UonFollowupChain.State.ACTIVE)
+        self.assertEqual(self.chain.step, UonFollowupChain.Step.TOUCH_1)
 
     @patch('integrations.tasks.sync_uon_lead.delay')
     @patch('integrations.tasks.get_uon_adapter')

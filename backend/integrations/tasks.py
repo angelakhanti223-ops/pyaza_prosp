@@ -514,11 +514,15 @@ def _close_active_chains(lead_id: str, reason: str, close_remote_reminder: bool 
     нескольких записей для разных «заходов» в статус 2 у одного обращения)."""
     from .models import UonFollowupChain
 
+    from django.conf import settings
+
     chains = list(UonFollowupChain.objects.filter(lead_id=lead_id, state=UonFollowupChain.State.ACTIVE))
     for chain in chains:
         if close_remote_reminder and chain.reminder_id:
             try:
-                get_uon_adapter().close_reminder(chain.reminder_id)
+                get_uon_adapter().close_reminder(
+                    chain.reminder_id, done_u_id=getattr(settings, 'UON_DEFAULT_MANAGER_ID', ''),
+                )
             except UonAdapterError as exc:
                 logger.warning('U-ON followup: не удалось закрыть задачу %s в U-ON: %s', chain.reminder_id, exc)
         chain.state = reason
@@ -705,6 +709,24 @@ def advance_followup_chains():
             chain.save(update_fields=['state', 'updated_at'])
             continue
 
+        # manager_id/created_u_id документация U-ON помечает необязательными, но их
+        # отсутствие подтверждённо роняет reminder/create в 500 (18.08.2026, живой API,
+        # проверено трижды, включая заведомо валидную заявку без этих полей). Без
+        # разрешимого manager_id создавать напоминание в U-ON нельзя вообще — такое
+        # обращение просто останется без дубля в U-ON (см. _titled в
+        # _sync_tasks_from_reminders — на канбане такая задача и так не назначается
+        # никому «по умолчанию», это то же самое ограничение с другой стороны).
+        from django.conf import settings
+
+        manager_id = _s(data, 'manager_id') or getattr(settings, 'UON_DEFAULT_MANAGER_ID', '')
+        if not manager_id:
+            logger.warning(
+                'U-ON followup: у обращения %s нет менеджера и не задан '
+                'UON_DEFAULT_MANAGER_ID — пропускаю создание напоминания в U-ON (шаг %s)',
+                chain.lead_id, chain.step,
+            )
+            continue  # next_fire_at не сдвигаем — попробуем на следующем проходе планировщика
+
         uon_url = build_uon_record_url('lead', chain.lead_id)
         text = _build_followup_text(chain.step, data, chain.lead_id, uon_url)
         now_local = timezone.localtime(timezone.now())
@@ -714,6 +736,8 @@ def advance_followup_chains():
             'datetime': now_local.strftime('%Y-%m-%d %H:%M:%S'),
             'datetime_to': (now_local + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S'),
             'text': text,
+            'manager_id': manager_id,
+            'created_u_id': manager_id,
         }
         try:
             response = get_uon_adapter().create_reminder(reminder_payload)

@@ -35,7 +35,7 @@ class BaseUonAdapter:
         используется цепочкой автозадач «клиент молчит после подборки»."""
         raise NotImplementedError
 
-    def close_reminder(self, reminder_id: str) -> None:
+    def close_reminder(self, reminder_id: str, done_u_id: str = '') -> None:
         """Закрыть задачу (U-ON: POST /{key}/reminder/close/{id}.json) — вызывается,
         когда цепочка гасится досрочно (клиент ответил), а задача уже была создана."""
         raise NotImplementedError
@@ -69,7 +69,7 @@ class MockUonAdapter(BaseUonAdapter):
     def create_reminder(self, payload: dict) -> dict:
         return {'result': 200, 'id': f'MOCK-REMINDER-{uuid.uuid4().hex[:10]}', 'mock': True, 'echo': payload}
 
-    def close_reminder(self, reminder_id: str) -> None:
+    def close_reminder(self, reminder_id: str, done_u_id: str = '') -> None:
         return None
 
     def list_request_actions(self, request_id: str) -> list:
@@ -156,11 +156,12 @@ class RealUonAdapter(BaseUonAdapter):
         return items[0] if items else None
 
     def create_reminder(self, payload: dict) -> dict:
-        # NOT YET CONFIRMED against a live call (found via cabinet recon, not tested)
-        # — response shape assumed to follow the same {"result": 200, "id": "..."}
-        # convention as lead/create.json, every other write endpoint in this API.
-        # Check UonWebhookLog / logs after the first real chain fires and adjust
-        # if the actual shape differs.
+        # Response shape {"result": 200, "id": "..."} confirmed against a live call
+        # (18.08.2026, заявка #61). ВАЖНО: manager_id и created_u_id документация
+        # помечает как необязательные ("Обязательное? Нет"), но на практике их
+        # отсутствие роняет сервер в 500 ("500 Server error", без деталей) —
+        # подтверждено трижды (обращение 200, его id_system=198, и даже заведомо
+        # рабочая заявка №61 без этих полей). Вызывающий код обязан их передавать.
         try:
             response = requests.post(
                 f'{self.base_url}/{self.api_key}/reminder/create.json',
@@ -175,12 +176,19 @@ class RealUonAdapter(BaseUonAdapter):
             raise UonAdapterError(f'U-ON reminder/create.json вернул ошибку: {data}')
         return data
 
-    def close_reminder(self, reminder_id: str) -> None:
-        # NOT YET CONFIRMED against a live call — best-effort, caller must swallow
-        # UonAdapterError so a failed close never blocks the chain from finishing.
+    def close_reminder(self, reminder_id: str, done_u_id: str = '') -> None:
+        # done/done_u_id/done_datetime подтверждены в документации как необязательные —
+        # но после того, как то же самое "необязательно" оказалось неправдой для
+        # reminder/create (см. выше), на всякий случай передаём done_u_id, если он
+        # известен. Best-effort: вызывающий код обязан гасить UonAdapterError, чтобы
+        # неудачное закрытие никогда не блокировало саму цепочку.
+        payload = {'done': '1'}
+        if done_u_id:
+            payload['done_u_id'] = done_u_id
         try:
             response = requests.post(
                 f'{self.base_url}/{self.api_key}/reminder/close/{reminder_id}.json',
+                data=payload,
                 timeout=10,
             )
             response.raise_for_status()

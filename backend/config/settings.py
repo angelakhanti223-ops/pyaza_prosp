@@ -239,6 +239,14 @@ UON_WEBHOOK_SECRET = env('UON_WEBHOOK_SECRET', default='')
 # {UON_CABINET_URL}/request_edit_lead.php?r_id={id} — same page for both заявки and
 # обращения (only r_id changes); adjust here if обращения turn out to need a different page.
 UON_CABINET_URL = env('UON_CABINET_URL', default='https://id62499.u-on.ru')
+# Числовой ID менеджера в U-ON (см. GET /manager.json), используется как manager_id/
+# created_u_id/done_u_id для reminder/create и reminder/close, когда у обращения нет
+# своего менеджера — эти поля документация называет необязательными, но на практике
+# их отсутствие роняет U-ON в 500 (подтверждено 18.08.2026 трижды на живом API, в том
+# числе на заведомо валидной заявке). Пусто — цепочка автозадач пропустит создание
+# напоминания в U-ON для обращений без менеджера (в лог), но задача на канбане и
+# уведомление в Telegram всё равно создадутся.
+UON_DEFAULT_MANAGER_ID = env('UON_DEFAULT_MANAGER_ID', default='')
 
 
 # Telegram bot (менеджерские команды и уведомления о назначении задач/заявок —
