@@ -29,9 +29,14 @@ def _s(data: dict, *keys: str) -> str:
 def _parse_uon_datetime(value):
     if not value:
         return None
-    try:
-        naive = dt.strptime(value, '%Y-%m-%d %H:%M')
-    except ValueError:
+    naive = None
+    for _fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
+        try:
+            naive = dt.strptime(value, _fmt)
+            break
+        except ValueError:
+            continue
+    if naive is None:
         # Формат "%Y-%m-%d %H:%M" подтверждён и для reminder.datetime, и для
         # request.dat_request на живом API — но не роняем синхронизацию, если
         # какое-то другое поле окажется в ином формате.
@@ -764,3 +769,86 @@ def advance_followup_chains():
         sync_uon_lead.delay(chain.lead_id)
 
     logger.info('U-ON followup: обработано цепочек: %s', len(due))
+
+
+_UON_SOURCE_MAP = {
+    '7': 'chatbot',
+}
+
+
+@shared_task
+def handle_uon_task_added(payload: dict):
+    """Событие U-ON «Добавление задачи» (type_id=34).
+
+    Payload вебхука содержит обращение (request[...]) и клиента (client[...])
+    целиком, поэтому лид и задача создаются напрямую, без запросов в API U-ON.
+    Повторная доставка того же вебхука дублей не создаёт.
+    """
+    from kanban.models import Task
+    from kanban.services import next_order_in_column
+    from leads.models import Lead
+    from telegrambot.services import get_first_column
+
+    def g(*keys):
+        for key in keys:
+            value = payload.get(key)
+            if value not in (None, ''):
+                return str(value).strip()
+        return ''
+
+    uon_ticket_id = g('request[r_id]', 'r_id', 'request_id')
+    reminder_id = g('reminder_id')
+    if uon_ticket_id in ('', '0') or not reminder_id:
+        logger.warning('U-ON task: нет r_id или reminder_id, пропускаем: %s', payload)
+        return False
+
+    name = ' '.join(p for p in (g('client[u_surname]'), g('client[u_name]')) if p)
+    lead, lead_created = Lead.objects.get_or_create(
+        uon_ticket_id=uon_ticket_id,
+        defaults={
+            'name': name or 'Обращение U-ON #%s' % uon_ticket_id,
+            'phone': g('client[u_phone_mobile]', 'client[u_phone]'),
+            'email': g('client[u_email]'),
+            'source': _UON_SOURCE_MAP.get(g('request[source_id]'), 'other'),
+            'initial_comment': g('client[u_note]'),
+        },
+    )
+
+    column = get_first_column()
+    if column is None:
+        logger.warning('U-ON task: на доске не настроено ни одной колонки, пропускаем')
+        return False
+
+    title = (g('text') or 'Напоминание U-ON #%s' % reminder_id)[:255]
+    deadline = _parse_uon_datetime(g('date_from_msk', 'date_from'))
+
+    task = Task.objects.filter(uon_reminder_id=reminder_id).first()
+    if task is None:
+        task = Task.objects.create(
+            uon_reminder_id=reminder_id,
+            title=title,
+            lead=lead,
+            column=column,
+            deadline=deadline,
+            assignee=lead.assigned_manager,
+            order=next_order_in_column(column),
+            uon_record_kind='lead',
+            uon_record_id=uon_ticket_id,
+        )
+        task_created = True
+    else:
+        Task.objects.filter(pk=task.pk).update(
+            title=title, deadline=deadline, lead=lead,
+            uon_record_kind='lead', uon_record_id=uon_ticket_id,
+        )
+        task_created = False
+
+    logger.info(
+        'U-ON task: лид #%s (%s), задача #%s (%s), напоминание %s',
+        lead.pk, 'создан' if lead_created else 'уже был',
+        task.pk, 'создана' if task_created else 'обновлена', reminder_id,
+    )
+    if task_created:
+        from telegrambot.tasks import notify_task_created
+        notify_task_created.delay(task.pk)
+    return True

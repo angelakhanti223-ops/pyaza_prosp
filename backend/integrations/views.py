@@ -24,6 +24,7 @@ from .tasks import (
 _STATUS_CHANGE_TYPE_ID = '16'
 _CHAT_MESSAGE_TYPE_ID = '15'
 _CHAIN_CLOSE_TYPE_IDS = {'27', '55'}
+_TASK_ADDED_TYPE_ID = '34'
 
 
 class UonSyncTriggerView(APIView):
@@ -68,10 +69,13 @@ class UonWebhookView(APIView):
 
         # dict(...) — на случай form-urlencoded тела (QueryDict): Celery с JSON-
         # сериализатором не умеет передать QueryDict напрямую в .delay(payload).
-        payload = dict(request.data)
+        payload = request.data.dict() if hasattr(request.data, 'dict') else dict(request.data)
         type_id = str(payload.get('type_id', ''))
         request_id = str(payload.get('request_id') or payload.get('r_id') or '')
         lead_id = str(payload.get('lead_id') or payload.get('l_id') or '')
+        # U-ON шлёт '0' вместо пустоты, а строка '0' проходит проверку ниже
+        request_id = '' if request_id in ('0', '') else request_id
+        lead_id = '' if lead_id in ('0', '') else lead_id
 
         UonWebhookLog.objects.create(payload=payload, type_id=type_id, request_id=request_id or lead_id)
 
@@ -88,6 +92,9 @@ class UonWebhookView(APIView):
             handle_uon_client_reply.delay(payload)
         elif type_id in _CHAIN_CLOSE_TYPE_IDS:
             handle_uon_chain_close.delay(payload)
+        elif type_id == _TASK_ADDED_TYPE_ID:
+            from .tasks import handle_uon_task_added
+            handle_uon_task_added.delay(payload)
 
         return Response({'detail': 'ok'})
 
