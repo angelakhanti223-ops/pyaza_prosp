@@ -16,12 +16,33 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { listColumns, listTasks, moveTask, type KanbanColumn, type KanbanTask } from "@/lib/kanbanApi";
-import BoardToolbar, { type AssigneeFilter, type SortMode } from "./BoardToolbar";
+import BoardToolbar, { type AssigneeFilter, type DateFilter, type SortMode } from "./BoardToolbar";
 import Column from "./Column";
 import TaskCard from "./TaskCard";
 import TaskModal from "./TaskModal";
 
 const PRIORITY_RANK: Record<string, number> = { urgent_important: 0, important: 1 };
+
+function startOfDay(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function matchesDateFilter(task: KanbanTask, filter: DateFilter): boolean {
+  if (filter === "all") return true;
+  if (!task.deadline) return false;
+
+  const today = startOfDay(new Date());
+  const deadlineDay = startOfDay(new Date(task.deadline));
+
+  if (filter === "overdue") return deadlineDay.getTime() < today.getTime();
+  if (filter === "today") return deadlineDay.getTime() === today.getTime();
+  // week — сегодня и ещё 6 дней вперёд (просроченные сюда не попадают, для них своя кнопка)
+  const weekEnd = new Date(today);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  return deadlineDay.getTime() >= today.getTime() && deadlineDay.getTime() <= weekEnd.getTime();
+}
 
 function sortTasks(tasks: KanbanTask[], mode: SortMode): KanbanTask[] {
   if (mode === "manual") return [...tasks].sort((a, b) => a.order - b.order);
@@ -55,6 +76,7 @@ export default function Board() {
   const [modalState, setModalState] = useState<{ task: KanbanTask | null; columnId: number | null } | null>(null);
   const [search, setSearch] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>("all");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("manual");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -85,7 +107,8 @@ export default function Board() {
     return grouped;
   }, [columns, tasks]);
 
-  const filtersActive = search.trim() !== "" || assigneeFilter !== "all" || sortMode !== "manual";
+  const filtersActive =
+    search.trim() !== "" || assigneeFilter !== "all" || dateFilter !== "all" || sortMode !== "manual";
 
   const visibleTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -94,12 +117,13 @@ export default function Board() {
         const haystack = `${task.title} ${task.description} ${task.lead_name ?? ""}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
-      if (assigneeFilter === "mine") return task.assignee?.id === user?.id;
-      if (assigneeFilter === "unassigned") return !task.assignee;
-      if (typeof assigneeFilter === "number") return task.assignee?.id === assigneeFilter;
+      if (assigneeFilter === "mine" && task.assignee?.id !== user?.id) return false;
+      if (assigneeFilter === "unassigned" && task.assignee) return false;
+      if (typeof assigneeFilter === "number" && task.assignee?.id !== assigneeFilter) return false;
+      if (!matchesDateFilter(task, dateFilter)) return false;
       return true;
     });
-  }, [tasks, search, assigneeFilter, user]);
+  }, [tasks, search, assigneeFilter, dateFilter, user]);
 
   const visibleTasksByColumn = useMemo(() => {
     const grouped: Record<number, KanbanTask[]> = {};
@@ -168,6 +192,8 @@ export default function Board() {
         onSearchChange={setSearch}
         assigneeFilter={assigneeFilter}
         onAssigneeFilterChange={setAssigneeFilter}
+        dateFilter={dateFilter}
+        onDateFilterChange={setDateFilter}
         sortMode={sortMode}
         onSortModeChange={setSortMode}
         managers={managers}

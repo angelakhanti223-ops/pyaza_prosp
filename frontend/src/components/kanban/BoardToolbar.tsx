@@ -5,12 +5,21 @@ import type { CrmUser } from "@/lib/crmApi";
 
 export type AssigneeFilter = "all" | "mine" | "unassigned" | number;
 export type SortMode = "manual" | "deadline" | "priority";
+export type DateFilter = "all" | "today" | "week" | "overdue";
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: "today", label: "Сегодня" },
+  { value: "week", label: "На неделю" },
+  { value: "overdue", label: "Просроченные" },
+];
 
 type Props = {
   search: string;
   onSearchChange: (value: string) => void;
   assigneeFilter: AssigneeFilter;
   onAssigneeFilterChange: (value: AssigneeFilter) => void;
+  dateFilter: DateFilter;
+  onDateFilterChange: (value: DateFilter) => void;
   sortMode: SortMode;
   onSortModeChange: (value: SortMode) => void;
   managers: CrmUser[];
@@ -22,12 +31,15 @@ export default function BoardToolbar({
   onSearchChange,
   assigneeFilter,
   onAssigneeFilterChange,
+  dateFilter,
+  onDateFilterChange,
   sortMode,
   onSortModeChange,
   managers,
   resultCount,
 }: Props) {
-  const filtersActive = search.trim() !== "" || assigneeFilter !== "all" || sortMode !== "manual";
+  const filtersActive =
+    search.trim() !== "" || assigneeFilter !== "all" || dateFilter !== "all" || sortMode !== "manual";
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -60,6 +72,21 @@ export default function BoardToolbar({
         ))}
       </select>
 
+      <div className="flex items-center gap-1 rounded-xl bg-blue-light/40 p-1">
+        {DATE_FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onDateFilterChange(dateFilter === opt.value ? "all" : opt.value)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              dateFilter === opt.value ? "bg-navy text-white" : "text-navy/70 hover:bg-white"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       <select
         value={sortMode}
         onChange={(e) => onSortModeChange(e.target.value as SortMode)}
@@ -78,6 +105,7 @@ export default function BoardToolbar({
             onClick={() => {
               onSearchChange("");
               onAssigneeFilterChange("all");
+              onDateFilterChange("all");
               onSortModeChange("manual");
             }}
             className="text-xs font-medium text-blue hover:underline"
