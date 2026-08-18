@@ -79,6 +79,14 @@ services:
     command: python manage.py run_telegram_bot
     env_file:
       - .env
+    # api.telegram.org resolves to both an A and AAAA record; the default
+    # Docker bridge network has no IPv6 route, so httpx's Happy-Eyeballs
+    # logic tries the AAAA address first and fails immediately with
+    # "Network is unreachable" instead of falling back to IPv4 (confirmed
+    # live, 18.08.2026 — this, not Russian ISP throttling, was the actual
+    # cause of every TimedOut/Conflict seen while debugging the bot today).
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
     depends_on:
       db:
         condition: service_healthy
