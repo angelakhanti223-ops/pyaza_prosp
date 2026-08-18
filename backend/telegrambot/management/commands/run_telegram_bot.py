@@ -8,7 +8,10 @@ logger = logging.getLogger('telegrambot')
 
 
 class Command(BaseCommand):
-    help = 'Запускает Telegram-бота (long polling) для команд менеджеров.'
+    help = (
+        'Запускает Telegram-бота для команд менеджеров: webhook-режим, если задан '
+        'TELEGRAM_WEBHOOK_URL, иначе long polling.'
+    )
 
     def handle(self, *args, **options):
         if not settings.TELEGRAM_BOT_ENABLED or not settings.TELEGRAM_BOT_TOKEN:
@@ -25,5 +28,23 @@ class Command(BaseCommand):
         from telegrambot.bot import build_application
 
         application = build_application()
-        self.stdout.write(self.style.SUCCESS('Telegram-бот запущен (long polling)...'))
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+        if settings.TELEGRAM_WEBHOOK_URL:
+            # Вебхук: Telegram сам шлёт короткий POST при каждом апдейте — в
+            # отличие от long polling (постоянно открытое исходящее соединение),
+            # это не упирается в замедление Telegram у российских провайдеров
+            # (см. TELEGRAM_WEBHOOK_URL в settings.py).
+            self.stdout.write(self.style.SUCCESS(
+                f'Telegram-бот запущен (webhook: {settings.TELEGRAM_WEBHOOK_URL})...',
+            ))
+            application.run_webhook(
+                listen='0.0.0.0',
+                port=settings.TELEGRAM_WEBHOOK_PORT,
+                url_path=settings.TELEGRAM_WEBHOOK_PATH,
+                webhook_url=settings.TELEGRAM_WEBHOOK_URL,
+                secret_token=settings.TELEGRAM_WEBHOOK_SECRET or None,
+                allowed_updates=Update.ALL_TYPES,
+            )
+        else:
+            self.stdout.write(self.style.SUCCESS('Telegram-бот запущен (long polling)...'))
+            application.run_polling(allowed_updates=Update.ALL_TYPES)

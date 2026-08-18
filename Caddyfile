@@ -23,6 +23,13 @@
 		reverse_proxy backend:8000
 	}
 
+	# Telegram webhook — обрабатывается отдельным процессом (telegram_bot,
+	# встроенный HTTP-сервер python-telegram-bot), не через Django/Gunicorn.
+	# См. TELEGRAM_WEBHOOK_URL в settings.py.
+	handle /telegram-webhook* {
+		reverse_proxy telegram_bot:8080
+	}
+
 	# Everything else: the Next.js site (public pages + /crm).
 	handle {
 		reverse_proxy frontend:3000

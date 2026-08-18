@@ -255,6 +255,23 @@ UON_DEFAULT_MANAGER_ID = env('UON_DEFAULT_MANAGER_ID', default='')
 TELEGRAM_BOT_ENABLED = env.bool('TELEGRAM_BOT_ENABLED', default=False)
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_API_BASE_URL = env('TELEGRAM_API_BASE_URL', default='https://api.telegram.org')
+# Юзернейм бота у @BotFather (без @) — только для человекочитаемых ссылок
+# привязки (telegram_link_code), сам бот определяет себя по токену.
+TELEGRAM_BOT_USERNAME = env('TELEGRAM_BOT_USERNAME', default='flypenza_bot')
+
+# Если задан TELEGRAM_WEBHOOK_URL — бот работает через вебхук (Telegram сам шлёт
+# короткий POST на этот адрес), иначе — long polling (см. run_telegram_bot.py).
+# Причина: с прод-сервера (РФ) long polling стабильно валится в TimedOut —
+# подтверждено 18.08.2026, оператор режет именно постоянно открытые исходящие
+# соединения, короткие запросы к api.telegram.org при этом проходят нормально.
+# В деве оставляем пусто — там нет публичного HTTPS для приёма вебхука.
+TELEGRAM_WEBHOOK_URL = env('TELEGRAM_WEBHOOK_URL', default='')
+TELEGRAM_WEBHOOK_PATH = env('TELEGRAM_WEBHOOK_PATH', default='/telegram-webhook')
+TELEGRAM_WEBHOOK_PORT = env.int('TELEGRAM_WEBHOOK_PORT', default=8080)
+# Telegram присылает это значение в заголовке X-Telegram-Bot-Api-Secret-Token
+# на каждом вебхуке — минимальная защита от посторонних POST на этот URL,
+# аналогично UON_WEBHOOK_SECRET для интеграции с U-ON.
+TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 
 
 LOGGING = {
