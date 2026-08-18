@@ -19,9 +19,18 @@ const KIND_STYLES: Record<TaskKind, string> = {
   general: "border-l-4 border-l-yellow-400 bg-yellow-50",
 };
 
-export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick: () => void }) {
+export default function TaskCard({
+  task,
+  draggable = true,
+  onClick,
+}: {
+  task: KanbanTask;
+  draggable?: boolean;
+  onClick: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
+    disabled: !draggable,
   });
 
   const style = {
@@ -38,9 +47,9 @@ export default function TaskCard({ task, onClick }: { task: KanbanTask; onClick:
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...(draggable ? listeners : {})}
       onClick={onClick}
-      className={`cursor-grab rounded-xl border border-black/5 p-3 text-sm shadow-sm active:cursor-grabbing ${KIND_STYLES[task.kind]}`}
+      className={`rounded-xl border border-black/5 p-3 text-sm shadow-sm ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${KIND_STYLES[task.kind]}`}
     >
       <p className="font-medium text-navy">{task.title}</p>
       {task.lead_name && (

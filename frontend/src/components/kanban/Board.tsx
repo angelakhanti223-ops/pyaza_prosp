@@ -13,10 +13,29 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
+import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { listColumns, listTasks, moveTask, type KanbanColumn, type KanbanTask } from "@/lib/kanbanApi";
+import BoardToolbar, { type AssigneeFilter, type SortMode } from "./BoardToolbar";
 import Column from "./Column";
 import TaskCard from "./TaskCard";
 import TaskModal from "./TaskModal";
+
+const PRIORITY_RANK: Record<string, number> = { urgent_important: 0, important: 1 };
+
+function sortTasks(tasks: KanbanTask[], mode: SortMode): KanbanTask[] {
+  if (mode === "manual") return [...tasks].sort((a, b) => a.order - b.order);
+  if (mode === "priority") {
+    return [...tasks].sort((a, b) => (PRIORITY_RANK[a.priority ?? ""] ?? 2) - (PRIORITY_RANK[b.priority ?? ""] ?? 2));
+  }
+  // deadline — задачи без срока уходят в конец
+  return [...tasks].sort((a, b) => {
+    if (!a.deadline && !b.deadline) return 0;
+    if (!a.deadline) return 1;
+    if (!b.deadline) return -1;
+    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+  });
+}
 
 function resolveTargetColumnId(overId: string | number, tasks: KanbanTask[]): number | null {
   if (typeof overId === "string" && overId.startsWith("column-")) {
@@ -27,18 +46,24 @@ function resolveTargetColumnId(overId: string | number, tasks: KanbanTask[]): nu
 }
 
 export default function Board() {
+  const { user } = useCrmAuth();
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [managers, setManagers] = useState<CrmUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [modalState, setModalState] = useState<{ task: KanbanTask | null; columnId: number | null } | null>(null);
+  const [search, setSearch] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("manual");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const load = () => {
-    Promise.all([listColumns(), listTasks()]).then(([cols, tks]) => {
+    Promise.all([listColumns(), listTasks(), listManagers()]).then(([cols, tks, mgrs]) => {
       setColumns(cols);
       setTasks(tks);
+      setManagers(mgrs);
       setLoading(false);
     });
   };
@@ -59,6 +84,35 @@ export default function Board() {
     }
     return grouped;
   }, [columns, tasks]);
+
+  const filtersActive = search.trim() !== "" || assigneeFilter !== "all" || sortMode !== "manual";
+
+  const visibleTasks = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return tasks.filter((task) => {
+      if (query) {
+        const haystack = `${task.title} ${task.description} ${task.lead_name ?? ""}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      if (assigneeFilter === "mine") return task.assignee?.id === user?.id;
+      if (assigneeFilter === "unassigned") return !task.assignee;
+      if (typeof assigneeFilter === "number") return task.assignee?.id === assigneeFilter;
+      return true;
+    });
+  }, [tasks, search, assigneeFilter, user]);
+
+  const visibleTasksByColumn = useMemo(() => {
+    const grouped: Record<number, KanbanTask[]> = {};
+    for (const col of columns) grouped[col.id] = [];
+    for (const task of visibleTasks) {
+      if (!grouped[task.column]) grouped[task.column] = [];
+      grouped[task.column].push(task);
+    }
+    for (const colId in grouped) {
+      grouped[colId] = sortTasks(grouped[colId], sortMode);
+    }
+    return grouped;
+  }, [columns, visibleTasks, sortMode]);
 
   function handleDragStart(event: DragStartEvent) {
     const task = tasks.find((t) => t.id === event.active.id);
@@ -109,6 +163,16 @@ export default function Board() {
 
   return (
     <div>
+      <BoardToolbar
+        search={search}
+        onSearchChange={setSearch}
+        assigneeFilter={assigneeFilter}
+        onAssigneeFilterChange={setAssigneeFilter}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
+        managers={managers}
+        resultCount={visibleTasks.length}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -121,7 +185,8 @@ export default function Board() {
             <Column
               key={col.id}
               column={col}
-              tasks={tasksByColumn[col.id] ?? []}
+              tasks={visibleTasksByColumn[col.id] ?? []}
+              draggable={!filtersActive}
               onTaskClick={(task) => setModalState({ task, columnId: null })}
               onAddTask={(columnId) => setModalState({ task: null, columnId })}
             />
