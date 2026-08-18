@@ -34,6 +34,13 @@ class TaskViewSet(
     для руководителя (тот же принцип ролевого доступа, что и в LeadViewSet)."""
 
     permission_classes = [IsAuthenticated]
+    # Доска должна показывать ВСЕ задачи во всех колонках сразу — глобальная
+    # DRF-пагинация (PAGE_SIZE=20, см. settings.REST_FRAMEWORK) режет список
+    # целиком, не по колонкам, а фронтенд (kanbanApi.listTasks) берёт только
+    # первую страницу и не подгружает следующие. При >20 задачах на доске
+    # (наш случай — только синхронизированных из U-ON уже больше сотни) это
+    # молча прячет часть задач без какой-либо ошибки в интерфейсе.
+    pagination_class = None
 
     def get_queryset(self):
         qs = Task.objects.select_related('column', 'assignee', 'lead')
