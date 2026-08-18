@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime as dt
+from datetime import timedelta
 
 from celery import shared_task
 from django.utils import timezone
@@ -160,10 +161,19 @@ def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, 
     assignee = _match_manager_user(manager_name)
     contact = f'{kind_label} №{uon_id}\nКлиент: {client_name or "—"}\nТелефон: {client_phone or "—"}'
 
+    def _titled(raw_text: str, has_assignee: bool) -> str:
+        # По решению заказчика: если у обращения/заявки не выбран менеджер в
+        # U-ON, задача не назначается «по умолчанию» ни на кого — вместо этого
+        # явно помечается в заголовке, чтобы не потеряться в общем списке без
+        # уведомления. Считается по итоговому состоянию задачи (а не только по
+        # свежему совпадению из U-ON), чтобы не перезаписать метку у задачи,
+        # которую менеджер уже назначил себе вручную прямо в CRM.
+        prefix = '' if has_assignee else '⚠️ БЕЗ МЕНЕДЖЕРА · '
+        return f'{prefix}№{uon_id}: {raw_text}'[:255]
+
     for reminder in reminders:
         reminder_id = str(reminder['id'])
         text = reminder.get('text') or f'Напоминание U-ON #{reminder_id}'
-        title = f'№{uon_id}: {text}'[:255]
         deadline = _parse_uon_datetime(reminder.get('datetime'))
         is_done = bool(reminder.get('is_done'))
         target_column = last_column if (is_done and last_column) else first_column
@@ -171,9 +181,9 @@ def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, 
         task = Task.objects.filter(uon_reminder_id=reminder_id).first()
         if task is None:
             task = Task.objects.create(
-                uon_reminder_id=reminder_id, title=title, description=contact, deadline=deadline,
-                column=target_column, assignee=assignee, order=next_order_in_column(target_column),
-                uon_record_kind=record_kind, uon_record_id=uon_id,
+                uon_reminder_id=reminder_id, title=_titled(text, bool(assignee)), description=contact,
+                deadline=deadline, column=target_column, assignee=assignee,
+                order=next_order_in_column(target_column), uon_record_kind=record_kind, uon_record_id=uon_id,
             )
             if assignee:
                 notify_task_assignment.delay(task.id)
@@ -181,13 +191,13 @@ def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, 
             old_assignee_id = task.assignee_id
             if task.column_id != target_column.id:
                 reposition_task(task, target_column, next_order_in_column(target_column))
-            task.title = title
+            if assignee:
+                task.assignee = assignee
+            task.title = _titled(text, bool(task.assignee_id or assignee))
             task.description = contact
             task.deadline = deadline
             task.uon_record_kind = record_kind
             task.uon_record_id = uon_id
-            if assignee:
-                task.assignee = assignee
             task.save(update_fields=[
                 'title', 'description', 'deadline', 'assignee', 'uon_record_kind', 'uon_record_id',
             ])
@@ -472,3 +482,261 @@ def sync_all_uon_leads():
     for ticket_id in ticket_ids:
         sync_uon_lead.delay(ticket_id)
     logger.info('U-ON: запущена синхронизация обращений для %s ID', len(ticket_ids))
+
+
+# --- Цепочка автозадач «клиент молчит после подборки» (см. uonfollowupspec.md) ---
+#
+# Статус ID 2 «Думает по предложению» подтверждён вручную осмотром кабинета
+# (statuses_lead.php) 18.08.2026 — не через GET /status_lead.json, поэтому если
+# клиент когда-нибудь переименует/пересоздаст статусы воронки, эту константу
+# нужно свериться заново по тому же справочнику.
+FOLLOWUP_TRIGGER_STATUS_ID = '2'
+
+
+def _working_hours(when):
+    """Сдвигает момент на ближайшие 09:00 МСК, если он попадает вне окна 09:00–20:00
+    (см. uonfollowupspec.md §3.4) — иначе задача, поставленная на «отправлено
+    предложение в 22:30», дойдёт до менеджера только следующим утром, и сутки
+    будут потеряны зря."""
+    local = timezone.localtime(when)
+    if 9 <= local.hour < 20:
+        return when
+    if local.hour < 9:
+        target_local = local.replace(hour=9, minute=0, second=0, microsecond=0)
+    else:
+        target_local = (local + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+    return target_local
+
+
+def _close_active_chains(lead_id: str, reason: str, close_remote_reminder: bool = False):
+    """Гасит все активные цепочки по обращению (в норме их не больше одной —
+    unique-ограничение на (lead_id, status_entered_at) не мешает существованию
+    нескольких записей для разных «заходов» в статус 2 у одного обращения)."""
+    from .models import UonFollowupChain
+
+    chains = list(UonFollowupChain.objects.filter(lead_id=lead_id, state=UonFollowupChain.State.ACTIVE))
+    for chain in chains:
+        if close_remote_reminder and chain.reminder_id:
+            try:
+                get_uon_adapter().close_reminder(chain.reminder_id)
+            except UonAdapterError as exc:
+                logger.warning('U-ON followup: не удалось закрыть задачу %s в U-ON: %s', chain.reminder_id, exc)
+        chain.state = reason
+        chain.last_client_action_at = timezone.now() if reason == 'closed_client_replied' else chain.last_client_action_at
+        chain.save(update_fields=['state', 'last_client_action_at', 'updated_at'])
+    if chains:
+        logger.info('U-ON followup: обращение %s — цепочка закрыта (%s)', lead_id, reason)
+
+
+def _followup_ids_from_payload(payload: dict) -> str:
+    """Payload-поля вебхука не подтверждены на живых данных (никогда не приходил
+    реальный вызов) — принимаем любое правдоподобное имя ключа, как и в
+    UonWebhookView, вместо того чтобы полагаться на одно конкретное."""
+    return str(payload.get('request_id') or payload.get('lead_id') or payload.get('r_id') or payload.get('l_id') or '')
+
+
+@shared_task
+def handle_uon_status_change(payload: dict):
+    """Реакция на вебхук type_id=16 «Изменение статуса в обращении» — стартует
+    цепочку автозадач при входе в статус FOLLOWUP_TRIGGER_STATUS_ID, гасит при
+    выходе из него (клиент согласился, отказался, менеджер сменил стадию вручную)."""
+    from .models import UonFollowupChain
+
+    lead_id = _followup_ids_from_payload(payload)
+    if not lead_id:
+        logger.warning('U-ON followup: вебхук смены статуса без ID обращения: %r', payload)
+        return
+
+    status_new = _s(payload, 'status_id_new')
+    status_old = _s(payload, 'status_id_old')
+    entered_at = _parse_uon_datetime(payload.get('datetime')) or timezone.now()
+
+    if status_new == FOLLOWUP_TRIGGER_STATUS_ID:
+        chain, created = UonFollowupChain.objects.get_or_create(
+            lead_id=lead_id,
+            status_entered_at=entered_at,
+            defaults={
+                'step': UonFollowupChain.Step.TOUCH_1,
+                'next_fire_at': _working_hours(entered_at + timedelta(hours=24)),
+                'state': UonFollowupChain.State.ACTIVE,
+            },
+        )
+        if created:
+            logger.info('U-ON followup: обращение %s вошло в статус %s, старт цепочки', lead_id, FOLLOWUP_TRIGGER_STATUS_ID)
+    elif status_old == FOLLOWUP_TRIGGER_STATUS_ID and status_new != FOLLOWUP_TRIGGER_STATUS_ID:
+        _close_active_chains(lead_id, UonFollowupChain.State.CLOSED_STATUS_MOVED, close_remote_reminder=True)
+
+
+@shared_task
+def handle_uon_client_reply(payload: dict):
+    """Реакция на вебхук type_id=15 «Отправка сообщения в чате» — единственное
+    событие, где U-ON, по данным разведки, отдаёт надёжный признак автора
+    (`sender_is_client`). type_id=31 (комментарий) сюда намеренно не заведён:
+    достоверного способа определить автора из его payload нет, и гадать хуже,
+    чем полагаться на живую перепроверку в advance_followup_chains."""
+    from .models import UonFollowupChain
+
+    lead_id = _followup_ids_from_payload(payload)
+    if not lead_id or not payload.get('sender_is_client'):
+        return
+    _close_active_chains(lead_id, UonFollowupChain.State.CLOSED_CLIENT_REPLIED, close_remote_reminder=True)
+
+
+@shared_task
+def handle_uon_chain_close(payload: dict):
+    """Реакция на вебхук type_id=27 (смена причины отказа) или 55 (удаление
+    обращения) — обращение выходит из работы, цепочка больше не нужна."""
+    from .models import UonFollowupChain
+
+    lead_id = _followup_ids_from_payload(payload)
+    if not lead_id:
+        return
+    _close_active_chains(lead_id, UonFollowupChain.State.CLOSED_REFUSED, close_remote_reminder=True)
+
+
+def _followup_lead_context(data: dict) -> dict:
+    """Плейсхолдеры пожеланий клиента — структурные поля обращения, подтверждённые
+    на живых данных обращения №226 в ходе разведки кабинета (см. uonfollowupspec.md §1.4).
+    Страна отдаётся списком ID (requirements_countries) — расшифровка в название
+    страны потребовала бы отдельного справочника, который пока не проверен, поэтому
+    сюда попадают сырые ID, а не названия."""
+    adults = _s(data, 'tourist_count') or '0'
+    children = _s(data, 'tourist_child_count') or '0'
+    babies = _s(data, 'tourist_baby_count') or '0'
+    composition = f'взр {adults}'
+    if children != '0':
+        composition += f', дет {children}'
+    if babies != '0':
+        composition += f', млад {babies}'
+    nights_from = _s(data, 'nights_from')
+    nights_to = _s(data, 'nights_to')
+    nights = f'{nights_from}–{nights_to} ноч.' if (nights_from or nights_to) else '—'
+    return {
+        'client_name': f"{_s(data, 'client_surname')} {_s(data, 'client_name')}".strip() or '—',
+        'client_phone': _s(data, 'client_phone_mobile', 'client_phone') or '—',
+        'countries': _s(data, 'requirements_countries') or '—',
+        'dates': f"{_s(data, 'date_from') or '—'}–{_s(data, 'date_to') or '—'}",
+        'nights': nights,
+        'hotel_types': _s(data, 'hotel_types') or '—',
+        'nutrition': _s(data, 'nutrition') or '—',
+        'composition': composition,
+        'budget': _s(data, 'budget') or '—',
+        'requirements_note': _s(data, 'requirements_note'),
+    }
+
+
+def _last_touch_text(lead_id: str) -> str:
+    """Текст последнего касания (см. uonfollowupspec.md §1.4 — сама подборка
+    структурно не хранится, только свободным текстом в request-action)."""
+    try:
+        actions = get_uon_adapter().list_request_actions(lead_id)
+    except UonAdapterError as exc:
+        logger.warning('U-ON followup: не удалось получить касания по %s: %s', lead_id, exc)
+        return ''
+    if not actions:
+        return ''
+    text = _s(actions[-1], 'text', 'note', 'comment')
+    return (text[:150] + '…') if len(text) > 150 else text
+
+
+_FOLLOWUP_TEMPLATES = {
+    0: (  # Step.TOUCH_1
+        'Подборка отправлена сутки назад — ответа нет.\n\n'
+        'Обращение №{lead_id} · {client_name} · {client_phone}\n'
+        'Пожелания: {countries} · {dates} · {nights} · {hotel_types} · {nutrition}\n'
+        'Состав: {composition} · Бюджет: {budget}\n'
+        '{requirements_note_line}'
+        '{last_touch_line}'
+        'Что сделать: написать клиенту одним сообщением — назвать один конкретный '
+        'вариант из подборки и задать один вопрос.\n'
+        'Открыть в U-ON: {uon_url}'
+    ),
+    1: (  # Step.TOUCH_2
+        'Второе касание. Клиент молчит 2 суток после подборки.\n\n'
+        'Обращение №{lead_id} · {client_name} · {client_phone}\n'
+        'Пожелания: {countries} · {dates} · Бюджет: {budget}\n'
+        '{requirements_note_line}\n'
+        'Что сделать: сменить канал связи (если писали — позвонить). Дать новую '
+        'причину для ответа: изменилась цена / уходят места / появился вариант ближе к бюджету.\n'
+        'Открыть в U-ON: {uon_url}'
+    ),
+    2: (  # Step.ESCALATION
+        'Клиент молчит 4 суток. Нужно решение, а не ещё одно напоминание.\n\n'
+        'Обращение №{lead_id} · {client_name} · {client_phone}\n'
+        'Пожелания: {countries} · {dates} · Бюджет: {budget}\n\n'
+        'Выбрать одно: позвонить с новым предложением / перевести в «Потом» / '
+        'перевести в «Отвалился» с причиной отказа.\n'
+        'Дальше автозадачи по этому обращению создаваться не будут.\n'
+        'Открыть в U-ON: {uon_url}'
+    ),
+}
+
+
+def _build_followup_text(step: int, data: dict, lead_id: str, uon_url: str) -> str:
+    ctx = _followup_lead_context(data)
+    ctx['lead_id'] = lead_id
+    ctx['uon_url'] = uon_url
+    ctx['requirements_note_line'] = f"Пожелания клиента: {ctx['requirements_note']}\n" if ctx['requirements_note'] else ''
+    last_touch = _last_touch_text(lead_id) if step == 0 else ''
+    ctx['last_touch_line'] = f'Последнее сообщение клиенту: «{last_touch}»\n\n' if last_touch else '\n'
+    return _FOLLOWUP_TEMPLATES[step].format(**ctx)
+
+
+@shared_task
+def advance_followup_chains():
+    """Периодическая задача (Celery Beat, раз в 5 минут) — продвигает активные
+    цепочки автозадач «клиент молчит после подборки» через TOUCH_1 → TOUCH_2 →
+    ESCALATION (см. uonfollowupspec.md §3.3). На каждом шаге живьём перечитывает
+    обращение из U-ON: если статус уже не FOLLOWUP_TRIGGER_STATUS_ID, цепочка
+    гасится без создания новой задачи — так же, как это сделал бы вебхук смены
+    статуса, но полагаться только на вебхук нельзя (доставка не гарантирована,
+    см. §3.5 запасной путь)."""
+    from .models import UonFollowupChain
+    from telegrambot.services import build_uon_record_url
+
+    due = list(UonFollowupChain.objects.filter(
+        state=UonFollowupChain.State.ACTIVE, next_fire_at__lte=timezone.now(),
+    ))
+    for chain in due:
+        data = get_uon_adapter().get_lead(chain.lead_id)
+        if not data or _s(data, 'status_id') != FOLLOWUP_TRIGGER_STATUS_ID:
+            reason = UonFollowupChain.State.CLOSED_STATUS_MOVED
+            chain.state = reason
+            chain.save(update_fields=['state', 'updated_at'])
+            continue
+
+        uon_url = build_uon_record_url('lead', chain.lead_id)
+        text = _build_followup_text(chain.step, data, chain.lead_id, uon_url)
+        now_local = timezone.localtime(timezone.now())
+        reminder_payload = {
+            'r_id': chain.lead_id,
+            'type_id': '1',
+            'datetime': now_local.strftime('%Y-%m-%d %H:%M:%S'),
+            'datetime_to': (now_local + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S'),
+            'text': text,
+        }
+        try:
+            response = get_uon_adapter().create_reminder(reminder_payload)
+        except UonAdapterError as exc:
+            logger.warning(
+                'U-ON followup: не удалось создать задачу по %s (шаг %s): %s', chain.lead_id, chain.step, exc,
+            )
+            continue  # next_fire_at не сдвигаем — попробуем на следующем проходе планировщика
+
+        chain.reminder_id = str(response.get('id', ''))
+        if chain.step == UonFollowupChain.Step.TOUCH_1:
+            chain.step = UonFollowupChain.Step.TOUCH_2
+            chain.next_fire_at = _working_hours(chain.status_entered_at + timedelta(hours=48))
+        elif chain.step == UonFollowupChain.Step.TOUCH_2:
+            chain.step = UonFollowupChain.Step.ESCALATION
+            chain.next_fire_at = _working_hours(chain.status_entered_at + timedelta(hours=96))
+        else:
+            chain.state = UonFollowupChain.State.CLOSED_ESCALATED
+        chain.save(update_fields=['reminder_id', 'step', 'next_fire_at', 'state', 'updated_at'])
+
+        # Переиспользует существующий путь подтяжки напоминаний на канбан +
+        # уведомление в Telegram (_sync_tasks_from_reminders) вместо того, чтобы
+        # дублировать создание локальной задачи отдельным кодом.
+        sync_uon_lead.delay(chain.lead_id)
+
+    logger.info('U-ON followup: обработано цепочек: %s', len(due))

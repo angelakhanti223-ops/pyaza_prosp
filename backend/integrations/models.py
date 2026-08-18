@@ -144,6 +144,51 @@ class UonWebhookLog(models.Model):
         return f'type_id={self.type_id} request_id={self.request_id} ({self.received_at:%Y-%m-%d %H:%M})'
 
 
+class UonFollowupChain(models.Model):
+    """Состояние цепочки автозадач «клиент молчит после подборки» по одному
+    обращению (см. uonfollowupspec.md) — стартует по вебхуку U-ON type_id=16
+    (смена статуса) при переходе в статус ID 2 «Думает по предложению»,
+    продвигается периодической задачей advance_followup_chains, гасится
+    ответом клиента / уходом из статуса 2 / отказом / удалением обращения.
+
+    unique_together на (lead_id, status_entered_at) — защита от повторной
+    доставки одного и того же вебхука U-ON (гарантий ровно-одной доставки
+    у вебхуков в общем случае нет)."""
+
+    class Step(models.IntegerChoices):
+        TOUCH_1 = 0, 'Первое касание (+24ч)'
+        TOUCH_2 = 1, 'Второе касание (+48ч)'
+        ESCALATION = 2, 'Эскалация (+96ч)'
+
+    class State(models.TextChoices):
+        ACTIVE = 'active', 'Активна'
+        CLOSED_CLIENT_REPLIED = 'closed_client_replied', 'Закрыта: клиент ответил'
+        CLOSED_STATUS_MOVED = 'closed_status_moved', 'Закрыта: статус изменился'
+        CLOSED_ESCALATED = 'closed_escalated', 'Закрыта: эскалирована менеджеру'
+        CLOSED_REFUSED = 'closed_refused', 'Закрыта: отказ/удаление'
+
+    lead_id = models.CharField('ID обращения в U-ON', max_length=64)
+    status_entered_at = models.DateTimeField('Момент входа в статус 2')
+    step = models.PositiveSmallIntegerField('Шаг цепочки', choices=Step.choices, default=Step.TOUCH_1)
+    reminder_id = models.CharField('ID последней задачи в U-ON', max_length=64, blank=True)
+    next_fire_at = models.DateTimeField('Когда сработает следующий шаг')
+    state = models.CharField('Состояние', max_length=30, choices=State.choices, default=State.ACTIVE)
+    last_client_action_at = models.DateTimeField('Последнее действие клиента', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['lead_id', 'status_entered_at'], name='uniq_uon_followup_chain_entry'),
+        ]
+        verbose_name = 'цепочка автозадач U-ON'
+        verbose_name_plural = 'цепочки автозадач U-ON'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Обращение №{self.lead_id}: шаг {self.step}, {self.get_state_display()}'
+
+
 class UonSyncLog(models.Model):
     """Журнал попыток отправки заявки в U-ON (ТЗ 8.2) — по одной записи на каждую попытку,
     используется адаптером интеграции (см. модуль integrations) для очереди повторов через Celery

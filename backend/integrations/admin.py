@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import UonClient, UonLeadRecord, UonRequestRecord, UonSyncLog, UonWebhookLog
+from .models import UonClient, UonFollowupChain, UonLeadRecord, UonRequestRecord, UonSyncLog, UonWebhookLog
 
 
 class UonMirrorAdmin(admin.ModelAdmin):
@@ -57,6 +57,19 @@ class UonWebhookLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+@admin.register(UonFollowupChain)
+class UonFollowupChainAdmin(admin.ModelAdmin):
+    list_display = ('lead_id', 'step', 'state', 'next_fire_at', 'status_entered_at')
+    list_filter = ('state', 'step')
+    search_fields = ('lead_id', 'reminder_id')
+    readonly_fields = (
+        'lead_id', 'status_entered_at', 'reminder_id', 'last_client_action_at', 'created_at', 'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(UonSyncLog)

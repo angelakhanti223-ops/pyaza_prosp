@@ -1,15 +1,23 @@
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from kanban.models import KanbanColumn, Task
 from leads.models import Direction, Lead
 
 from .adapters import MockUonAdapter, RealUonAdapter, UonAdapterError, build_ticket_payload
-from .models import UonClient, UonLeadRecord, UonRequestRecord, UonWebhookLog
+from .models import UonClient, UonFollowupChain, UonLeadRecord, UonRequestRecord, UonWebhookLog
 from .tasks import (
+    FOLLOWUP_TRIGGER_STATUS_ID,
     _match_manager_user,
+    _working_hours,
+    advance_followup_chains,
+    handle_uon_chain_close,
+    handle_uon_client_reply,
+    handle_uon_status_change,
     pull_uon_reminders_for_lead,
     sync_all_uon_leads,
     sync_all_uon_reminders,
@@ -650,6 +658,38 @@ class UonWebhookViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         mock_delay.assert_called_once_with('61')
 
+    @patch('integrations.views.handle_uon_status_change.delay')
+    def test_type_16_dispatches_status_change_handler(self, mock_delay):
+        response = self.client.post(
+            '/api/integrations/uon/webhook/',
+            data={'type_id': '16', 'request_id': '226', 'status_id_old': '1', 'status_id_new': '2'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once_with({'type_id': '16', 'request_id': '226', 'status_id_old': '1', 'status_id_new': '2'})
+
+    @patch('integrations.views.handle_uon_client_reply.delay')
+    def test_type_15_dispatches_client_reply_handler(self, mock_delay):
+        response = self.client.post(
+            '/api/integrations/uon/webhook/',
+            data={'type_id': '15', 'request_id': '226', 'sender_is_client': True},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once()
+
+    @patch('integrations.views.handle_uon_chain_close.delay')
+    def test_type_27_and_55_dispatch_chain_close_handler(self, mock_delay):
+        for type_id in ('27', '55'):
+            mock_delay.reset_mock()
+            response = self.client.post(
+                '/api/integrations/uon/webhook/',
+                data={'type_id': type_id, 'request_id': '226'},
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_delay.assert_called_once()
+
 
 class UonMirrorViewSetTests(TestCase):
     def setUp(self):
@@ -668,3 +708,261 @@ class UonMirrorViewSetTests(TestCase):
     def test_write_methods_not_allowed(self):
         response = self.client.post('/api/crm/uon/requests/', {'uon_id': '99', 'client_name': 'x'})
         self.assertEqual(response.status_code, 405)
+
+
+class BezMenedzheraMarkerTests(TestCase):
+    """Решение заказчика (18.08.2026): обращения без менеджера в U-ON не получают
+    задачу «по умолчанию» ни на кого — вместо этого заголовок явно помечается,
+    чтобы не потеряться в общем списке без уведомления (см. _titled в tasks.py)."""
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_title_marked_when_no_manager_match(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_lead.return_value = dict(
+            REAL_LEAD_PAYLOAD, manager_name='',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 920, 'text': 'Уточнить даты', 'datetime': '2026-07-09 10:00', 'is_done': 0},
+        ]
+
+        sync_uon_lead('199')
+
+        task = Task.objects.get(uon_reminder_id='920')
+        self.assertTrue(task.title.startswith('⚠️ БЕЗ МЕНЕДЖЕРА'))
+        self.assertIsNone(task.assignee)
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_manual_assignment_not_overwritten_by_marker_on_rerun(self, mock_get_adapter):
+        manager = User.objects.create_user(username='manual', password='x', first_name='Ручной')
+        mock_get_adapter.return_value.get_lead.return_value = dict(
+            REAL_LEAD_PAYLOAD, manager_name='',
+        )
+        mock_get_adapter.return_value.list_reminders.return_value = [
+            {'id': 921, 'text': 'Уточнить даты', 'datetime': '2026-07-09 10:00', 'is_done': 0},
+        ]
+        sync_uon_lead('199')
+        task = Task.objects.get(uon_reminder_id='921')
+        task.assignee = manager
+        task.save(update_fields=['assignee'])
+
+        sync_uon_lead('199')
+
+        task.refresh_from_db()
+        self.assertFalse(task.title.startswith('⚠️'))
+        self.assertEqual(task.assignee_id, manager.id)
+
+
+class WorkingHoursTests(TestCase):
+    def test_within_window_unchanged(self):
+        when = timezone.make_aware(datetime(2026, 8, 19, 14, 0), timezone.get_current_timezone())
+        self.assertEqual(_working_hours(when), when)
+
+    def test_before_window_shifts_to_nine(self):
+        when = timezone.make_aware(datetime(2026, 8, 19, 6, 0), timezone.get_current_timezone())
+        result = timezone.localtime(_working_hours(when))
+        self.assertEqual((result.date(), result.hour, result.minute), (when.date(), 9, 0))
+
+    def test_after_window_shifts_to_next_day_nine(self):
+        when = timezone.make_aware(datetime(2026, 8, 19, 22, 30), timezone.get_current_timezone())
+        result = timezone.localtime(_working_hours(when))
+        self.assertEqual((result.date(), result.hour, result.minute), (when.date() + timedelta(days=1), 9, 0))
+
+
+FOLLOWUP_STATUS_CHANGE_PAYLOAD = {
+    'request_id': '226',
+    'status_id_old': '1',
+    'status_id_new': FOLLOWUP_TRIGGER_STATUS_ID,
+    'datetime': '2026-08-18 10:00',
+}
+
+
+class HandleUonStatusChangeTests(TestCase):
+    def test_entering_status_2_starts_chain(self):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.step, UonFollowupChain.Step.TOUCH_1)
+        self.assertEqual(chain.state, UonFollowupChain.State.ACTIVE)
+        entered_at = timezone.make_aware(datetime(2026, 8, 18, 10, 0), timezone.get_current_timezone())
+        self.assertEqual(chain.next_fire_at, _working_hours(entered_at + timedelta(hours=24)))
+
+    def test_duplicate_webhook_delivery_does_not_duplicate_chain(self):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+
+        self.assertEqual(UonFollowupChain.objects.filter(lead_id='226').count(), 1)
+
+    def test_leaving_status_2_closes_active_chain(self):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+
+        handle_uon_status_change({
+            'request_id': '226', 'status_id_old': FOLLOWUP_TRIGGER_STATUS_ID, 'status_id_new': '6',
+            'datetime': '2026-08-19 09:00',
+        })
+
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.state, UonFollowupChain.State.CLOSED_STATUS_MOVED)
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_leaving_status_2_closes_open_remote_reminder(self, mock_get_adapter):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        chain.reminder_id = '5001'
+        chain.save(update_fields=['reminder_id'])
+
+        handle_uon_status_change({
+            'request_id': '226', 'status_id_old': FOLLOWUP_TRIGGER_STATUS_ID, 'status_id_new': '6',
+        })
+
+        mock_get_adapter.return_value.close_reminder.assert_called_once_with('5001')
+
+    def test_unrelated_status_change_is_noop(self):
+        handle_uon_status_change({'request_id': '226', 'status_id_old': '3', 'status_id_new': '4'})
+        self.assertEqual(UonFollowupChain.objects.count(), 0)
+
+    def test_missing_lead_id_is_ignored(self):
+        handle_uon_status_change({'status_id_old': '1', 'status_id_new': FOLLOWUP_TRIGGER_STATUS_ID})
+        self.assertEqual(UonFollowupChain.objects.count(), 0)
+
+
+class HandleUonClientReplyTests(TestCase):
+    def setUp(self):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+
+    def test_client_message_closes_active_chain(self):
+        handle_uon_client_reply({'request_id': '226', 'sender_is_client': True})
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.state, UonFollowupChain.State.CLOSED_CLIENT_REPLIED)
+        self.assertIsNotNone(chain.last_client_action_at)
+
+    def test_manager_message_does_not_close_chain(self):
+        handle_uon_client_reply({'request_id': '226', 'sender_is_client': False})
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.state, UonFollowupChain.State.ACTIVE)
+
+    def test_missing_sender_flag_does_not_close_chain(self):
+        handle_uon_client_reply({'request_id': '226'})
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.state, UonFollowupChain.State.ACTIVE)
+
+
+class HandleUonChainCloseTests(TestCase):
+    def test_refusal_event_closes_active_chain(self):
+        handle_uon_status_change(FOLLOWUP_STATUS_CHANGE_PAYLOAD)
+
+        handle_uon_chain_close({'request_id': '226'})
+
+        chain = UonFollowupChain.objects.get(lead_id='226')
+        self.assertEqual(chain.state, UonFollowupChain.State.CLOSED_REFUSED)
+
+
+REAL_LEAD_FOLLOWUP_PAYLOAD = {
+    'id': '226',
+    'client_surname': 'Иванова',
+    'client_name': 'Мария',
+    'client_phone_mobile': '+79991234567',
+    'status_id': FOLLOWUP_TRIGGER_STATUS_ID,
+    'manager_name': 'Екатерина Макеева',
+    'requirements_countries': '4,12',
+    'date_from': '2026-07-27',
+    'date_to': '2026-08-20',
+    'nights_from': '14',
+    'nights_to': '14',
+    'hotel_types': '4*,5*,5+*',
+    'nutrition': 'BB',
+    'tourist_count': '2',
+    'tourist_child_count': '1',
+    'tourist_baby_count': '0',
+    'budget': '450000',
+    'requirements_note': '',
+}
+
+
+class AdvanceFollowupChainsTests(TestCase):
+    def setUp(self):
+        self.entered_at = timezone.make_aware(datetime(2026, 8, 15, 10, 0), timezone.get_current_timezone())
+        self.chain = UonFollowupChain.objects.create(
+            lead_id='226', status_entered_at=self.entered_at, step=UonFollowupChain.Step.TOUCH_1,
+            next_fire_at=timezone.now() - timedelta(minutes=1), state=UonFollowupChain.State.ACTIVE,
+        )
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_fires_touch_1_and_advances_to_touch_2(self, mock_get_adapter, mock_sync_delay):
+        mock_get_adapter.return_value.get_lead.return_value = REAL_LEAD_FOLLOWUP_PAYLOAD
+        mock_get_adapter.return_value.list_request_actions.return_value = []
+        mock_get_adapter.return_value.create_reminder.return_value = {'result': 200, 'id': '5001'}
+
+        advance_followup_chains()
+
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.step, UonFollowupChain.Step.TOUCH_2)
+        self.assertEqual(self.chain.state, UonFollowupChain.State.ACTIVE)
+        self.assertEqual(self.chain.reminder_id, '5001')
+        self.assertEqual(self.chain.next_fire_at, _working_hours(self.entered_at + timedelta(hours=48)))
+
+        mock_get_adapter.return_value.create_reminder.assert_called_once()
+        payload = mock_get_adapter.return_value.create_reminder.call_args.args[0]
+        self.assertEqual(payload['r_id'], '226')
+        self.assertIn('Иванова Мария', payload['text'])
+        self.assertIn('+79991234567', payload['text'])
+        self.assertIn('450000', payload['text'])
+        mock_sync_delay.assert_called_once_with('226')
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_escalation_step_closes_chain(self, mock_get_adapter, mock_sync_delay):
+        self.chain.step = UonFollowupChain.Step.ESCALATION
+        self.chain.save(update_fields=['step'])
+        mock_get_adapter.return_value.get_lead.return_value = REAL_LEAD_FOLLOWUP_PAYLOAD
+        mock_get_adapter.return_value.list_request_actions.return_value = []
+        mock_get_adapter.return_value.create_reminder.return_value = {'result': 200, 'id': '5003'}
+
+        advance_followup_chains()
+
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.state, UonFollowupChain.State.CLOSED_ESCALATED)
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_status_moved_away_closes_without_creating_reminder(self, mock_get_adapter, mock_sync_delay):
+        mock_get_adapter.return_value.get_lead.return_value = dict(REAL_LEAD_FOLLOWUP_PAYLOAD, status_id='6')
+
+        advance_followup_chains()
+
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.state, UonFollowupChain.State.CLOSED_STATUS_MOVED)
+        mock_get_adapter.return_value.create_reminder.assert_not_called()
+        mock_sync_delay.assert_not_called()
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_lead_not_found_closes_chain(self, mock_get_adapter, mock_sync_delay):
+        mock_get_adapter.return_value.get_lead.return_value = None
+
+        advance_followup_chains()
+
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.state, UonFollowupChain.State.CLOSED_STATUS_MOVED)
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_reminder_create_failure_leaves_chain_active_for_retry(self, mock_get_adapter, mock_sync_delay):
+        mock_get_adapter.return_value.get_lead.return_value = REAL_LEAD_FOLLOWUP_PAYLOAD
+        mock_get_adapter.return_value.create_reminder.side_effect = UonAdapterError('boom')
+
+        advance_followup_chains()
+
+        self.chain.refresh_from_db()
+        self.assertEqual(self.chain.state, UonFollowupChain.State.ACTIVE)
+        self.assertEqual(self.chain.step, UonFollowupChain.Step.TOUCH_1)
+        mock_sync_delay.assert_not_called()
+
+    @patch('integrations.tasks.sync_uon_lead.delay')
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_ignores_chains_not_yet_due(self, mock_get_adapter, mock_sync_delay):
+        self.chain.next_fire_at = timezone.now() + timedelta(hours=1)
+        self.chain.save(update_fields=['next_fire_at'])
+
+        advance_followup_chains()
+
+        mock_get_adapter.return_value.get_lead.assert_not_called()

@@ -30,6 +30,21 @@ class BaseUonAdapter:
         """Полное обращение (лид) по ID (U-ON: GET /{key}/lead/{id}.json)."""
         raise NotImplementedError
 
+    def create_reminder(self, payload: dict) -> dict:
+        """Создать задачу по обращению (U-ON: POST /{key}/reminder/create.json) —
+        используется цепочкой автозадач «клиент молчит после подборки»."""
+        raise NotImplementedError
+
+    def close_reminder(self, reminder_id: str) -> None:
+        """Закрыть задачу (U-ON: POST /{key}/reminder/close/{id}.json) — вызывается,
+        когда цепочка гасится досрочно (клиент ответил), а задача уже была создана."""
+        raise NotImplementedError
+
+    def list_request_actions(self, request_id: str) -> list:
+        """Касания (переписка/звонки) по обращению (U-ON: GET /{key}/request-action/{r_id}.json)
+        — источник текста последнего исходящего сообщения для шаблона задачи."""
+        raise NotImplementedError
+
 
 class MockUonAdapter(BaseUonAdapter):
     """Used until a real U-ON API key is issued. Simulates a successful ticket creation."""
@@ -50,6 +65,15 @@ class MockUonAdapter(BaseUonAdapter):
 
     def get_lead(self, lead_id: str) -> dict | None:
         return None
+
+    def create_reminder(self, payload: dict) -> dict:
+        return {'result': 200, 'id': f'MOCK-REMINDER-{uuid.uuid4().hex[:10]}', 'mock': True, 'echo': payload}
+
+    def close_reminder(self, reminder_id: str) -> None:
+        return None
+
+    def list_request_actions(self, request_id: str) -> list:
+        return []
 
 
 class RealUonAdapter(BaseUonAdapter):
@@ -130,6 +154,56 @@ class RealUonAdapter(BaseUonAdapter):
             raise UonAdapterError(str(exc)) from exc
         items = response.json().get('lead', [])
         return items[0] if items else None
+
+    def create_reminder(self, payload: dict) -> dict:
+        # NOT YET CONFIRMED against a live call (found via cabinet recon, not tested)
+        # — response shape assumed to follow the same {"result": 200, "id": "..."}
+        # convention as lead/create.json, every other write endpoint in this API.
+        # Check UonWebhookLog / logs after the first real chain fires and adjust
+        # if the actual shape differs.
+        try:
+            response = requests.post(
+                f'{self.base_url}/{self.api_key}/reminder/create.json',
+                data=payload,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if str(data.get('result')) != '200':
+            raise UonAdapterError(f'U-ON reminder/create.json вернул ошибку: {data}')
+        return data
+
+    def close_reminder(self, reminder_id: str) -> None:
+        # NOT YET CONFIRMED against a live call — best-effort, caller must swallow
+        # UonAdapterError so a failed close never blocks the chain from finishing.
+        try:
+            response = requests.post(
+                f'{self.base_url}/{self.api_key}/reminder/close/{reminder_id}.json',
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+
+    def list_request_actions(self, request_id: str) -> list:
+        # NOT YET CONFIRMED — response key assumed to follow the "singular
+        # endpoint noun as JSON key" convention seen on /reminder/{id}.json
+        # ({"reminder": [...]}); falls back to the raw list if U-ON returns one
+        # directly instead of wrapping it.
+        try:
+            response = requests.get(
+                f'{self.base_url}/{self.api_key}/request-action/{request_id}.json',
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        return data.get('request-action') or data.get('request_action') or []
 
 
 def get_uon_adapter() -> BaseUonAdapter:

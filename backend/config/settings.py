@@ -185,11 +185,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# Периодические задачи (Celery Beat) — сейчас только подтяжка напоминаний из U-ON.
+# Периодические задачи (Celery Beat).
 CELERY_BEAT_SCHEDULE = {
     'sync-uon-reminders': {
         'task': 'integrations.tasks.sync_all_uon_reminders',
         'schedule': 600.0,  # каждые 10 минут
+    },
+    'advance-uon-followup-chains': {
+        'task': 'integrations.tasks.advance_followup_chains',
+        'schedule': 300.0,  # каждые 5 минут, см. uonfollowupspec.md §3.3
     },
 }
 

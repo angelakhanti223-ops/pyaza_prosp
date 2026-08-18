@@ -8,7 +8,22 @@ from accounts.permissions import is_head
 
 from .models import UonClient, UonLeadRecord, UonRequestRecord, UonWebhookLog
 from .serializers import UonClientSerializer, UonLeadRecordSerializer, UonRequestRecordSerializer
-from .tasks import sync_all_uon_leads, sync_all_uon_reminders, sync_uon_lead, sync_uon_request
+from .tasks import (
+    handle_uon_chain_close,
+    handle_uon_client_reply,
+    handle_uon_status_change,
+    sync_all_uon_leads,
+    sync_all_uon_reminders,
+    sync_uon_lead,
+    sync_uon_request,
+)
+
+# type_id из doc_webhooks.php клиентского кабинета, задействованные цепочкой
+# автозадач «клиент молчит после подборки» (см. uonfollowupspec.md §1.2) —
+# не полный список 74+ событий U-ON, только те, что мы реально обрабатываем.
+_STATUS_CHANGE_TYPE_ID = '16'
+_CHAT_MESSAGE_TYPE_ID = '15'
+_CHAIN_CLOSE_TYPE_IDS = {'27', '55'}
 
 
 class UonSyncTriggerView(APIView):
@@ -51,7 +66,9 @@ class UonWebhookView(APIView):
         if secret and request.query_params.get('token') != secret:
             return Response({'detail': 'Invalid token'}, status=403)
 
-        payload = request.data
+        # dict(...) — на случай form-urlencoded тела (QueryDict): Celery с JSON-
+        # сериализатором не умеет передать QueryDict напрямую в .delay(payload).
+        payload = dict(request.data)
         type_id = str(payload.get('type_id', ''))
         request_id = str(payload.get('request_id') or payload.get('r_id') or '')
         lead_id = str(payload.get('lead_id') or payload.get('l_id') or '')
@@ -62,6 +79,15 @@ class UonWebhookView(APIView):
             sync_uon_request.delay(request_id)
         if lead_id:
             sync_uon_lead.delay(lead_id)
+
+        # Цепочка автозадач «клиент молчит после подборки» (см. uonfollowupspec.md)
+        # реагирует на конкретные type_id поверх общего досинхронизирования выше.
+        if type_id == _STATUS_CHANGE_TYPE_ID:
+            handle_uon_status_change.delay(payload)
+        elif type_id == _CHAT_MESSAGE_TYPE_ID:
+            handle_uon_client_reply.delay(payload)
+        elif type_id in _CHAIN_CLOSE_TYPE_IDS:
+            handle_uon_chain_close.delay(payload)
 
         return Response({'detail': 'ok'})
 
