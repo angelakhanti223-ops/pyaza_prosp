@@ -87,6 +87,12 @@ services:
     # cause of every TimedOut/Conflict seen while debugging the bot today).
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1
+      # `all` alone leaves eth0 (created by Docker's own networking setup,
+      # which runs after this sysctl is applied) in a half-disabled state —
+      # confirmed live: httpx then fails with errno 99 "Cannot assign
+      # requested address" instead of a clean IPv4 connection. `default`
+      # is what new interfaces actually inherit.
+      - net.ipv6.conf.default.disable_ipv6=1
     depends_on:
       db:
         condition: service_healthy
