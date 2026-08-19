@@ -5,6 +5,7 @@
 синхронный, а PTB v21+ работает на asyncio.
 """
 import logging
+from datetime import timedelta
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -29,7 +30,20 @@ from .services import (
 
 logger = logging.getLogger('telegrambot')
 
-MAX_TASKS_SHOWN = 20
+# /tasks раньше слало одно сообщение НА КАЖДУЮ задачу — при полусотне открытых
+# задач (обычное дело на этой доске) чат превращался в стену карточек. Теперь
+# сначала сводка по срокам (см. _task_category), потом компактный список по
+# TASKS_PAGE_SIZE штук на странице с кнопками пагинации и «✅» прямо в строке.
+TASKS_PAGE_SIZE = 5
+
+_CATEGORY_LABELS = {
+    'overdue': '🔴 Просрочено',
+    'today': '🟡 Сегодня',
+    'week': '🔵 Эта неделя',
+    'later': '🟣 Позже',
+    'no_deadline': '⚪ Без срока',
+}
+_CATEGORY_ORDER = ['overdue', 'today', 'week', 'later', 'no_deadline']
 
 NOT_LINKED_TEXT = 'Аккаунт не привязан. Обратитесь к руководителю за кодом (/start &lt;код&gt;).'
 
@@ -100,15 +114,91 @@ def _link_account(account: TelegramAccount, chat_id: int, username: str):
     account.save(update_fields=['chat_id', 'telegram_username', 'linked_at'])
 
 
+def _task_category(task, today) -> str:
+    if not task.deadline:
+        return 'no_deadline'
+    deadline_date = timezone.localtime(task.deadline).date()
+    if deadline_date < today:
+        return 'overdue'
+    if deadline_date == today:
+        return 'today'
+    if deadline_date <= today + timedelta(days=6):
+        return 'week'
+    return 'later'
+
+
 @sync_to_async
-def _list_open_tasks(user):
+def _load_task_buckets(user):
+    """Все открытые задачи пользователя, разложенные по категориям срока —
+    одним запросом в базу (десятки задач на менеджера, не тысячи, поэтому
+    раскладка по корзинам в памяти дешевле, чем считать по категориям отдельно)."""
     from kanban.models import Task
 
     last_column = get_last_column()
     qs = Task.objects.select_related('column', 'lead').filter(assignee=user)
     if last_column:
         qs = qs.exclude(column=last_column)
-    return list(qs.order_by('column__order', 'order')[:MAX_TASKS_SHOWN])
+    tasks = list(qs.order_by('column__order', 'order'))
+
+    today = timezone.localdate()
+    buckets = {category: [] for category in _CATEGORY_ORDER}
+    for task in tasks:
+        buckets[_task_category(task, today)].append(task)
+    return buckets
+
+
+def _format_summary_text(buckets: dict) -> str:
+    total = sum(len(v) for v in buckets.values())
+    if total == 0:
+        return '🎉 Открытых задач нет.'
+    lines = [f'📋 Ваши задачи: {total} открытых', '']
+    for category in _CATEGORY_ORDER:
+        count = len(buckets[category])
+        if count:
+            lines.append(f'{_CATEGORY_LABELS[category]} — {count}')
+    return '\n'.join(lines)
+
+
+def _summary_keyboard(buckets: dict) -> InlineKeyboardMarkup | None:
+    rows = [
+        [InlineKeyboardButton(f'{_CATEGORY_LABELS[category]} ({len(buckets[category])})', callback_data=f'cat:{category}:1')]
+        for category in _CATEGORY_ORDER
+        if buckets[category]
+    ]
+    return InlineKeyboardMarkup(rows) if rows else None
+
+
+def _format_list_line(index: int, task) -> str:
+    title = task.title if len(task.title) <= 60 else task.title[:57] + '…'
+    if task.deadline:
+        return f'{index}. {escape_html(title)} — до {timezone.localtime(task.deadline).strftime("%d.%m")}'
+    return f'{index}. {escape_html(title)}'
+
+
+def _category_list_text(category: str, page_tasks: list, page: int, total_pages: int, total: int) -> str:
+    lines = [f'{_CATEGORY_LABELS[category]} — {total}', '']
+    lines.extend(_format_list_line(i, task) for i, task in enumerate(page_tasks, start=1))
+    if total_pages > 1:
+        lines.append(f'\nСтраница {page} из {total_pages}')
+    return '\n'.join(lines)
+
+
+def _category_list_keyboard(category: str, page_tasks: list, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    rows = []
+    if page_tasks:
+        rows.append([
+            InlineKeyboardButton(f'✅ {i}', callback_data=f'donelist:{task.id}:{category}:{page}')
+            for i, task in enumerate(page_tasks, start=1)
+        ])
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton('◀ Пред', callback_data=f'cat:{category}:{page - 1}'))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton('След ▶', callback_data=f'cat:{category}:{page + 1}'))
+    if nav_row:
+        rows.append(nav_row)
+    rows.append([InlineKeyboardButton('🔙 К сводке', callback_data='menu:tasks')])
+    return InlineKeyboardMarkup(rows)
 
 
 @sync_to_async
@@ -165,13 +255,39 @@ def _get_lead_with_uon(user, lead_id: int):
     return qs.filter(pk=lead_id).first()
 
 
-async def _send_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount):
-    tasks = await _list_open_tasks(account.user)
-    if not tasks:
-        await _reply(update, context, '🎉 Открытых задач нет.')
-        return
-    for task in tasks:
-        await _reply(update, context, format_task_line(task), keyboard=task_keyboard(task))
+async def _send_task_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount, edit: bool = False):
+    buckets = await _load_task_buckets(account.user)
+    text = _format_summary_text(buckets)
+    keyboard = _summary_keyboard(buckets)
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
+
+
+async def _send_category_page(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount,
+    category: str, page: int, edit: bool = False,
+):
+    buckets = await _load_task_buckets(account.user)
+    all_tasks = buckets.get(category, [])
+    total = len(all_tasks)
+    total_pages = max(1, -(-total // TASKS_PAGE_SIZE))  # ceil division
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * TASKS_PAGE_SIZE
+    page_tasks = all_tasks[start:start + TASKS_PAGE_SIZE]
+
+    if total == 0:
+        text = f'{_CATEGORY_LABELS.get(category, category)}\n\nЗдесь пусто — всё разобрано.'
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('🔙 К сводке', callback_data='menu:tasks')]])
+    else:
+        text = _category_list_text(category, page_tasks, page, total_pages, total)
+        keyboard = _category_list_keyboard(category, page_tasks, page, total_pages)
+
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,7 +320,7 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if account is None:
         await _reply(update, context, NOT_LINKED_TEXT)
         return
-    await _send_tasks(update, context, account)
+    await _send_task_summary(update, context, account)
 
 
 async def cmd_newtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -299,12 +415,28 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == 'menu:tasks':
         await query.answer()
-        await _send_tasks(update, context, account)
+        await _send_task_summary(update, context, account, edit=True)
         return
 
     if data == 'menu:help':
         await query.answer()
         await _reply(update, context, HELP_TEXT)
+        return
+
+    if data.startswith('cat:'):
+        _, category, page_str = data.split(':', 2)
+        await query.answer()
+        await _send_category_page(update, context, account, category, int(page_str), edit=True)
+        return
+
+    if data.startswith('donelist:'):
+        _, task_id_str, category, page_str = data.split(':', 3)
+        task = await _mark_done(account.user, int(task_id_str))
+        if task is None:
+            await query.answer('Задача не найдена.', show_alert=True)
+            return
+        await query.answer('Готово ✅')
+        await _send_category_page(update, context, account, category, int(page_str), edit=True)
         return
 
     if data.startswith('done:'):

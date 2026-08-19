@@ -141,7 +141,11 @@ class BotHandlersTests(TestCase):
 
         self.assertIn('не найден', sent_texts(context)[0])
 
-    def test_tasks_lists_only_own_open_tasks(self):
+    def test_tasks_shows_summary_counting_only_own_open_tasks(self):
+        # /tasks теперь шлёт сводку по срокам (см. bot._format_summary_text), а не
+        # по сообщению на каждую задачу — названия задач в сводке не появляются,
+        # только счётчики; сами названия проверяются в CallbackHandlerTests
+        # через разворачивание конкретной категории (cat:<категория>:<страница>).
         Task.objects.create(title='Моя задача', column=self.column_new, assignee=self.manager)
         Task.objects.create(title='Чужая задача', column=self.column_new, assignee=self.other_manager)
         Task.objects.create(title='Готовая задача', column=self.column_done, assignee=self.manager)
@@ -150,10 +154,10 @@ class BotHandlersTests(TestCase):
         context = make_context()
         async_to_sync(cmd_tasks)(update, context)
 
-        texts = sent_texts(context)
-        self.assertTrue(any('Моя задача' in t for t in texts))
-        self.assertFalse(any('Чужая задача' in t for t in texts))
-        self.assertFalse(any('Готовая задача' in t for t in texts))
+        text = sent_texts(context)[0]
+        self.assertIn('1 открытых', text)
+        self.assertNotIn('Чужая задача', text)
+        self.assertNotIn('Готовая задача', text)
 
     def test_tasks_empty_shows_friendly_message(self):
         update = make_update(chat_id=555)
@@ -272,14 +276,47 @@ class CallbackHandlerTests(TestCase):
         query.answer.assert_called_once()
         self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))
 
-    def test_menu_tasks_lists_open_tasks(self):
+    def test_menu_tasks_shows_summary_via_edit(self):
         Task.objects.create(title='Моя задача', column=self.column_new, assignee=self.manager)
         update, query = make_callback(chat_id=555, data='menu:tasks')
         context = make_context()
         async_to_sync(on_callback)(update, context)
 
         query.answer.assert_called_once()
-        self.assertTrue(any('Моя задача' in t for t in sent_texts(context)))
+        query.edit_message_text.assert_called_once()
+        self.assertIn('1 открытых', query.edit_message_text.call_args.args[0])
+
+    def test_category_callback_shows_task_titles(self):
+        Task.objects.create(title='Моя задача без срока', column=self.column_new, assignee=self.manager)
+        update, query = make_callback(chat_id=555, data='cat:no_deadline:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.edit_message_text.assert_called_once()
+        self.assertIn('Моя задача без срока', query.edit_message_text.call_args.args[0])
+
+    def test_category_callback_paginates(self):
+        for i in range(7):
+            Task.objects.create(title=f'Задача {i}', column=self.column_new, assignee=self.manager)
+        update, query = make_callback(chat_id=555, data='cat:no_deadline:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn('Страница 1 из 2', text)
+        # Пять на странице (см. bot.TASKS_PAGE_SIZE), шестая и седьмая — на второй.
+        self.assertEqual(text.count('. Задача '), 5)
+
+    def test_donelist_callback_marks_task_and_refreshes_category(self):
+        task = Task.objects.create(title='Задача без срока', column=self.column_new, assignee=self.manager)
+        update, query = make_callback(chat_id=555, data=f'donelist:{task.id}:no_deadline:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        task.refresh_from_db()
+        self.assertEqual(task.column_id, self.column_done.id)
+        query.answer.assert_called_once_with('Готово ✅')
+        self.assertIn('Здесь пусто', query.edit_message_text.call_args.args[0])
 
     def test_menu_help_sends_help_text(self):
         update, query = make_callback(chat_id=555, data='menu:help')
