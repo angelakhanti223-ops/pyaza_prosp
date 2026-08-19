@@ -2,9 +2,28 @@
 Django settings for the Sletat.ru site + mini-CRM.
 """
 
+import socket
 from pathlib import Path
 
 import environ
+
+# This Docker host's IPv6 routing is broken for outbound connections (confirmed
+# live, 18-19.08.2026): any A+AAAA host — api.telegram.org first, then rediscovered
+# for celery_worker's own requests.post() calls to the same host — fails with
+# "[Errno 101] Network is unreachable" because httpx/urllib3 try the AAAA record
+# first. Disabling IPv6 via Docker sysctls didn't fully take (see
+# docker-compose.prod.yml history), so we force AF_INET at the Python level
+# instead. Belongs here, not in one management command, because every process
+# that imports Django settings — backend, celery_worker, celery_beat,
+# telegram_bot — can end up making an outbound HTTP call to a dual-stack host.
+_original_getaddrinfo = socket.getaddrinfo
+
+
+def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+
+socket.getaddrinfo = _ipv4_only_getaddrinfo
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
