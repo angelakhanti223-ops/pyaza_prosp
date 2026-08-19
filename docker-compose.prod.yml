@@ -43,6 +43,14 @@ services:
       - .env
     volumes:
       - backend_media:/app/media
+    # api.telegram.org is unreachable from this host at the network level (not
+    # a code/IPv6 bug — confirmed live, 19.08.2026: even IPv4-forced connect
+    # attempts time out). Routes it through the WireGuard tunnel instead — the
+    # Amsterdam server relays raw TCP to the real api.telegram.org on 443, TLS
+    # stays fully end-to-end (see telegram-relay.service there), so this is
+    # just a network hop, not a MITM.
+    extra_hosts:
+      - "api.telegram.org:10.10.10.2"
     depends_on:
       db:
         condition: service_healthy
@@ -59,6 +67,8 @@ services:
       - .env
     volumes:
       - backend_media:/app/media
+    extra_hosts:
+      - "api.telegram.org:10.10.10.2"
     depends_on:
       db:
         condition: service_healthy
@@ -73,6 +83,8 @@ services:
     command: celery -A config beat -l info
     env_file:
       - .env
+    extra_hosts:
+      - "api.telegram.org:10.10.10.2"
     depends_on:
       db:
         condition: service_healthy
