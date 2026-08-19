@@ -8,9 +8,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # No published port — only reachable from other containers on this
-    # compose network, unlike the dev file which exposes 5432 for a local
-    # psql client.
+    # Bound only to the WireGuard tunnel address (10.10.10.1, see wg0 on this
+    # host) — reachable from the Telegram bot on the Amsterdam server, not
+    # from the public internet. Every other container still reaches this
+    # over the compose network directly, same as before.
+    ports:
+      - "10.10.10.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
@@ -20,6 +23,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # Same reasoning as db above — Telegram bot commands on the Amsterdam
+    # server enqueue Celery tasks (e.g. /sync_uon, /done) that the main
+    # server's celery_worker picks up from this same broker.
+    ports:
+      - "10.10.10.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
