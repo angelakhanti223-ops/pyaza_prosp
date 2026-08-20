@@ -140,7 +140,10 @@ class CreateNewLeadTaskTests(TestCase):
         create_new_lead_task(lead.id)
 
         task = Task.objects.get(lead=lead)
-        self.assertIn('Новый клиент', task.title)
+        # ФИО клиента — только в description (видно в CRM), не в title (уходит
+        # в Telegram целиком, см. telegrambot.services.format_task_line).
+        self.assertNotIn('Новый клиент', task.title)
+        self.assertIn(str(lead.id), task.title)
         self.assertIsNone(task.assignee)
         self.assertEqual(task.column_id, self.column_new.id)
         self.assertIn('+79990001122', task.description)
@@ -168,6 +171,7 @@ class CheckStaleLeadsTests(TestCase):
 
         task = Task.objects.get(lead=lead)
         self.assertIn('без движения', task.title)
+        self.assertNotIn(lead.name, task.title)  # ФИО — только в description, ТЗ 11.5, 152-ФЗ
         self.assertEqual(task.assignee_id, self.manager.id)
         mock_notify.assert_called_once_with(task.id)
 

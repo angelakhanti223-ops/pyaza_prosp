@@ -39,8 +39,12 @@ def create_new_lead_task(lead_id: int):
         logger.warning('На доске не настроено ни одной колонки, задача на контакт не создана')
         return
 
+    # Заголовок задачи целиком уходит в текст Telegram-уведомления (см.
+    # telegrambot.services.format_task_line) — ФИО/телефон клиента туда попадать
+    # не должны (ТЗ 11.5, 152-ФЗ), поэтому имя есть только в description
+    # (виден исключительно в самой CRM).
     task = Task.objects.create(
-        title=f'{_NEW_LEAD_TITLE_PREFIX}: {lead.name}'[:255],
+        title=f'{_NEW_LEAD_TITLE_PREFIX} №{lead.id}',
         description=f'Новый лид №{lead.id}\nТелефон: {lead.phone or "—"}',
         column=column, lead=lead, order=next_order_in_column(column),
     )
@@ -81,7 +85,7 @@ def check_stale_leads():
             continue
 
         task = Task.objects.create(
-            title=f'{_STALE_LEAD_TITLE_PREFIX}: {lead.name}'[:255],
+            title=f'{_STALE_LEAD_TITLE_PREFIX} №{lead.id}',
             description=f'Лид №{lead.id} без движения {STALE_LEAD_THRESHOLD_DAYS}+ дня\nТелефон: {lead.phone or "—"}',
             column=column, lead=lead, assignee=lead.assigned_manager,
             order=next_order_in_column(column),
