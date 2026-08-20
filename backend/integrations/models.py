@@ -35,6 +35,11 @@ class UonRequestRecord(UonMirrorRecord):
     notes = models.TextField('Заметки', blank=True)
     is_archive = models.BooleanField('В архиве', default=False)
     uon_created_at = models.DateTimeField('Создана в U-ON', null=True, blank=True)
+    date_begin = models.DateField(
+        'Дата вылета', null=True, blank=True,
+        help_text='date_begin из сырых данных заявки — используется для напоминания «выдать документы» за 5 дней.',
+    )
+    date_end = models.DateField('Дата окончания тура', null=True, blank=True)
 
     class Meta:
         verbose_name = 'заявка U-ON'

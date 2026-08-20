@@ -11,10 +11,12 @@ from leads.models import Direction, Lead
 from .adapters import MockUonAdapter, RealUonAdapter, UonAdapterError, build_ticket_payload
 from .models import UonClient, UonFollowupChain, UonLeadRecord, UonRequestRecord, UonWebhookLog
 from .tasks import (
+    DOCUMENT_ISSUANCE_LEAD_DAYS,
     FOLLOWUP_TRIGGER_STATUS_ID,
     _match_manager_user,
     _working_hours,
     advance_followup_chains,
+    check_document_issuance_deadlines,
     handle_uon_chain_close,
     handle_uon_client_reply,
     handle_uon_status_change,
@@ -452,6 +454,94 @@ class SyncUonRequestTests(TestCase):
         self.assertEqual(record.client_phone, '')
         self.assertEqual(record.client_email, '')
         self.assertEqual(record.client_name, '')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_saves_departure_dates(self, mock_get_adapter):
+        payload = dict(REAL_REQUEST_PAYLOAD, date_begin='2026-09-01 00:00', date_end='2026-09-10 00:00')
+        mock_get_adapter.return_value.get_request.return_value = payload
+
+        sync_uon_request('61')
+
+        record = UonRequestRecord.objects.get(uon_id='61')
+        self.assertEqual(str(record.date_begin), '2026-09-01')
+        self.assertEqual(str(record.date_end), '2026-09-10')
+
+    @patch('integrations.tasks.get_uon_adapter')
+    def test_missing_departure_dates_stay_null(self, mock_get_adapter):
+        mock_get_adapter.return_value.get_request.return_value = REAL_REQUEST_PAYLOAD
+        sync_uon_request('61')
+        record = UonRequestRecord.objects.get(uon_id='61')
+        self.assertIsNone(record.date_begin)
+        self.assertIsNone(record.date_end)
+
+
+class CheckDocumentIssuanceDeadlinesTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='ekaterina2', password='x', first_name='Екатерина')
+        self.column_new = KanbanColumn.objects.get(name='Новая')
+        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.target_date = timezone.localdate() + timedelta(days=DOCUMENT_ISSUANCE_LEAD_DAYS)
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_creates_task_for_matching_departure_date(self, mock_notify):
+        UonRequestRecord.objects.create(
+            uon_id='300', client_name='Иванов Иван', client_phone='+7000',
+            manager_name='Екатерина', date_begin=self.target_date,
+        )
+
+        created = check_document_issuance_deadlines()
+
+        self.assertEqual(created, 1)
+        task = Task.objects.get(uon_record_kind='request', uon_record_id='300')
+        self.assertIn('Выдать документы', task.title)
+        self.assertEqual(task.assignee_id, self.manager.id)
+        mock_notify.assert_called_once_with(task.id)
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_marks_unassigned_when_no_manager_match(self, mock_notify):
+        UonRequestRecord.objects.create(
+            uon_id='301', client_name='Клиент', manager_name='', date_begin=self.target_date,
+        )
+        check_document_issuance_deadlines()
+        task = Task.objects.get(uon_record_id='301')
+        self.assertIsNone(task.assignee)
+        self.assertIn('БЕЗ МЕНЕДЖЕРА', task.title)
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_skips_wrong_departure_date(self, mock_notify):
+        UonRequestRecord.objects.create(
+            uon_id='302', client_name='Клиент', date_begin=timezone.localdate() + timedelta(days=6),
+        )
+        created = check_document_issuance_deadlines()
+        self.assertEqual(created, 0)
+        self.assertFalse(Task.objects.filter(uon_record_id='302').exists())
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_skips_archived_request(self, mock_notify):
+        UonRequestRecord.objects.create(
+            uon_id='303', client_name='Клиент', date_begin=self.target_date, is_archive=True,
+        )
+        created = check_document_issuance_deadlines()
+        self.assertEqual(created, 0)
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_does_not_duplicate_open_task(self, mock_notify):
+        UonRequestRecord.objects.create(uon_id='304', client_name='Клиент', date_begin=self.target_date)
+        check_document_issuance_deadlines()
+        created_second_pass = check_document_issuance_deadlines()
+        self.assertEqual(created_second_pass, 0)
+        self.assertEqual(Task.objects.filter(uon_record_id='304').count(), 1)
+
+    @patch('telegrambot.tasks.notify_task_created.delay')
+    def test_recreates_after_previous_task_closed(self, mock_notify):
+        UonRequestRecord.objects.create(uon_id='305', client_name='Клиент', date_begin=self.target_date)
+        check_document_issuance_deadlines()
+        Task.objects.filter(uon_record_id='305').update(column=self.column_done)
+
+        created_second_pass = check_document_issuance_deadlines()
+
+        self.assertEqual(created_second_pass, 1)
+        self.assertEqual(Task.objects.filter(uon_record_id='305').count(), 2)
 
 
 REAL_LEAD_PAYLOAD = {

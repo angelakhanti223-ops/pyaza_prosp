@@ -388,6 +388,8 @@ def sync_uon_request(self, request_id: str):
             'notes': _s(data, 'notes'),
             'is_archive': bool(data.get('is_archive')),
             'uon_created_at': _parse_uon_datetime(data.get('dat_request') or data.get('created_at')),
+            'date_begin': _parse_uon_date(data.get('date_begin')),
+            'date_end': _parse_uon_date(data.get('date_end')),
             'raw_data': data,
         },
     )
@@ -858,4 +860,61 @@ def handle_uon_task_added(payload: dict):
     if task_created:
         from telegrambot.tasks import notify_task_created
         notify_task_created.delay(task.pk)
+
+
+DOCUMENT_ISSUANCE_LEAD_DAYS = 5
+_DOCS_TITLE_PREFIX = '📄 Выдать документы'
+
+
+@shared_task
+def check_document_issuance_deadlines():
+    """Раз в день (см. CELERY_BEAT_SCHEDULE) — заявки (сделки, не обращения — у них
+    есть подтверждённая дата вылета) с датой вылета ровно через
+    DOCUMENT_ISSUANCE_LEAD_DAYS дней получают задачу «выдать документы».
+    Идемпотентно, как и check_stale_leads в leads.tasks: проверка по префиксу
+    заголовка + uon_record_id, повторно не создаём, пока прежняя задача открыта."""
+    from kanban.models import Task
+    from kanban.services import next_order_in_column
+    from telegrambot.services import get_first_column, get_last_column
+    from telegrambot.tasks import notify_task_created
+
+    from .models import UonRequestRecord
+
+    target_date = timezone.localdate() + timedelta(days=DOCUMENT_ISSUANCE_LEAD_DAYS)
+    requests = UonRequestRecord.objects.filter(date_begin=target_date, is_archive=False)
+
+    column = get_first_column()
+    last_column = get_last_column()
+    if column is None:
+        logger.warning('На доске не настроено ни одной колонки, проверка выдачи документов пропущена')
+        return
+
+    created = 0
+    for record in requests:
+        existing = Task.objects.filter(
+            uon_record_kind='request', uon_record_id=record.uon_id, title__startswith=_DOCS_TITLE_PREFIX,
+        )
+        if last_column is not None:
+            existing = existing.exclude(column=last_column)
+        if existing.exists():
+            continue
+
+        assignee = _match_manager_user(record.manager_name)
+        title_prefix = _DOCS_TITLE_PREFIX if assignee else f'{_DOCS_TITLE_PREFIX} ⚠️ БЕЗ МЕНЕДЖЕРА'
+        title = f'{title_prefix} №{record.uon_id}: {record.client_name or "клиент"}'[:255]
+        description = (
+            f'Заявка №{record.uon_id}\nКлиент: {record.client_name or "—"}\n'
+            f'Телефон: {record.client_phone or "—"}\nВылет: {record.date_begin:%d.%m.%Y}'
+        )
+        task = Task.objects.create(
+            title=title, description=description, column=column, assignee=assignee,
+            order=next_order_in_column(column), uon_record_kind='request', uon_record_id=record.uon_id,
+        )
+        notify_task_created.delay(task.pk)
+        created += 1
+
+    logger.info(
+        'Проверка выдачи документов (%s): создано задач — %s', target_date, created,
+    )
+    return created
     return True

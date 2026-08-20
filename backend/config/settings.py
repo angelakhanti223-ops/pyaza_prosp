@@ -220,6 +220,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'leads.tasks.check_stale_leads',
         'schedule': crontab(hour=9, minute=0),
     },
+    'check-document-issuance-deadlines': {
+        'task': 'integrations.tasks.check_document_issuance_deadlines',
+        'schedule': crontab(hour=9, minute=0),
+    },
     'notify-daily-deadlines': {
         # Написана ещё в прошлой сессии, но расписание для неё так и не завели —
         # старый долг, закрываю заодно (см. leads.tasks.check_stale_leads рядом).
