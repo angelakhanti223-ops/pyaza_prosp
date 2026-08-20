@@ -6,6 +6,7 @@ import socket
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 # This Docker host's IPv6 routing is broken for outbound connections (confirmed
 # live, 18-19.08.2026): any A+AAAA host — api.telegram.org first, then rediscovered
@@ -204,7 +205,8 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# Периодические задачи (Celery Beat).
+# Периодические задачи (Celery Beat). CELERY_TIMEZONE = TIME_ZONE (Europe/Moscow,
+# см. выше) — время в crontab() ниже уже московское, дополнительно пересчитывать не нужно.
 CELERY_BEAT_SCHEDULE = {
     'sync-uon-reminders': {
         'task': 'integrations.tasks.sync_all_uon_reminders',
@@ -213,6 +215,16 @@ CELERY_BEAT_SCHEDULE = {
     'advance-uon-followup-chains': {
         'task': 'integrations.tasks.advance_followup_chains',
         'schedule': 300.0,  # каждые 5 минут, см. uonfollowupspec.md §3.3
+    },
+    'check-stale-leads': {
+        'task': 'leads.tasks.check_stale_leads',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    'notify-daily-deadlines': {
+        # Написана ещё в прошлой сессии, но расписание для неё так и не завели —
+        # старый долг, закрываю заодно (см. leads.tasks.check_stale_leads рядом).
+        'task': 'telegrambot.tasks.notify_daily_deadlines',
+        'schedule': crontab(hour=9, minute=0),
     },
 }
 

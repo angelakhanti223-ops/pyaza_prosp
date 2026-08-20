@@ -40,6 +40,8 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         from emailing.tasks import send_lead_confirmation_task, send_lead_notification_task
         from integrations.tasks import sync_lead_to_uon
 
+        from .tasks import create_new_lead_task
+
         validated_data.pop('consent')
         validated_data.setdefault('source', Lead.Source.SITE_FORM)
         validated_data['consent_personal_data_at'] = timezone.now()
@@ -47,6 +49,7 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
         sync_lead_to_uon.delay(lead.id)
         send_lead_notification_task.delay(lead.id)
+        create_new_lead_task.delay(lead.id)
         if settings.SEND_LEAD_CONFIRMATION_EMAIL:
             send_lead_confirmation_task.delay(lead.id)
 
