@@ -11,7 +11,12 @@ from leads.models import Direction, Lead
 from .bot import cmd_done, cmd_lead, cmd_newtask, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
 from .models import TelegramAccount, TelegramNotificationLog
 from .services import build_board_url, build_lead_url, build_uon_record_url, format_lead_summary, format_task_line
-from .tasks import notify_lead_assignment, notify_task_assignment
+from .tasks import (
+    notify_lead_assignment,
+    notify_lead_client_replied,
+    notify_lead_status_change,
+    notify_task_assignment,
+)
 
 User = get_user_model()
 
@@ -441,3 +446,65 @@ class NotifyLeadTests(TestCase):
         mock_post.assert_called_once()
         log = TelegramNotificationLog.objects.get()
         self.assertEqual(log.status, TelegramNotificationLog.Status.SUCCESS)
+
+
+class NotifyLeadStatusChangeTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='manager3', password='x')
+        self.account = TelegramAccount.objects.create(user=self.manager, chat_id=777)
+        self.direction = Direction.objects.create(name='Кипр')
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_sends_message_for_booked(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.BOOKED,
+        )
+
+        notify_lead_status_change(lead.id, Lead.Status.BOOKED)
+
+        mock_post.assert_called_once()
+        self.assertIn('Бронь', mock_post.call_args.kwargs['json']['text'])
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_skips_without_assignee(self, mock_post):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction, status=Lead.Status.PAID)
+        notify_lead_status_change(lead.id, Lead.Status.PAID)
+        mock_post.assert_not_called()
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_skips_without_linked_account(self, mock_post):
+        other = User.objects.create_user(username='nolink2', password='x')
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=other, status=Lead.Status.CLOSED_LOST,
+        )
+        notify_lead_status_change(lead.id, Lead.Status.CLOSED_LOST)
+        mock_post.assert_not_called()
+
+
+class NotifyLeadClientRepliedTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='manager4', password='x')
+        self.account = TelegramAccount.objects.create(user=self.manager, chat_id=888)
+        self.direction = Direction.objects.create(name='Черногория')
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_sends_message(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+        lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager)
+
+        notify_lead_client_replied(lead.id)
+
+        mock_post.assert_called_once()
+        self.assertIn('ответил', mock_post.call_args.kwargs['json']['text'])
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_skips_without_assignee(self, mock_post):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction)
+        notify_lead_client_replied(lead.id)
+        mock_post.assert_not_called()

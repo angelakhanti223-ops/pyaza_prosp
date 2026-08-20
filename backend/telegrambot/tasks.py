@@ -140,6 +140,91 @@ def notify_lead_assignment(self, lead_id: int):
     )
 
 
+@shared_task(
+    bind=True,
+    autoretry_for=(TelegramSendError,),
+    retry_backoff=60,
+    retry_backoff_max=3600,
+    retry_jitter=True,
+    max_retries=MAX_RETRIES,
+)
+def notify_lead_status_change(self, lead_id: int, new_status: str):
+    """Уведомляет ответственного менеджера о переходе заявки в ключевой статус
+    (бронь/оплата/отказ) — не на каждую смену статуса, только эти три, чтобы
+    не превращать уведомления в шум (решение заказчика, 19.08.2026)."""
+    from leads.models import Lead
+
+    if not settings.TELEGRAM_BOT_ENABLED:
+        return
+
+    try:
+        lead = Lead.objects.select_related('assigned_manager', 'direction').get(pk=lead_id)
+    except Lead.DoesNotExist:
+        logger.warning('Telegram: заявка #%s не найдена, пропускаем уведомление о статусе', lead_id)
+        return
+
+    if not lead.assigned_manager_id:
+        return
+
+    account = TelegramAccount.objects.filter(
+        user_id=lead.assigned_manager_id, is_active=True, chat_id__isnull=False,
+    ).first()
+    if account is None:
+        return
+
+    icons = {
+        Lead.Status.BOOKED: '🎫',
+        Lead.Status.PAID: '💰',
+        Lead.Status.CLOSED_LOST: '❌',
+    }
+    icon = icons.get(new_status, 'ℹ️')
+    status_label = dict(Lead.Status.choices).get(new_status, new_status)
+    text = f'{icon} Заявка перешла в статус «{status_label}»:\n{format_lead_summary(lead)}'
+    _send_telegram_message(
+        account.chat_id, text, TelegramNotificationLog.EventType.LEAD_ASSIGNED,
+        reply_markup=_link_button('🔗 Открыть в CRM', build_lead_url(lead.id)),
+    )
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(TelegramSendError,),
+    retry_backoff=60,
+    retry_backoff_max=3600,
+    retry_jitter=True,
+    max_retries=MAX_RETRIES,
+)
+def notify_lead_client_replied(self, lead_id: int):
+    """Уведомляет ответственного менеджера, что клиент ответил по обращению —
+    вызывается из integrations.tasks._close_active_chains при гашении цепочки
+    автозадач по причине closed_client_replied (см. uonfollowupspec.md)."""
+    from leads.models import Lead
+
+    if not settings.TELEGRAM_BOT_ENABLED:
+        return
+
+    try:
+        lead = Lead.objects.select_related('assigned_manager', 'direction').get(pk=lead_id)
+    except Lead.DoesNotExist:
+        logger.warning('Telegram: заявка #%s не найдена, пропускаем уведомление об ответе клиента', lead_id)
+        return
+
+    if not lead.assigned_manager_id:
+        return
+
+    account = TelegramAccount.objects.filter(
+        user_id=lead.assigned_manager_id, is_active=True, chat_id__isnull=False,
+    ).first()
+    if account is None:
+        return
+
+    text = f'💬 Клиент ответил по заявке:\n{format_lead_summary(lead)}'
+    _send_telegram_message(
+        account.chat_id, text, TelegramNotificationLog.EventType.LEAD_ASSIGNED,
+        reply_markup=_link_button('🔗 Открыть в CRM', build_lead_url(lead.id)),
+    )
+
+
 @shared_task
 def notify_task_created(task_id: int):
     """Уведомление о новой задаче: исполнителю, а если его нет — всем сотрудникам."""

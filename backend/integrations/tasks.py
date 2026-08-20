@@ -535,6 +535,13 @@ def _close_active_chains(lead_id: str, reason: str, close_remote_reminder: bool 
         chain.save(update_fields=['state', 'last_client_action_at', 'updated_at'])
     if chains:
         logger.info('U-ON followup: обращение %s — цепочка закрыта (%s)', lead_id, reason)
+        if reason == 'closed_client_replied':
+            from leads.models import Lead
+            from telegrambot.tasks import notify_lead_client_replied
+
+            our_lead = Lead.objects.filter(uon_ticket_id=lead_id).first()
+            if our_lead is not None:
+                notify_lead_client_replied.delay(our_lead.id)
 
 
 def _followup_ids_from_payload(payload: dict) -> str:

@@ -904,6 +904,20 @@ class HandleUonClientReplyTests(TestCase):
         chain = UonFollowupChain.objects.get(lead_id='226')
         self.assertEqual(chain.state, UonFollowupChain.State.ACTIVE)
 
+    @patch('telegrambot.tasks.notify_lead_client_replied.delay')
+    def test_client_reply_notifies_matching_local_lead(self, mock_notify):
+        direction = Direction.objects.create(name='Мальдивы')
+        lead = Lead.objects.create(name='Клиент', direction=direction, uon_ticket_id='226')
+
+        handle_uon_client_reply({'request_id': '226', 'sender_is_client': True})
+
+        mock_notify.assert_called_once_with(lead.id)
+
+    @patch('telegrambot.tasks.notify_lead_client_replied.delay')
+    def test_client_reply_skips_notification_without_local_lead(self, mock_notify):
+        handle_uon_client_reply({'request_id': '226', 'sender_is_client': True})
+        mock_notify.assert_not_called()
+
 
 class HandleUonChainCloseTests(TestCase):
     def test_refusal_event_closes_active_chain(self):

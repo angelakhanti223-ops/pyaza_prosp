@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.permissions import is_head
-from telegrambot.tasks import notify_lead_assignment
+from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
 from .models import Direction, Lead, LeadStatusHistory
 from .serializers import (
@@ -108,6 +108,10 @@ class LeadViewSet(
             LeadStatusHistory.objects.create(
                 lead=lead, old_status=old_status, new_status=new_status, changed_by=request.user,
             )
+            # Только ключевые для денег переходы — не на каждую смену статуса,
+            # иначе уведомления превращаются в шум (решение заказчика, 19.08.2026).
+            if new_status in (Lead.Status.BOOKED, Lead.Status.PAID, Lead.Status.CLOSED_LOST):
+                notify_lead_status_change.delay(lead.id, new_status)
 
         if lead.assigned_manager_id and lead.assigned_manager_id != old_assigned_manager_id:
             notify_lead_assignment.delay(lead.id)
