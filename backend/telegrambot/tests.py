@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from kanban.models import KanbanColumn, Task
 from leads.models import Direction, Lead
 
-from .bot import cmd_done, cmd_lead, cmd_newtask, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
+from .bot import cmd_done, cmd_lead, cmd_leads, cmd_newtask, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
 from .models import TelegramAccount, TelegramNotificationLog
 from .services import build_board_url, build_lead_url, build_uon_record_url, format_lead_summary, format_task_line
 from .tasks import (
@@ -364,6 +364,79 @@ class CallbackHandlerTests(TestCase):
 
         mock_delay.assert_called_once_with(lead.id)
         query.answer.assert_called_once()
+
+
+class LeadSummaryBotTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='leadmanager', password='x', role=User.Role.MANAGER)
+        self.other_manager = User.objects.create_user(username='otherlead', password='x', role=User.Role.MANAGER)
+        self.account = TelegramAccount.objects.create(user=self.manager, chat_id=555)
+        self.direction = Direction.objects.create(name='Греция')
+
+    def test_leads_command_shows_summary_counting_only_own_open_leads(self):
+        Lead.objects.create(name='Мой лид', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW)
+        Lead.objects.create(name='Чужой', direction=self.direction, assigned_manager=self.other_manager)
+        Lead.objects.create(
+            name='Закрыт', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.CLOSED_WON,
+        )
+
+        update = make_update(chat_id=555)
+        context = make_context()
+        async_to_sync(cmd_leads)(update, context)
+
+        text = sent_texts(context)[0]
+        self.assertIn('1 открытых', text)
+        self.assertNotIn('Мой лид', text)  # ФИО не должно быть в сводке — ТЗ 11.5, 152-ФЗ
+
+    def test_menu_leads_callback_shows_summary_via_edit(self):
+        Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW)
+        update, query = make_callback(chat_id=555, data='menu:leads')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.edit_message_text.assert_called_once()
+        self.assertIn('1 открытых', query.edit_message_text.call_args.args[0])
+
+    def test_leadcat_callback_lists_leads_without_pii(self):
+        lead = Lead.objects.create(
+            name='Секретное Имя', phone='+79990000000', direction=self.direction,
+            assigned_manager=self.manager, status=Lead.Status.NEW,
+        )
+        update, query = make_callback(chat_id=555, data='leadcat:new:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn(f'№{lead.id}', text)
+        self.assertNotIn('Секретное Имя', text)
+        self.assertNotIn('+79990000000', text)
+
+    def test_leadopen_callback_shows_full_card_with_back_button(self):
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW,
+        )
+        update, query = make_callback(chat_id=555, data=f'leadopen:{lead.id}:new:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.edit_message_text.assert_called_once()
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn(f'#{lead.id}', text)
+        keyboard = query.edit_message_text.call_args.kwargs['reply_markup']
+        back_buttons = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+            if btn.callback_data == 'leadcat:new:1'
+        ]
+        self.assertEqual(len(back_buttons), 1)
+
+    def test_leadopen_callback_denies_other_managers_lead(self):
+        lead = Lead.objects.create(name='Чужой', direction=self.direction, assigned_manager=self.other_manager)
+        update, query = make_callback(chat_id=555, data=f'leadopen:{lead.id}:new:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.answer.assert_called_once()
+        self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))
 
 
 class NotifyTaskTests(TestCase):

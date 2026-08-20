@@ -45,11 +45,26 @@ _CATEGORY_LABELS = {
 }
 _CATEGORY_ORDER = ['overdue', 'today', 'week', 'later', 'no_deadline']
 
+# /leads — тот же приём сводка→категория→список, что и /tasks, но по срочности
+# заявки, а не по сроку (решение заказчика, 19.08.2026): без движения дольше
+# LEADS_STALE_DAYS — тревожнее, чем сам статус воронки.
+LEADS_STALE_DAYS = 3
+
+_LEAD_CATEGORY_LABELS = {
+    'stale': '🔴 Без движения 3+ дня',
+    'new': '🟡 Новые, не в работе',
+    'booked_unpaid': '🟠 Бронь без оплаты',
+    'active': '🔵 В работе',
+    'other': '⚪ Остальное',
+}
+_LEAD_CATEGORY_ORDER = ['stale', 'new', 'booked_unpaid', 'active', 'other']
+
 NOT_LINKED_TEXT = 'Аккаунт не привязан. Обратитесь к руководителю за кодом (/start &lt;код&gt;).'
 
 HELP_TEXT = (
     '<b>Доступные команды</b>\n'
     '/tasks — мои открытые задачи\n'
+    '/leads — мои заявки\n'
     '/newtask &lt;текст&gt; — создать задачу\n'
     '/done &lt;номер&gt; — отметить задачу выполненной\n'
     '/lead &lt;номер&gt; — карточка заявки\n'
@@ -59,6 +74,7 @@ HELP_TEXT = (
 
 MAIN_MENU_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton('📋 Мои задачи', callback_data='menu:tasks')],
+    [InlineKeyboardButton('📁 Мои заявки', callback_data='menu:leads')],
     [InlineKeyboardButton('ℹ️ Все команды', callback_data='menu:help')],
 ])
 
@@ -201,6 +217,94 @@ def _category_list_keyboard(category: str, page_tasks: list, page: int, total_pa
     return InlineKeyboardMarkup(rows)
 
 
+def _lead_category(lead, today) -> str:
+    from leads.models import Lead
+
+    days_since_update = (today - timezone.localtime(lead.updated_at).date()).days
+    if days_since_update >= LEADS_STALE_DAYS:
+        return 'stale'
+    if lead.status == Lead.Status.NEW:
+        return 'new'
+    if lead.status == Lead.Status.BOOKED:
+        return 'booked_unpaid'
+    if lead.status == Lead.Status.IN_PROGRESS:
+        return 'active'
+    return 'other'
+
+
+@sync_to_async
+def _load_lead_buckets(user):
+    """Открытые заявки менеджера, разложенные по категориям срочности (не по
+    статусу воронки — «без движения» важнее для внимания, чем сама стадия)."""
+    from leads.models import Lead
+
+    leads = list(
+        Lead.objects.filter(assigned_manager=user)
+        .exclude(status__in=[Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST])
+        .order_by('-updated_at'),
+    )
+    today = timezone.localdate()
+    buckets = {category: [] for category in _LEAD_CATEGORY_ORDER}
+    for lead in leads:
+        buckets[_lead_category(lead, today)].append(lead)
+    return buckets
+
+
+def _format_lead_summary_text(buckets: dict) -> str:
+    total = sum(len(v) for v in buckets.values())
+    if total == 0:
+        return '🎉 Открытых заявок нет.'
+    lines = [f'📁 Ваши заявки: {total} открытых', '']
+    for category in _LEAD_CATEGORY_ORDER:
+        count = len(buckets[category])
+        if count:
+            lines.append(f'{_LEAD_CATEGORY_LABELS[category]} — {count}')
+    return '\n'.join(lines)
+
+
+def _lead_summary_keyboard(buckets: dict) -> InlineKeyboardMarkup | None:
+    rows = [
+        [InlineKeyboardButton(
+            f'{_LEAD_CATEGORY_LABELS[category]} ({len(buckets[category])})', callback_data=f'leadcat:{category}:1',
+        )]
+        for category in _LEAD_CATEGORY_ORDER
+        if buckets[category]
+    ]
+    return InlineKeyboardMarkup(rows) if rows else None
+
+
+def _format_lead_list_line(index: int, lead) -> str:
+    # Без ФИО/телефона — только номер и статус (ТЗ 11.5, 152-ФЗ), как и в
+    # format_lead_summary для карточки одной заявки.
+    return f'{index}. №{lead.id} — {escape_html(lead.get_status_display())}'
+
+
+def _lead_category_list_text(category: str, page_leads: list, page: int, total_pages: int, total: int) -> str:
+    lines = [f'{_LEAD_CATEGORY_LABELS[category]} — {total}', '']
+    lines.extend(_format_lead_list_line(i, lead) for i, lead in enumerate(page_leads, start=1))
+    if total_pages > 1:
+        lines.append(f'\nСтраница {page} из {total_pages}')
+    return '\n'.join(lines)
+
+
+def _lead_category_list_keyboard(category: str, page_leads: list, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    rows = []
+    if page_leads:
+        rows.append([
+            InlineKeyboardButton(str(i), callback_data=f'leadopen:{lead.id}:{category}:{page}')
+            for i, lead in enumerate(page_leads, start=1)
+        ])
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton('◀ Пред', callback_data=f'leadcat:{category}:{page - 1}'))
+    if page < total_pages:
+        nav_row.append(InlineKeyboardButton('След ▶', callback_data=f'leadcat:{category}:{page + 1}'))
+    if nav_row:
+        rows.append(nav_row)
+    rows.append([InlineKeyboardButton('🔙 К сводке', callback_data='menu:leads')])
+    return InlineKeyboardMarkup(rows)
+
+
 @sync_to_async
 def _create_task(user, title: str):
     from kanban.models import Task
@@ -290,6 +394,41 @@ async def _send_category_page(
         await _reply(update, context, text, keyboard=keyboard)
 
 
+async def _send_lead_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount, edit: bool = False):
+    buckets = await _load_lead_buckets(account.user)
+    text = _format_lead_summary_text(buckets)
+    keyboard = _lead_summary_keyboard(buckets)
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
+
+
+async def _send_lead_category_page(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount,
+    category: str, page: int, edit: bool = False,
+):
+    buckets = await _load_lead_buckets(account.user)
+    all_leads = buckets.get(category, [])
+    total = len(all_leads)
+    total_pages = max(1, -(-total // TASKS_PAGE_SIZE))
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * TASKS_PAGE_SIZE
+    page_leads = all_leads[start:start + TASKS_PAGE_SIZE]
+
+    if total == 0:
+        text = f'{_LEAD_CATEGORY_LABELS.get(category, category)}\n\nЗдесь пусто.'
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('🔙 К сводке', callback_data='menu:leads')]])
+    else:
+        text = _lead_category_list_text(category, page_leads, page, total_pages, total)
+        keyboard = _lead_category_list_keyboard(category, page_leads, page, total_pages)
+
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await _reply(update, context, 'Чтобы привязать аккаунт, отправьте код, который вам выдал руководитель: /start &lt;код&gt;')
@@ -321,6 +460,14 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _reply(update, context, NOT_LINKED_TEXT)
         return
     await _send_task_summary(update, context, account)
+
+
+async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    account = await _get_account(update.effective_chat.id)
+    if account is None:
+        await _reply(update, context, NOT_LINKED_TEXT)
+        return
+    await _send_lead_summary(update, context, account)
 
 
 async def cmd_newtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -429,6 +576,31 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _send_category_page(update, context, account, category, int(page_str), edit=True)
         return
 
+    if data == 'menu:leads':
+        await query.answer()
+        await _send_lead_summary(update, context, account, edit=True)
+        return
+
+    if data.startswith('leadcat:'):
+        _, category, page_str = data.split(':', 2)
+        await query.answer()
+        await _send_lead_category_page(update, context, account, category, int(page_str), edit=True)
+        return
+
+    if data.startswith('leadopen:'):
+        _, lead_id_str, category, page_str = data.split(':', 3)
+        lead = await _get_lead(account.user, int(lead_id_str))
+        if lead is None:
+            await query.answer('Заявка не найдена.', show_alert=True)
+            return
+        await query.answer()
+        keyboard_rows = list(lead_keyboard(lead).inline_keyboard)
+        keyboard_rows.append([InlineKeyboardButton('🔙 К списку', callback_data=f'leadcat:{category}:{page_str}')])
+        await update.callback_query.edit_message_text(
+            format_lead_summary(lead), reply_markup=InlineKeyboardMarkup(keyboard_rows), parse_mode=ParseMode.HTML,
+        )
+        return
+
     if data.startswith('donelist:'):
         _, task_id_str, category, page_str = data.split(':', 3)
         task = await _mark_done(account.user, int(task_id_str))
@@ -467,6 +639,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _post_init(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand('tasks', 'Мои открытые задачи'),
+        BotCommand('leads', 'Мои заявки'),
         BotCommand('newtask', 'Создать задачу'),
         BotCommand('done', 'Отметить задачу выполненной'),
         BotCommand('lead', 'Карточка заявки'),
@@ -480,6 +653,7 @@ def build_application() -> Application:
     application.add_handler(CommandHandler('start', cmd_start))
     application.add_handler(CommandHandler('menu', cmd_menu))
     application.add_handler(CommandHandler('tasks', cmd_tasks))
+    application.add_handler(CommandHandler('leads', cmd_leads))
     application.add_handler(CommandHandler('newtask', cmd_newtask))
     application.add_handler(CommandHandler('done', cmd_done))
     application.add_handler(CommandHandler('lead', cmd_lead))
