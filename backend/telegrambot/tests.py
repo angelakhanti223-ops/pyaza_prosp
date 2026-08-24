@@ -727,4 +727,88 @@ class SummaryBotTests(TestCase):
         async_to_sync(on_callback)(update, context)
 
         query.answer.assert_called_once()
-        self.assertIn('Обращения в работе', sent_texts(context)[0])
+        query.edit_message_text.assert_called_once()
+        self.assertIn('Обращения в работе', query.edit_message_text.call_args.args[0])
+
+    def test_sumlead_callback_lists_leads_without_pii(self):
+        lead = Lead.objects.create(
+            name='Секретное Имя', phone='+79990000000', direction=self.direction,
+            assigned_manager=self.manager, status=Lead.Status.IN_PROGRESS,
+        )
+        update, query = make_callback(chat_id=920, data=f'sumlead:{Lead.Status.IN_PROGRESS}:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn(f'№{lead.id}', text)
+        self.assertNotIn('Секретное Имя', text)
+        self.assertNotIn('+79990000000', text)
+
+    def test_sumleadopen_callback_shows_full_card_with_back_button(self):
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.IN_PROGRESS,
+        )
+        update, query = make_callback(chat_id=920, data=f'sumleadopen:{lead.id}:{Lead.Status.IN_PROGRESS}:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.edit_message_text.assert_called_once()
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn(f'#{lead.id}', text)
+        keyboard = query.edit_message_text.call_args.kwargs['reply_markup']
+        back_buttons = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+            if btn.callback_data == f'sumlead:{Lead.Status.IN_PROGRESS}:1'
+        ]
+        self.assertEqual(len(back_buttons), 1)
+
+    def test_sumleadopen_callback_denies_other_managers_lead(self):
+        other = User.objects.create_user(username='summaryother2', password='x')
+        lead = Lead.objects.create(name='Чужой', direction=self.direction, assigned_manager=other, status=Lead.Status.NEW)
+        update, query = make_callback(chat_id=920, data=f'sumleadopen:{lead.id}:{Lead.Status.NEW}:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.answer.assert_called_once()
+        self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))
+
+    def test_sumreq_callback_lists_requests_without_pii(self):
+        UonRequestRecord.objects.create(
+            uon_id='42', status_name='Бронь', manager_name='Екатерина Макеева',
+            client_name='Секретный Клиент', client_phone='+79990000000', is_archive=False,
+        )
+        update, query = make_callback(chat_id=920, data='sumreq:Бронь:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn('№42', text)
+        self.assertNotIn('Секретный Клиент', text)
+        self.assertNotIn('+79990000000', text)
+
+    def test_sumreqopen_callback_shows_full_card_with_back_button(self):
+        UonRequestRecord.objects.create(
+            uon_id='42', status_name='Бронь', manager_name='Екатерина Макеева', is_archive=False,
+        )
+        update, query = make_callback(chat_id=920, data='sumreqopen:42:Бронь:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.edit_message_text.assert_called_once()
+        text = query.edit_message_text.call_args.args[0]
+        self.assertIn('№42', text)
+        keyboard = query.edit_message_text.call_args.kwargs['reply_markup']
+        back_buttons = [
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
+            if btn.callback_data == 'sumreq:Бронь:1'
+        ]
+        self.assertEqual(len(back_buttons), 1)
+
+    def test_sumreqopen_callback_denies_other_managers_request(self):
+        UonRequestRecord.objects.create(uon_id='99', status_name='Бронь', manager_name='Роман Петров', is_archive=False)
+        update, query = make_callback(chat_id=920, data='sumreqopen:99:Бронь:1')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.answer.assert_called_once()
+        self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))

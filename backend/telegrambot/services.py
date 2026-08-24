@@ -105,6 +105,16 @@ def format_plan_summary(year: int, month: int, rows: list, target_total, actual_
     return '\n'.join(lines)
 
 
+def format_request_summary(record) -> str:
+    lines = [
+        f'🧾 Заявка №{record.uon_id}',
+        f'Статус: <b>{escape_html(record.status_name) if record.status_name else "Без статуса"}</b>',
+    ]
+    if record.date_begin:
+        lines.append(f'Вылет: {record.date_begin.strftime("%d.%m.%Y")}')
+    return '\n'.join(lines)
+
+
 def format_work_summary(data: dict) -> str:
     """Обращения (Lead) и заявки (U-ON) в работе — общий формат для /summary
     в боте и панели «Сводка» в CRM (см. leads.dashboard.work_summary_data)."""

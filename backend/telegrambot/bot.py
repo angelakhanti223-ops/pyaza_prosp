@@ -20,9 +20,11 @@ from .models import TelegramAccount
 from .services import (
     build_board_url,
     build_lead_url,
+    build_uon_record_url,
     escape_html,
     format_lead_summary,
     format_plan_summary,
+    format_request_summary,
     format_task_line,
     format_work_summary,
     get_first_column,
@@ -504,13 +506,174 @@ def _load_work_summary(user):
     return work_summary_data(user, is_head(user))
 
 
+def _work_summary_keyboard(data: dict) -> InlineKeyboardMarkup | None:
+    rows = []
+    for row in data['leads_by_status']:
+        if row['count']:
+            rows.append([InlineKeyboardButton(
+                f"📁 {row['status_display']} ({row['count']})", callback_data=f"sumlead:{row['status']}:1",
+            )])
+    for row in data['requests_by_status']:
+        rows.append([InlineKeyboardButton(
+            f"🧾 {row['status_name']} ({row['count']})", callback_data=f"sumreq:{row['status_name']}:1",
+        )])
+    return InlineKeyboardMarkup(rows) if rows else None
+
+
+async def _send_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount, edit: bool = False):
+    data = await _load_work_summary(account.user)
+    text = format_work_summary(data)
+    keyboard = _work_summary_keyboard(data)
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
+
+
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     account = await _get_account(update.effective_chat.id)
     if account is None:
         await _reply(update, context, NOT_LINKED_TEXT)
         return
-    data = await _load_work_summary(account.user)
-    await _reply(update, context, format_work_summary(data))
+    await _send_summary(update, context, account)
+
+
+def _request_status_filter(status_name: str):
+    from django.db.models import Q
+
+    if status_name == 'Без статуса':
+        return Q(status_name='')
+    return Q(status_name=status_name)
+
+
+@sync_to_async
+def _load_summary_lead_page(user, status: str, page: int):
+    from leads.models import Lead
+
+    qs = Lead.objects.filter(status=status)
+    if not is_head(user):
+        qs = qs.filter(assigned_manager=user)
+    qs = qs.order_by('-updated_at')
+
+    total = qs.count()
+    total_pages = max(1, -(-total // TASKS_PAGE_SIZE))
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * TASKS_PAGE_SIZE
+    return list(qs[start:start + TASKS_PAGE_SIZE]), total, total_pages, page
+
+
+@sync_to_async
+def _load_summary_request_page(user, status_name: str, page: int):
+    from integrations.models import UonRequestRecord
+
+    qs = UonRequestRecord.objects.filter(is_archive=False).filter(_request_status_filter(status_name))
+    if not is_head(user):
+        qs = qs.filter(manager_name__istartswith=user.first_name) if user.first_name else qs.none()
+    qs = qs.order_by('-uon_created_at')
+
+    total = qs.count()
+    total_pages = max(1, -(-total // TASKS_PAGE_SIZE))
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * TASKS_PAGE_SIZE
+    return list(qs[start:start + TASKS_PAGE_SIZE]), total, total_pages, page
+
+
+@sync_to_async
+def _get_summary_request(user, uon_id: str):
+    from integrations.models import UonRequestRecord
+
+    qs = UonRequestRecord.objects.all()
+    if not is_head(user):
+        qs = qs.filter(manager_name__istartswith=user.first_name) if user.first_name else qs.none()
+    return qs.filter(uon_id=uon_id).first()
+
+
+def _format_request_list_line(index: int, record) -> str:
+    # Без ФИО/телефона клиента — только номер и статус (ТЗ 11.5, 152-ФЗ).
+    status = record.status_name or 'Без статуса'
+    return f'{index}. №{record.uon_id} — {escape_html(status)}'
+
+
+def request_keyboard(record) -> InlineKeyboardMarkup:
+    rows = []
+    row = _url_row('🔗 Открыть в U-ON', build_uon_record_url('request', record.uon_id))
+    if row:
+        rows.append(row)
+    return InlineKeyboardMarkup(rows)
+
+
+async def _send_summary_lead_page(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount, status: str, page: int, edit: bool = False,
+):
+    page_leads, total, total_pages, page = await _load_summary_lead_page(account.user, status, page)
+    from leads.models import Lead
+
+    status_display = Lead.Status(status).label if status in Lead.Status.values else status
+
+    if total == 0:
+        text = f'📁 {status_display}\n\nЗдесь пусто.'
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('🔙 К сводке', callback_data='menu:summary')]])
+    else:
+        lines = [f'📁 {status_display} — {total}', '']
+        lines.extend(_format_lead_list_line(i, lead) for i, lead in enumerate(page_leads, start=1))
+        if total_pages > 1:
+            lines.append(f'\nСтраница {page} из {total_pages}')
+        text = '\n'.join(lines)
+
+        rows = [[
+            InlineKeyboardButton(str(i), callback_data=f'sumleadopen:{lead.id}:{status}:{page}')
+            for i, lead in enumerate(page_leads, start=1)
+        ]]
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton('◀ Пред', callback_data=f'sumlead:{status}:{page - 1}'))
+        if page < total_pages:
+            nav_row.append(InlineKeyboardButton('След ▶', callback_data=f'sumlead:{status}:{page + 1}'))
+        if nav_row:
+            rows.append(nav_row)
+        rows.append([InlineKeyboardButton('🔙 К сводке', callback_data='menu:summary')])
+        keyboard = InlineKeyboardMarkup(rows)
+
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
+
+
+async def _send_summary_request_page(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, account: TelegramAccount,
+    status_name: str, page: int, edit: bool = False,
+):
+    page_records, total, total_pages, page = await _load_summary_request_page(account.user, status_name, page)
+
+    if total == 0:
+        text = f'🧾 {status_name}\n\nЗдесь пусто.'
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('🔙 К сводке', callback_data='menu:summary')]])
+    else:
+        lines = [f'🧾 {status_name} — {total}', '']
+        lines.extend(_format_request_list_line(i, r) for i, r in enumerate(page_records, start=1))
+        if total_pages > 1:
+            lines.append(f'\nСтраница {page} из {total_pages}')
+        text = '\n'.join(lines)
+
+        rows = [[
+            InlineKeyboardButton(str(i), callback_data=f'sumreqopen:{r.uon_id}:{status_name}:{page}')
+            for i, r in enumerate(page_records, start=1)
+        ]]
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton('◀ Пред', callback_data=f'sumreq:{status_name}:{page - 1}'))
+        if page < total_pages:
+            nav_row.append(InlineKeyboardButton('След ▶', callback_data=f'sumreq:{status_name}:{page + 1}'))
+        if nav_row:
+            rows.append(nav_row)
+        rows.append([InlineKeyboardButton('🔙 К сводке', callback_data='menu:summary')])
+        keyboard = InlineKeyboardMarkup(rows)
+
+    if edit and update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    else:
+        await _reply(update, context, text, keyboard=keyboard)
 
 
 async def cmd_newtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -621,8 +784,47 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == 'menu:summary':
         await query.answer()
-        summary_data = await _load_work_summary(account.user)
-        await _reply(update, context, format_work_summary(summary_data))
+        await _send_summary(update, context, account, edit=True)
+        return
+
+    if data.startswith('sumlead:'):
+        _, status, page_str = data.split(':', 2)
+        await query.answer()
+        await _send_summary_lead_page(update, context, account, status, int(page_str), edit=True)
+        return
+
+    if data.startswith('sumleadopen:'):
+        _, lead_id_str, status, page_str = data.split(':', 3)
+        lead = await _get_lead(account.user, int(lead_id_str))
+        if lead is None:
+            await query.answer('Заявка не найдена.', show_alert=True)
+            return
+        await query.answer()
+        keyboard_rows = list(lead_keyboard(lead).inline_keyboard)
+        keyboard_rows.append([InlineKeyboardButton('🔙 К списку', callback_data=f'sumlead:{status}:{page_str}')])
+        await update.callback_query.edit_message_text(
+            format_lead_summary(lead), reply_markup=InlineKeyboardMarkup(keyboard_rows), parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if data.startswith('sumreq:'):
+        _, status_name, page_str = data.split(':', 2)
+        await query.answer()
+        await _send_summary_request_page(update, context, account, status_name, int(page_str), edit=True)
+        return
+
+    if data.startswith('sumreqopen:'):
+        _, uon_id, status_name, page_str = data.split(':', 3)
+        record = await _get_summary_request(account.user, uon_id)
+        if record is None:
+            await query.answer('Заявка не найдена.', show_alert=True)
+            return
+        await query.answer()
+        keyboard_rows = list(request_keyboard(record).inline_keyboard)
+        keyboard_rows.append([InlineKeyboardButton('🔙 К списку', callback_data=f'sumreq:{status_name}:{page_str}')])
+        await update.callback_query.edit_message_text(
+            format_request_summary(record), reply_markup=InlineKeyboardMarkup(keyboard_rows), parse_mode=ParseMode.HTML,
+        )
         return
 
     if data.startswith('cat:'):
