@@ -494,7 +494,7 @@ class CheckDocumentIssuanceDeadlinesTests(TestCase):
         self.assertEqual(created, 1)
         task = Task.objects.get(uon_record_kind='request', uon_record_id='300')
         self.assertIn('Выдать документы', task.title)
-        self.assertNotIn('Иванов', task.title)  # ФИО — только в description, ТЗ 11.5, 152-ФЗ
+        self.assertNotIn('Иванов', task.title)  # title — стабильный ключ идемпотентности, без ФИО
         self.assertEqual(task.assignee_id, self.manager.id)
         mock_notify.assert_called_once_with(task.id)
 

@@ -900,8 +900,9 @@ def check_document_issuance_deadlines():
             continue
 
         assignee = _match_manager_user(record.manager_name)
-        # ФИО/телефон — только в description (виден в CRM), не в title (уходит
-        # в Telegram целиком, см. telegrambot.services.format_task_line; ТЗ 11.5, 152-ФЗ).
+        # Заголовок — стабильный ключ для идемпотентности (title__startswith
+        # выше), поэтому без ФИО; format_task_line подтягивает его отдельно при
+        # отправке в Telegram через task.uon_record_kind/uon_record_id.
         title_prefix = _DOCS_TITLE_PREFIX if assignee else f'{_DOCS_TITLE_PREFIX} ⚠️ БЕЗ МЕНЕДЖЕРА'
         title = f'{title_prefix} №{record.uon_id}'
         description = (

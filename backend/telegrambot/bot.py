@@ -158,11 +158,15 @@ def _load_task_buckets(user):
     раскладка по корзинам в памяти дешевле, чем считать по категориям отдельно)."""
     from kanban.models import Task
 
+    from .services import resolve_task_client_name
+
     last_column = get_last_column()
     qs = Task.objects.select_related('column', 'lead').filter(assignee=user)
     if last_column:
         qs = qs.exclude(column=last_column)
     tasks = list(qs.order_by('column__order', 'order'))
+    for task in tasks:
+        task.client_name = resolve_task_client_name(task)
 
     today = timezone.localdate()
     buckets = {category: [] for category in _CATEGORY_ORDER}
@@ -194,9 +198,10 @@ def _summary_keyboard(buckets: dict) -> InlineKeyboardMarkup | None:
 
 def _format_list_line(index: int, task) -> str:
     title = task.title if len(task.title) <= 60 else task.title[:57] + '…'
+    name_part = f' — {escape_html(task.client_name)}' if getattr(task, 'client_name', None) else ''
     if task.deadline:
-        return f'{index}. {escape_html(title)} — до {timezone.localtime(task.deadline).strftime("%d.%m")}'
-    return f'{index}. {escape_html(title)}'
+        return f'{index}. {escape_html(title)}{name_part} — до {timezone.localtime(task.deadline).strftime("%d.%m")}'
+    return f'{index}. {escape_html(title)}{name_part}'
 
 
 def _category_list_text(category: str, page_tasks: list, page: int, total_pages: int, total: int) -> str:
@@ -282,9 +287,7 @@ def _lead_summary_keyboard(buckets: dict) -> InlineKeyboardMarkup | None:
 
 
 def _format_lead_list_line(index: int, lead) -> str:
-    # Без ФИО/телефона — только номер и статус (ТЗ 11.5, 152-ФЗ), как и в
-    # format_lead_summary для карточки одной заявки.
-    return f'{index}. №{lead.id} — {escape_html(lead.get_status_display())}'
+    return f'{index}. №{lead.id} — {escape_html(lead.name)} — {escape_html(lead.get_status_display())}'
 
 
 def _lead_category_list_text(category: str, page_leads: list, page: int, total_pages: int, total: int) -> str:
@@ -589,9 +592,9 @@ def _get_summary_request(user, uon_id: str):
 
 
 def _format_request_list_line(index: int, record) -> str:
-    # Без ФИО/телефона клиента — только номер и статус (ТЗ 11.5, 152-ФЗ).
     status = record.status_name or 'Без статуса'
-    return f'{index}. №{record.uon_id} — {escape_html(status)}'
+    name_part = f' — {escape_html(record.client_name)}' if record.client_name else ''
+    return f'{index}. №{record.uon_id}{name_part} — {escape_html(status)}'
 
 
 def request_keyboard(record) -> InlineKeyboardMarkup:

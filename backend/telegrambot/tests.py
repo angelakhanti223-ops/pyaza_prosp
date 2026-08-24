@@ -22,7 +22,14 @@ from .bot import (
     on_callback,
 )
 from .models import TelegramAccount, TelegramNotificationLog
-from .services import build_board_url, build_lead_url, build_uon_record_url, format_lead_summary, format_task_line
+from .services import (
+    build_board_url,
+    build_lead_url,
+    build_uon_record_url,
+    format_lead_summary,
+    format_task_line,
+    resolve_task_client_name,
+)
 from .tasks import (
     notify_lead_assignment,
     notify_lead_client_replied,
@@ -110,21 +117,35 @@ class ServicesFormattingTests(TestCase):
         url = build_uon_record_url('lead', '199')
         self.assertEqual(url, 'https://id62499.u-on.ru/request_edit_lead.php?r_id=199')
 
-    def test_format_lead_summary_has_no_pii(self):
+    def test_format_lead_summary_includes_name_but_not_contacts(self):
+        # ФИО показывается сознательно (решение заказчика, 24.08.2026); телефон
+        # и email по-прежнему нет — за ними ссылка на карточку в CRM/U-ON.
         text = format_lead_summary(self.lead)
-        self.assertNotIn(self.lead.name, text)
+        self.assertIn(self.lead.name, text)
         self.assertNotIn(self.lead.phone, text)
         self.assertNotIn(self.lead.email, text)
         self.assertIn(str(self.lead.id), text)
         self.assertIn(self.direction.name, text)
 
-    def test_format_task_line_has_no_pii(self):
+    def test_format_task_line_includes_linked_lead_name_but_not_contacts(self):
         # The CRM link is now delivered as a button (see bot.task_keyboard),
         # not embedded in the message text, so it's no longer asserted here.
         text = format_task_line(self.task)
-        self.assertNotIn(self.lead.name, text)
+        self.assertIn(self.lead.name, text)
         self.assertNotIn(self.lead.phone, text)
         self.assertIn(self.task.title, text)
+
+    def test_resolve_task_client_name_from_uon_request_record(self):
+        UonRequestRecord.objects.create(uon_id='555', client_name='Заявка Клиентова')
+        task = Task.objects.create(
+            title='Выдать документы №555', column=self.column,
+            uon_record_kind='request', uon_record_id='555',
+        )
+        self.assertEqual(resolve_task_client_name(task), 'Заявка Клиентова')
+
+    def test_resolve_task_client_name_none_for_general_task(self):
+        task = Task.objects.create(title='Общая задача без клиента', column=self.column)
+        self.assertIsNone(resolve_task_client_name(task))
 
 
 class BotHandlersTests(TestCase):
@@ -211,7 +232,7 @@ class BotHandlersTests(TestCase):
         self.assertEqual(task.column_id, self.column_new.id)
         self.assertIn('не найдена', sent_texts(context)[0])
 
-    def test_lead_shows_summary_without_pii_for_owner(self):
+    def test_lead_shows_summary_with_name_but_not_phone(self):
         direction = Direction.objects.create(name='Египет')
         lead = Lead.objects.create(
             name='Пётр Петров', phone='+7000', direction=direction, assigned_manager=self.manager,
@@ -221,7 +242,7 @@ class BotHandlersTests(TestCase):
         async_to_sync(cmd_lead)(update, context)
 
         text = sent_texts(context)[0]
-        self.assertNotIn('Пётр Петров', text)
+        self.assertIn('Пётр Петров', text)
         self.assertNotIn('+7000', text)
         self.assertIn('Египет', text)
 
@@ -399,7 +420,7 @@ class LeadSummaryBotTests(TestCase):
 
         text = sent_texts(context)[0]
         self.assertIn('1 открытых', text)
-        self.assertNotIn('Мой лид', text)  # ФИО не должно быть в сводке — ТЗ 11.5, 152-ФЗ
+        self.assertNotIn('Мой лид', text)  # сводка верхнего уровня — только агрегированные счётчики
 
     def test_menu_leads_callback_shows_summary_via_edit(self):
         Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW)
@@ -410,7 +431,7 @@ class LeadSummaryBotTests(TestCase):
         query.edit_message_text.assert_called_once()
         self.assertIn('1 открытых', query.edit_message_text.call_args.args[0])
 
-    def test_leadcat_callback_lists_leads_without_pii(self):
+    def test_leadcat_callback_lists_leads_with_name_but_not_phone(self):
         lead = Lead.objects.create(
             name='Секретное Имя', phone='+79990000000', direction=self.direction,
             assigned_manager=self.manager, status=Lead.Status.NEW,
@@ -421,7 +442,7 @@ class LeadSummaryBotTests(TestCase):
 
         text = query.edit_message_text.call_args.args[0]
         self.assertIn(f'№{lead.id}', text)
-        self.assertNotIn('Секретное Имя', text)
+        self.assertIn('Секретное Имя', text)
         self.assertNotIn('+79990000000', text)
 
     def test_leadopen_callback_shows_full_card_with_back_button(self):
@@ -707,7 +728,7 @@ class SummaryBotTests(TestCase):
         self.assertIn('Обращения в работе</b> — 1', text)
         self.assertIn('Заявки в работе</b> — 1', text)
         self.assertIn('Бронь: 1', text)
-        self.assertNotIn('Мой', text)  # ФИО клиента не должно быть в сводке — ТЗ 11.5, 152-ФЗ
+        self.assertNotIn('Мой', text)  # сводка верхнего уровня — только агрегированные счётчики
 
     def test_summary_shows_everything_for_head(self):
         Lead.objects.create(name='Клиент', direction=self.direction, status=Lead.Status.NEW)
@@ -730,7 +751,7 @@ class SummaryBotTests(TestCase):
         query.edit_message_text.assert_called_once()
         self.assertIn('Обращения в работе', query.edit_message_text.call_args.args[0])
 
-    def test_sumlead_callback_lists_leads_without_pii(self):
+    def test_sumlead_callback_lists_leads_with_name_but_not_phone(self):
         lead = Lead.objects.create(
             name='Секретное Имя', phone='+79990000000', direction=self.direction,
             assigned_manager=self.manager, status=Lead.Status.IN_PROGRESS,
@@ -741,7 +762,7 @@ class SummaryBotTests(TestCase):
 
         text = query.edit_message_text.call_args.args[0]
         self.assertIn(f'№{lead.id}', text)
-        self.assertNotIn('Секретное Имя', text)
+        self.assertIn('Секретное Имя', text)
         self.assertNotIn('+79990000000', text)
 
     def test_sumleadopen_callback_shows_full_card_with_back_button(self):
@@ -772,7 +793,7 @@ class SummaryBotTests(TestCase):
         query.answer.assert_called_once()
         self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))
 
-    def test_sumreq_callback_lists_requests_without_pii(self):
+    def test_sumreq_callback_lists_requests_with_name_but_not_phone(self):
         UonRequestRecord.objects.create(
             uon_id='42', status_name='Бронь', manager_name='Екатерина Макеева',
             client_name='Секретный Клиент', client_phone='+79990000000', is_archive=False,
@@ -783,7 +804,7 @@ class SummaryBotTests(TestCase):
 
         text = query.edit_message_text.call_args.args[0]
         self.assertIn('№42', text)
-        self.assertNotIn('Секретный Клиент', text)
+        self.assertIn('Секретный Клиент', text)
         self.assertNotIn('+79990000000', text)
 
     def test_sumreqopen_callback_shows_full_card_with_back_button(self):

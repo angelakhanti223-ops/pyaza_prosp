@@ -172,7 +172,7 @@ class CheckStaleLeadsTests(TestCase):
 
         task = Task.objects.get(lead=lead)
         self.assertIn('без движения', task.title)
-        self.assertNotIn(lead.name, task.title)  # ФИО — только в description, ТЗ 11.5, 152-ФЗ
+        self.assertNotIn(lead.name, task.title)  # title — стабильный ключ идемпотентности, без ФИО
         self.assertEqual(task.assignee_id, self.manager.id)
         mock_notify.assert_called_once_with(task.id)
 

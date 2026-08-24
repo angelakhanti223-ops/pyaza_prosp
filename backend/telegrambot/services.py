@@ -1,8 +1,9 @@
 """Форматирование сообщений и ссылок для бота.
 
-Сообщения намеренно не содержат ФИО/телефон/email клиента (ТЗ 11.5, 152-ФЗ) —
-только статус/направление/дедлайн; ссылка на карточку в веб-CRM выводится
-отдельной кнопкой (см. bot.py), а не текстом.
+ФИО клиента показывается в сообщениях (решение заказчика, 24.08.2026, —
+осознанный откат более раннего запрета по ТЗ 11.5/152-ФЗ); телефон/email
+по-прежнему не выводятся — ссылка на карточку в веб-CRM или в U-ON, где есть
+полные контакты, выводится отдельной кнопкой (см. bot.py), а не текстом.
 
 Модели kanban/leads импортируются лениво внутри функций (а не на уровне
 модуля), как это сделано в integrations/tasks.py — этот модуль используется
@@ -53,17 +54,39 @@ def escape_html(value: str) -> str:
     return html_lib.escape(value or '')
 
 
+def resolve_task_client_name(task) -> str | None:
+    """ФИО клиента по задаче: напрямую из привязанного Lead, либо (для задач,
+    заведённых из напоминаний U-ON) из зеркала обращения/заявки по
+    uon_record_kind/uon_record_id — у самой Task такого поля нет."""
+    if task.lead_id:
+        return task.lead.name if task.lead else None
+    if task.uon_record_kind and task.uon_record_id:
+        if task.uon_record_kind == 'request':
+            from integrations.models import UonRequestRecord
+
+            record = UonRequestRecord.objects.filter(uon_id=task.uon_record_id).first()
+        else:
+            from integrations.models import UonLeadRecord
+
+            record = UonLeadRecord.objects.filter(uon_id=task.uon_record_id).first()
+        return record.client_name if record and record.client_name else None
+    return None
+
+
 def format_task_line(task) -> str:
     deadline = task.deadline.strftime('%d.%m.%Y %H:%M') if task.deadline else 'без срока'
-    return (
-        f'📌 <b>{escape_html(task.title)}</b>\n'
-        f'{escape_html(task.column.name)} · до {deadline}'
-    )
+    lines = [f'📌 <b>{escape_html(task.title)}</b>']
+    client_name = resolve_task_client_name(task)
+    if client_name:
+        lines.append(f'👤 {escape_html(client_name)}')
+    lines.append(f'{escape_html(task.column.name)} · до {deadline}')
+    return '\n'.join(lines)
 
 
 def format_lead_summary(lead) -> str:
     lines = [
         f'📋 Заявка #{lead.id}',
+        f'ФИО: <b>{escape_html(lead.name)}</b>',
         f'Статус: <b>{escape_html(lead.get_status_display())}</b>',
         f'Направление: {escape_html(lead.direction.name) if lead.direction_id else "—"}',
     ]
@@ -106,10 +129,10 @@ def format_plan_summary(year: int, month: int, rows: list, target_total, actual_
 
 
 def format_request_summary(record) -> str:
-    lines = [
-        f'🧾 Заявка №{record.uon_id}',
-        f'Статус: <b>{escape_html(record.status_name) if record.status_name else "Без статуса"}</b>',
-    ]
+    lines = [f'🧾 Заявка №{record.uon_id}']
+    if record.client_name:
+        lines.append(f'ФИО: <b>{escape_html(record.client_name)}</b>')
+    lines.append(f'Статус: <b>{escape_html(record.status_name) if record.status_name else "Без статуса"}</b>')
     if record.date_begin:
         lines.append(f'Вылет: {record.date_begin.strftime("%d.%m.%Y")}')
     return '\n'.join(lines)
