@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchDashboard, type DashboardData } from "@/lib/dashboardApi";
+import { fetchDashboard, fetchPlan, type DashboardData, type PlanData } from "@/lib/dashboardApi";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import SimpleBarChart from "@/components/dashboard/SimpleBarChart";
@@ -16,6 +16,11 @@ function formatMoney(value: number): string {
   return new Intl.NumberFormat("ru-RU").format(value) + " ₽";
 }
 
+const MONTH_LABELS = [
+  "", "январь", "февраль", "март", "апрель", "май", "июнь",
+  "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+];
+
 export default function CrmDashboardPage() {
   const { user } = useCrmAuth();
   const isHead = user?.is_head ?? false;
@@ -25,10 +30,15 @@ export default function CrmDashboardPage() {
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [plan, setPlan] = useState<PlanData | null>(null);
 
   useEffect(() => {
     if (isHead) listManagers().then(setManagers);
   }, [isHead]);
+
+  useEffect(() => {
+    fetchPlan().then(setPlan);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -82,6 +92,40 @@ export default function CrmDashboardPage() {
           </div>
         </div>
       </div>
+
+      {plan && plan.rows.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-black/5 bg-white p-5">
+          <h2 className="mb-4 text-sm font-semibold text-navy">
+            План на {MONTH_LABELS[plan.month]} {plan.year}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {plan.rows.map((row) => (
+              <div key={row.manager_id}>
+                <div className="flex items-center justify-between text-xs text-foreground/60">
+                  <span>{row.manager_name}</span>
+                  <span>
+                    {formatMoney(row.actual)} / {formatMoney(row.target)} · {row.percent}%
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-blue-light">
+                  <div
+                    className={`h-full rounded-full ${row.percent >= 100 ? "bg-green-500" : row.percent >= 70 ? "bg-gold" : "bg-blue"}`}
+                    style={{ width: `${Math.min(row.percent, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {plan.rows.length > 1 && (
+            <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-3 text-sm font-semibold text-navy">
+              <span>Итого офис</span>
+              <span>
+                {formatMoney(plan.actual_total)} / {formatMoney(plan.target_total)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {loading || !data ? (
         <p className="text-sm text-foreground/50">Загрузка…</p>

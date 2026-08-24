@@ -10,6 +10,7 @@ from .services import (
     build_lead_url,
     build_uon_record_url,
     format_lead_summary,
+    format_plan_summary,
     format_task_line,
     is_local_url,
 )
@@ -320,3 +321,42 @@ def notify_daily_deadlines():
         except TelegramSendError as exc:
             logger.warning('Telegram: сводка не отправлена в чат %s: %s', account.chat_id, exc)
     logger.info('Telegram: утренняя сводка — задач %s, получателей %s', len(tasks), sent)
+
+
+@shared_task
+def notify_weekly_plan_progress():
+    """Еженедельная сводка план/факт по комиссии текущего месяца — руководителю
+    целиком по офису, менеджеру — только его собственная строка."""
+    from django.utils import timezone as tz
+
+    from accounts.permissions import is_head
+    from leads.dashboard import plan_progress_rows
+
+    if not settings.TELEGRAM_BOT_ENABLED:
+        return
+
+    today = tz.localdate()
+    year, month = today.year, today.month
+    all_rows = plan_progress_rows(year, month, managers=None)
+    if not all_rows:
+        logger.info('Telegram: план на %s.%s не задан — рассылка пропущена', month, year)
+        return
+
+    accounts = TelegramAccount.objects.select_related('user').filter(is_active=True, chat_id__isnull=False)
+    sent = 0
+    for account in accounts:
+        if is_head(account.user):
+            rows = all_rows
+        else:
+            rows = [r for r in all_rows if r['manager_id'] == account.user_id]
+            if not rows:
+                continue
+        target_total = sum((r['target'] for r in rows), 0)
+        actual_total = sum((r['actual'] for r in rows), 0)
+        text = format_plan_summary(year, month, rows, target_total, actual_total)
+        try:
+            _send_telegram_message(account.chat_id, text, TelegramNotificationLog.EventType.PLAN_DIGEST)
+            sent += 1
+        except TelegramSendError as exc:
+            logger.warning('Telegram: план не отправлен в чат %s: %s', account.chat_id, exc)
+    logger.info('Telegram: еженедельная сводка по плану — получателей %s', sent)

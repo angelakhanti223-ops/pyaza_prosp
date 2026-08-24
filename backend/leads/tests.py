@@ -8,7 +8,8 @@ from django.utils import timezone
 from integrations.models import UonLeadRecord
 from kanban.models import KanbanColumn, Task
 
-from .models import Direction, Lead
+from .dashboard import actual_commission_for_month, plan_progress_rows
+from .models import Direction, Lead, MonthlyPlan
 from .tasks import check_stale_leads, create_new_lead_task
 
 User = get_user_model()
@@ -210,3 +211,75 @@ class CheckStaleLeadsTests(TestCase):
         check_stale_leads()
 
         self.assertEqual(Task.objects.filter(lead=lead).count(), 2)
+
+
+class PlanProgressTests(TestCase):
+    """План/факт по комиссии засчитывается по дате перехода в «Оплачено»
+    (LeadStatusHistory), не по дате создания заявки — решение заказчика."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='planhead2', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='planmanager3', password='x', role=User.Role.MANAGER)
+        self.direction = Direction.objects.create(name='Кипр')
+        self.client.force_login(self.head)
+
+    def _pay_lead(self, commission, manager=None):
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=manager or self.manager,
+            status=Lead.Status.BOOKED, commission=commission,
+        )
+        self.client.patch(f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.PAID}, content_type='application/json')
+        return lead
+
+    def test_actual_commission_sums_paid_leads_this_month(self):
+        self._pay_lead(30000)
+        self._pay_lead(15000)
+        today = timezone.now().date()
+        total = actual_commission_for_month(self.manager, today.year, today.month)
+        self.assertEqual(total, 45000)
+
+    def test_actual_commission_ignores_other_managers(self):
+        other = User.objects.create_user(username='other_manager2', password='x')
+        self._pay_lead(10000, manager=other)
+        today = timezone.now().date()
+        total = actual_commission_for_month(self.manager, today.year, today.month)
+        self.assertEqual(total, 0)
+
+    def test_plan_progress_rows_computes_percent(self):
+        today = timezone.now().date()
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, target_commission=60000)
+        self._pay_lead(30000)
+
+        rows = plan_progress_rows(today.year, today.month)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['target'], 60000)
+        self.assertEqual(rows[0]['actual'], 30000)
+        self.assertEqual(rows[0]['percent'], 50.0)
+
+
+class PlanViewTests(TestCase):
+    def setUp(self):
+        self.head = User.objects.create_user(username='planhead3', password='x', role=User.Role.HEAD)
+        self.manager1 = User.objects.create_user(username='planmanager4', password='x', role=User.Role.MANAGER)
+        self.manager2 = User.objects.create_user(username='planmanager5', password='x', role=User.Role.MANAGER)
+        today = timezone.now().date()
+        self.year, self.month = today.year, today.month
+        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month, target_commission=60000)
+        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month, target_commission=80000)
+
+    def test_head_sees_all_managers(self):
+        self.client.force_login(self.head)
+        response = self.client.get('/api/crm/plan/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['rows']), 2)
+        self.assertEqual(float(data['target_total']), 140000)
+
+    def test_manager_sees_only_own_row(self):
+        self.client.force_login(self.manager1)
+        response = self.client.get('/api/crm/plan/')
+        data = response.json()
+        self.assertEqual(len(data['rows']), 1)
+        self.assertEqual(data['rows'][0]['manager_id'], self.manager1.id)
+        self.assertEqual(float(data['target_total']), 60000)

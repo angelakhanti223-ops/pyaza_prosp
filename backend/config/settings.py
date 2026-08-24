@@ -230,6 +230,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'telegrambot.tasks.notify_daily_deadlines',
         'schedule': crontab(hour=9, minute=0),
     },
+    'notify-weekly-plan-progress': {
+        'task': 'telegrambot.tasks.notify_weekly_plan_progress',
+        'schedule': crontab(day_of_week=1, hour=9, minute=0),  # понедельник, 09:00 МСК
+    },
 }
 
 

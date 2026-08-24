@@ -42,6 +42,7 @@ class TelegramNotificationLog(models.Model):
     class EventType(models.TextChoices):
         TASK_ASSIGNED = 'task_assigned', 'Назначена задача'
         LEAD_ASSIGNED = 'lead_assigned', 'Назначена заявка'
+        PLAN_DIGEST = 'plan_digest', 'Сводка по плану'
 
     chat_id = models.BigIntegerField()
     event_type = models.CharField(max_length=30, choices=EventType.choices)

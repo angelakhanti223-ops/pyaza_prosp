@@ -6,9 +6,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from kanban.models import KanbanColumn, Task
-from leads.models import Direction, Lead
+from leads.models import Direction, Lead, MonthlyPlan
 
-from .bot import cmd_done, cmd_lead, cmd_leads, cmd_newtask, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
+from .bot import cmd_done, cmd_lead, cmd_leads, cmd_newtask, cmd_plan, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
 from .models import TelegramAccount, TelegramNotificationLog
 from .services import build_board_url, build_lead_url, build_uon_record_url, format_lead_summary, format_task_line
 from .tasks import (
@@ -16,6 +16,7 @@ from .tasks import (
     notify_lead_client_replied,
     notify_lead_status_change,
     notify_task_assignment,
+    notify_weekly_plan_progress,
 )
 
 User = get_user_model()
@@ -580,4 +581,90 @@ class NotifyLeadClientRepliedTests(TestCase):
     def test_skips_without_assignee(self, mock_post):
         lead = Lead.objects.create(name='Клиент', direction=self.direction)
         notify_lead_client_replied(lead.id)
+        mock_post.assert_not_called()
+
+
+class PlanBotTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+
+        self.head = User.objects.create_user(username='planhead', password='x', role=User.Role.HEAD)
+        self.manager1 = User.objects.create_user(username='planmanager1', password='x', role=User.Role.MANAGER)
+        self.manager2 = User.objects.create_user(username='planmanager2', password='x', role=User.Role.MANAGER)
+        self.head_account = TelegramAccount.objects.create(user=self.head, chat_id=901)
+        self.manager1_account = TelegramAccount.objects.create(user=self.manager1, chat_id=902)
+        today = timezone.localdate()
+        self.year, self.month = today.year, today.month
+        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month, target_commission=60000)
+        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month, target_commission=80000)
+
+    def test_manager_sees_only_own_row(self):
+        update = make_update(chat_id=902)
+        context = make_context()
+        async_to_sync(cmd_plan)(update, context)
+
+        text = sent_texts(context)[0]
+        self.assertIn('60 000', text)
+        self.assertNotIn('80 000', text)
+        self.assertNotIn('Итого офис', text)
+
+    def test_head_sees_all_rows_and_total(self):
+        update = make_update(chat_id=901)
+        context = make_context()
+        async_to_sync(cmd_plan)(update, context)
+
+        text = sent_texts(context)[0]
+        self.assertIn('60 000', text)
+        self.assertIn('80 000', text)
+        self.assertIn('Итого офис', text)
+        self.assertIn('140 000', text)
+
+    def test_unlinked_chat_gets_not_linked_message(self):
+        update = make_update(chat_id=999)
+        context = make_context()
+        async_to_sync(cmd_plan)(update, context)
+        self.assertIn('не привязан', sent_texts(context)[0])
+
+
+class NotifyWeeklyPlanProgressTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+
+        self.head = User.objects.create_user(username='weeklyhead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='weeklymanager', password='x', role=User.Role.MANAGER)
+        self.head_account = TelegramAccount.objects.create(user=self.head, chat_id=911)
+        self.manager_account = TelegramAccount.objects.create(user=self.manager, chat_id=912)
+        today = timezone.localdate()
+        self.year, self.month = today.year, today.month
+        MonthlyPlan.objects.create(manager=self.manager, year=self.year, month=self.month, target_commission=60000)
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_sends_personal_and_office_digests(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+
+        notify_weekly_plan_progress()
+
+        self.assertEqual(mock_post.call_count, 2)
+        texts_by_chat = {call.kwargs['json']['chat_id']: call.kwargs['json']['text'] for call in mock_post.call_args_list}
+        self.assertIn('60 000', texts_by_chat[911])
+        self.assertIn('60 000', texts_by_chat[912])
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_skips_manager_without_plan(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+        other = User.objects.create_user(username='noplan', password='x')
+        TelegramAccount.objects.create(user=other, chat_id=913)
+
+        notify_weekly_plan_progress()
+
+        chat_ids = {call.kwargs['json']['chat_id'] for call in mock_post.call_args_list}
+        self.assertNotIn(913, chat_ids)
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_skips_entirely_when_no_plan_for_month(self, mock_post):
+        MonthlyPlan.objects.all().delete()
+        notify_weekly_plan_progress()
         mock_post.assert_not_called()

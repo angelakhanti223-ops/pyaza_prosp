@@ -1,4 +1,5 @@
-from datetime import timedelta
+from calendar import monthrange
+from datetime import datetime, timedelta
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
@@ -9,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import is_head
 
-from .models import Lead
+from .models import Lead, LeadStatusHistory, MonthlyPlan
 
 PERIOD_DAYS = {'7d': 7, '30d': 30, '90d': 90}
 
@@ -118,3 +119,71 @@ class DashboardView(APIView):
             ]
 
         return Response(data)
+
+
+def month_bounds(year, month):
+    """Границы календарного месяца в текущей таймзоне проекта (Europe/Moscow)."""
+    start = timezone.make_aware(datetime(year, month, 1))
+    last_day = monthrange(year, month)[1]
+    end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59, 999999))
+    return start, end
+
+
+def actual_commission_for_month(manager, year, month):
+    """Комиссия менеджера, засчитанная в план месяца — по дате перехода заявки в
+    статус «Оплачено» (LeadStatusHistory), а не по дате создания заявки."""
+    start, end = month_bounds(year, month)
+    lead_ids = (
+        LeadStatusHistory.objects.filter(
+            new_status=Lead.Status.PAID, changed_at__gte=start, changed_at__lte=end,
+            lead__assigned_manager=manager,
+        )
+        .values_list('lead_id', flat=True)
+        .distinct()
+    )
+    return Lead.objects.filter(id__in=lead_ids).aggregate(total=Sum('commission'))['total'] or 0
+
+
+def plan_progress_rows(year, month, managers=None):
+    """Строки план/факт по комиссии за месяц. `managers=None` — по всем, у кого есть план."""
+    plans = MonthlyPlan.objects.filter(year=year, month=month).select_related('manager')
+    if managers is not None:
+        plans = plans.filter(manager__in=managers)
+
+    rows = []
+    for plan in plans:
+        actual = actual_commission_for_month(plan.manager, year, month)
+        target = plan.target_commission
+        rows.append({
+            'manager_id': plan.manager_id,
+            'manager_name': plan.manager.get_full_name() or plan.manager.username,
+            'target': target,
+            'actual': actual,
+            'percent': round(float(actual) / float(target) * 100, 1) if target else 0,
+        })
+    return rows
+
+
+class PlanView(APIView):
+    """План/факт по комиссии на месяц: своя строка для менеджера, все строки для руководителя."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except ValueError:
+            year, month = today.year, today.month
+
+        head = is_head(request.user)
+        rows = plan_progress_rows(year, month, managers=None if head else [request.user])
+
+        return Response({
+            'year': year,
+            'month': month,
+            'rows': rows,
+            'target_total': sum((r['target'] for r in rows), 0),
+            'actual_total': sum((r['actual'] for r in rows), 0),
+        })

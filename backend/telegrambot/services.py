@@ -70,3 +70,36 @@ def format_lead_summary(lead) -> str:
     if lead.deal_amount is not None:
         lines.append(f'Сумма сделки: {lead.deal_amount} ₽')
     return '\n'.join(lines)
+
+
+MONTH_NAMES_RU = {
+    1: 'январь', 2: 'февраль', 3: 'март', 4: 'апрель', 5: 'май', 6: 'июнь',
+    7: 'июль', 8: 'август', 9: 'сентябрь', 10: 'октябрь', 11: 'ноябрь', 12: 'декабрь',
+}
+
+
+def format_money(value) -> str:
+    return f'{float(value):,.0f} ₽'.replace(',', ' ')
+
+
+def format_plan_summary(year: int, month: int, rows: list, target_total, actual_total) -> str:
+    """План/факт по комиссии менеджеров — общий формат для /plan в боте и
+    еженедельной рассылки (см. telegrambot.tasks.notify_weekly_plan_progress)."""
+    month_label = MONTH_NAMES_RU.get(month, str(month))
+    if not rows:
+        return f'📊 План на {month_label} {year} не задан.'
+
+    lines = [f'📊 <b>План на {month_label} {year}</b>']
+    for row in rows:
+        percent = row['percent']
+        icon = '✅' if percent >= 100 else ('🟡' if percent >= 70 else '🔴')
+        lines.append(
+            f"{icon} {escape_html(row['manager_name'])}: "
+            f"{format_money(row['actual'])} / {format_money(row['target'])} ({percent}%)"
+        )
+
+    if len(rows) > 1:
+        total_percent = round(float(actual_total) / float(target_total) * 100, 1) if target_total else 0
+        lines.append(f'\n<b>Итого офис:</b> {format_money(actual_total)} / {format_money(target_total)} ({total_percent}%)')
+
+    return '\n'.join(lines)

@@ -43,3 +43,29 @@ export async function fetchDashboard(params: { period?: string; manager?: number
   if (!res.ok) throw new Error("Не удалось загрузить дашборд");
   return res.json();
 }
+
+export type PlanRow = {
+  manager_id: number;
+  manager_name: string;
+  target: number;
+  actual: number;
+  percent: number;
+};
+
+export type PlanData = {
+  year: number;
+  month: number;
+  rows: PlanRow[];
+  target_total: number;
+  actual_total: number;
+};
+
+export async function fetchPlan(params: { year?: number; month?: number } = {}): Promise<PlanData> {
+  const qs = new URLSearchParams();
+  if (params.year) qs.set("year", String(params.year));
+  if (params.month) qs.set("month", String(params.month));
+
+  const res = await fetch(`${API_BASE_URL}/api/crm/plan/?${qs.toString()}`, { credentials: "include" });
+  if (!res.ok) throw new Error("Не удалось загрузить план");
+  return res.json();
+}

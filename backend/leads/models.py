@@ -57,6 +57,24 @@ class Lead(models.Model):
         return f'{self.name} ({self.phone})'
 
 
+class MonthlyPlan(models.Model):
+    """Целевая комиссия менеджера на месяц — план/факт на дашборде CRM и в боте."""
+
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_plans',
+    )
+    year = models.PositiveSmallIntegerField('Год')
+    month = models.PositiveSmallIntegerField('Месяц')
+    target_commission = models.DecimalField('Целевая комиссия', max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['-year', '-month']
+        unique_together = ('manager', 'year', 'month')
+
+    def __str__(self):
+        return f'{self.manager} — {self.month:02d}.{self.year}: {self.target_commission} ₽'
+
+
 class LeadComment(models.Model):
     """Лента комментариев менеджера по ходу работы с заявкой (ТЗ 5.1, 5.4)."""
 

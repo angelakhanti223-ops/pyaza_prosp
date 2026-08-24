@@ -22,6 +22,7 @@ from .services import (
     build_lead_url,
     escape_html,
     format_lead_summary,
+    format_plan_summary,
     format_task_line,
     get_first_column,
     get_last_column,
@@ -65,6 +66,7 @@ HELP_TEXT = (
     '<b>Доступные команды</b>\n'
     '/tasks — мои открытые задачи\n'
     '/leads — мои заявки\n'
+    '/plan — план/факт по комиссии за месяц\n'
     '/newtask &lt;текст&gt; — создать задачу\n'
     '/done &lt;номер&gt; — отметить задачу выполненной\n'
     '/lead &lt;номер&gt; — карточка заявки\n'
@@ -75,6 +77,7 @@ HELP_TEXT = (
 MAIN_MENU_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton('📋 Мои задачи', callback_data='menu:tasks')],
     [InlineKeyboardButton('📁 Мои заявки', callback_data='menu:leads')],
+    [InlineKeyboardButton('📊 План по комиссии', callback_data='menu:plan')],
     [InlineKeyboardButton('ℹ️ Все команды', callback_data='menu:help')],
 ])
 
@@ -470,6 +473,27 @@ async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _send_lead_summary(update, context, account)
 
 
+@sync_to_async
+def _load_plan(user):
+    from leads.dashboard import plan_progress_rows
+
+    today = timezone.localdate()
+    managers = None if is_head(user) else [user]
+    rows = plan_progress_rows(today.year, today.month, managers=managers)
+    target_total = sum((r['target'] for r in rows), 0)
+    actual_total = sum((r['actual'] for r in rows), 0)
+    return today.year, today.month, rows, target_total, actual_total
+
+
+async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    account = await _get_account(update.effective_chat.id)
+    if account is None:
+        await _reply(update, context, NOT_LINKED_TEXT)
+        return
+    year, month, rows, target_total, actual_total = await _load_plan(account.user)
+    await _reply(update, context, format_plan_summary(year, month, rows, target_total, actual_total))
+
+
 async def cmd_newtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     account = await _get_account(update.effective_chat.id)
     if account is None:
@@ -570,6 +594,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _reply(update, context, HELP_TEXT)
         return
 
+    if data == 'menu:plan':
+        await query.answer()
+        year, month, rows, target_total, actual_total = await _load_plan(account.user)
+        await _reply(update, context, format_plan_summary(year, month, rows, target_total, actual_total))
+        return
+
     if data.startswith('cat:'):
         _, category, page_str = data.split(':', 2)
         await query.answer()
@@ -640,6 +670,7 @@ async def _post_init(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand('tasks', 'Мои открытые задачи'),
         BotCommand('leads', 'Мои заявки'),
+        BotCommand('plan', 'План/факт по комиссии за месяц'),
         BotCommand('newtask', 'Создать задачу'),
         BotCommand('done', 'Отметить задачу выполненной'),
         BotCommand('lead', 'Карточка заявки'),
@@ -654,6 +685,7 @@ def build_application() -> Application:
     application.add_handler(CommandHandler('menu', cmd_menu))
     application.add_handler(CommandHandler('tasks', cmd_tasks))
     application.add_handler(CommandHandler('leads', cmd_leads))
+    application.add_handler(CommandHandler('plan', cmd_plan))
     application.add_handler(CommandHandler('newtask', cmd_newtask))
     application.add_handler(CommandHandler('done', cmd_done))
     application.add_handler(CommandHandler('lead', cmd_lead))

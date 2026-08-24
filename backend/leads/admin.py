@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
+from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan
 
 
 class LeadCommentInline(admin.TabularInline):
@@ -36,3 +36,9 @@ class DirectionAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name',)
+
+
+@admin.register(MonthlyPlan)
+class MonthlyPlanAdmin(admin.ModelAdmin):
+    list_display = ('manager', 'year', 'month', 'target_commission')
+    list_filter = ('year', 'month', 'manager')
