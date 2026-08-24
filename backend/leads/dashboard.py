@@ -187,3 +187,55 @@ class PlanView(APIView):
             'target_total': sum((r['target'] for r in rows), 0),
             'actual_total': sum((r['actual'] for r in rows), 0),
         })
+
+
+# «В работе» = не финальные статусы обращения (Lead) + не архивные заявки U-ON
+# (UonRequestRecord.is_archive) — у заявок нет отдельного поля «завершена»,
+# U-ON архивирует запись, когда работа по ней закончена (решение заказчика,
+# 24.08.2026).
+OPEN_LEAD_STATUSES = [
+    s for s in Lead.Status.values if s not in (Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST)
+]
+
+
+def work_summary_data(user, head):
+    from integrations.models import UonRequestRecord
+
+    leads_qs = Lead.objects.filter(status__in=OPEN_LEAD_STATUSES)
+    requests_qs = UonRequestRecord.objects.filter(is_archive=False)
+
+    if not head:
+        leads_qs = leads_qs.filter(assigned_manager=user)
+        # У заявки нет FK на менеджера — только имя, синхронизированное из U-ON
+        # (см. integrations.tasks._match_manager_user). Тот же способ сопоставления
+        # применён и здесь, только в обратную сторону — от пользователя к записям.
+        requests_qs = requests_qs.filter(manager_name__istartswith=user.first_name) if user.first_name else requests_qs.none()
+
+    lead_counts = {row['status']: row['count'] for row in leads_qs.values('status').annotate(count=Count('id'))}
+    leads_by_status = [
+        {'status': status, 'status_display': label, 'count': lead_counts.get(status, 0)}
+        for status, label in Lead.Status.choices
+        if status in OPEN_LEAD_STATUSES
+    ]
+
+    request_counts = requests_qs.values('status_name').annotate(count=Count('id')).order_by('-count')
+    requests_by_status = [
+        {'status_name': row['status_name'] or 'Без статуса', 'count': row['count']} for row in request_counts
+    ]
+
+    return {
+        'leads_total': leads_qs.count(),
+        'leads_by_status': leads_by_status,
+        'requests_total': requests_qs.count(),
+        'requests_by_status': requests_by_status,
+    }
+
+
+class WorkSummaryView(APIView):
+    """Сводка «в работе»: обращения (Lead) + заявки (U-ON) — своя для менеджера,
+    по всему офису для руководителя."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(work_summary_data(request.user, is_head(request.user)))

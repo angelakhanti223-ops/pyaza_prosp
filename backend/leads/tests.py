@@ -5,10 +5,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from integrations.models import UonLeadRecord
+from integrations.models import UonLeadRecord, UonRequestRecord
 from kanban.models import KanbanColumn, Task
 
-from .dashboard import actual_commission_for_month, plan_progress_rows
+from .dashboard import actual_commission_for_month, plan_progress_rows, work_summary_data
 from .models import Direction, Lead, MonthlyPlan
 from .tasks import check_stale_leads, create_new_lead_task
 
@@ -283,3 +283,80 @@ class PlanViewTests(TestCase):
         self.assertEqual(len(data['rows']), 1)
         self.assertEqual(data['rows'][0]['manager_id'], self.manager1.id)
         self.assertEqual(float(data['target_total']), 60000)
+
+
+class WorkSummaryTests(TestCase):
+    """«В работе» = не финальные статусы Lead + не архивные UonRequestRecord —
+    решение заказчика 24.08.2026 (у заявки нет отдельного поля «завершена»)."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='summaryhead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(
+            username='summarymanager', password='x', role=User.Role.MANAGER, first_name='Екатерина',
+        )
+        self.direction = Direction.objects.create(name='Турция')
+
+    def test_counts_open_leads_only(self):
+        Lead.objects.create(name='В работе', direction=self.direction, status=Lead.Status.IN_PROGRESS)
+        Lead.objects.create(name='Оплачено', direction=self.direction, status=Lead.Status.PAID)
+        Lead.objects.create(name='Успех', direction=self.direction, status=Lead.Status.CLOSED_WON)
+        Lead.objects.create(name='Отказ', direction=self.direction, status=Lead.Status.CLOSED_LOST)
+
+        data = work_summary_data(self.head, head=True)
+
+        self.assertEqual(data['leads_total'], 2)
+        counts = {row['status']: row['count'] for row in data['leads_by_status']}
+        self.assertEqual(counts[Lead.Status.IN_PROGRESS], 1)
+        self.assertEqual(counts[Lead.Status.PAID], 1)
+        self.assertNotIn(Lead.Status.CLOSED_WON, counts)
+
+    def test_counts_non_archived_requests_only(self):
+        UonRequestRecord.objects.create(uon_id='1', status_name='Бронь', is_archive=False)
+        UonRequestRecord.objects.create(uon_id='2', status_name='Бронь', is_archive=False)
+        UonRequestRecord.objects.create(uon_id='3', status_name='Завершена', is_archive=True)
+
+        data = work_summary_data(self.head, head=True)
+
+        self.assertEqual(data['requests_total'], 2)
+        self.assertEqual(data['requests_by_status'], [{'status_name': 'Бронь', 'count': 2}])
+
+    def test_manager_sees_only_own_leads_and_requests(self):
+        other = User.objects.create_user(username='summaryother', password='x', first_name='Роман')
+        Lead.objects.create(
+            name='Мой', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW,
+        )
+        Lead.objects.create(
+            name='Чужой', direction=self.direction, assigned_manager=other, status=Lead.Status.NEW,
+        )
+        UonRequestRecord.objects.create(uon_id='1', status_name='Бронь', manager_name='Екатерина Макеева', is_archive=False)
+        UonRequestRecord.objects.create(uon_id='2', status_name='Бронь', manager_name='Роман Петров', is_archive=False)
+
+        data = work_summary_data(self.manager, head=False)
+
+        self.assertEqual(data['leads_total'], 1)
+        self.assertEqual(data['requests_total'], 1)
+
+    def test_head_sees_everything(self):
+        Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.NEW)
+        UonRequestRecord.objects.create(uon_id='1', status_name='Бронь', manager_name='Кто-то', is_archive=False)
+
+        data = work_summary_data(self.head, head=True)
+
+        self.assertEqual(data['leads_total'], 1)
+        self.assertEqual(data['requests_total'], 1)
+
+
+class WorkSummaryViewTests(TestCase):
+    def setUp(self):
+        self.head = User.objects.create_user(username='summaryviewhead', password='x', role=User.Role.HEAD)
+        self.direction = Direction.objects.create(name='Кипр')
+
+    def test_endpoint_returns_summary(self):
+        Lead.objects.create(name='Клиент', direction=self.direction, status=Lead.Status.NEW)
+        self.client.force_login(self.head)
+
+        response = self.client.get('/api/crm/summary/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['leads_total'], 1)

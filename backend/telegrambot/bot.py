@@ -24,6 +24,7 @@ from .services import (
     format_lead_summary,
     format_plan_summary,
     format_task_line,
+    format_work_summary,
     get_first_column,
     get_last_column,
     is_local_url,
@@ -67,6 +68,7 @@ HELP_TEXT = (
     '/tasks — мои открытые задачи\n'
     '/leads — мои заявки\n'
     '/plan — план/факт по комиссии за месяц\n'
+    '/summary — сводка по обращениям и заявкам в работе\n'
     '/newtask &lt;текст&gt; — создать задачу\n'
     '/done &lt;номер&gt; — отметить задачу выполненной\n'
     '/lead &lt;номер&gt; — карточка заявки\n'
@@ -78,6 +80,7 @@ MAIN_MENU_KEYBOARD = InlineKeyboardMarkup([
     [InlineKeyboardButton('📋 Мои задачи', callback_data='menu:tasks')],
     [InlineKeyboardButton('📁 Мои заявки', callback_data='menu:leads')],
     [InlineKeyboardButton('📊 План по комиссии', callback_data='menu:plan')],
+    [InlineKeyboardButton('📈 Сводка: в работе', callback_data='menu:summary')],
     [InlineKeyboardButton('ℹ️ Все команды', callback_data='menu:help')],
 ])
 
@@ -494,6 +497,22 @@ async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _reply(update, context, format_plan_summary(year, month, rows, target_total, actual_total))
 
 
+@sync_to_async
+def _load_work_summary(user):
+    from leads.dashboard import work_summary_data
+
+    return work_summary_data(user, is_head(user))
+
+
+async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    account = await _get_account(update.effective_chat.id)
+    if account is None:
+        await _reply(update, context, NOT_LINKED_TEXT)
+        return
+    data = await _load_work_summary(account.user)
+    await _reply(update, context, format_work_summary(data))
+
+
 async def cmd_newtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     account = await _get_account(update.effective_chat.id)
     if account is None:
@@ -600,6 +619,12 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _reply(update, context, format_plan_summary(year, month, rows, target_total, actual_total))
         return
 
+    if data == 'menu:summary':
+        await query.answer()
+        summary_data = await _load_work_summary(account.user)
+        await _reply(update, context, format_work_summary(summary_data))
+        return
+
     if data.startswith('cat:'):
         _, category, page_str = data.split(':', 2)
         await query.answer()
@@ -671,6 +696,7 @@ async def _post_init(application: Application) -> None:
         BotCommand('tasks', 'Мои открытые задачи'),
         BotCommand('leads', 'Мои заявки'),
         BotCommand('plan', 'План/факт по комиссии за месяц'),
+        BotCommand('summary', 'Сводка по обращениям и заявкам в работе'),
         BotCommand('newtask', 'Создать задачу'),
         BotCommand('done', 'Отметить задачу выполненной'),
         BotCommand('lead', 'Карточка заявки'),
@@ -686,6 +712,7 @@ def build_application() -> Application:
     application.add_handler(CommandHandler('tasks', cmd_tasks))
     application.add_handler(CommandHandler('leads', cmd_leads))
     application.add_handler(CommandHandler('plan', cmd_plan))
+    application.add_handler(CommandHandler('summary', cmd_summary))
     application.add_handler(CommandHandler('newtask', cmd_newtask))
     application.add_handler(CommandHandler('done', cmd_done))
     application.add_handler(CommandHandler('lead', cmd_lead))

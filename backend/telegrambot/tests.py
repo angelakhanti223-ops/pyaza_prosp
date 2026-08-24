@@ -5,10 +5,22 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
+from integrations.models import UonRequestRecord
 from kanban.models import KanbanColumn, Task
 from leads.models import Direction, Lead, MonthlyPlan
 
-from .bot import cmd_done, cmd_lead, cmd_leads, cmd_newtask, cmd_plan, cmd_start, cmd_sync_uon, cmd_tasks, on_callback
+from .bot import (
+    cmd_done,
+    cmd_lead,
+    cmd_leads,
+    cmd_newtask,
+    cmd_plan,
+    cmd_start,
+    cmd_summary,
+    cmd_sync_uon,
+    cmd_tasks,
+    on_callback,
+)
 from .models import TelegramAccount, TelegramNotificationLog
 from .services import build_board_url, build_lead_url, build_uon_record_url, format_lead_summary, format_task_line
 from .tasks import (
@@ -668,3 +680,51 @@ class NotifyWeeklyPlanProgressTests(TestCase):
         MonthlyPlan.objects.all().delete()
         notify_weekly_plan_progress()
         mock_post.assert_not_called()
+
+
+class SummaryBotTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            username='summarybotmanager', password='x', role=User.Role.MANAGER, first_name='Екатерина',
+        )
+        self.head = User.objects.create_user(username='summarybothead', password='x', role=User.Role.HEAD)
+        self.account = TelegramAccount.objects.create(user=self.manager, chat_id=920)
+        self.head_account = TelegramAccount.objects.create(user=self.head, chat_id=921)
+        self.direction = Direction.objects.create(name='Кипр')
+
+    def test_summary_shows_own_leads_and_requests_for_manager(self):
+        Lead.objects.create(
+            name='Мой', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.IN_PROGRESS,
+        )
+        Lead.objects.create(name='Чужой', direction=self.direction, status=Lead.Status.NEW)
+        UonRequestRecord.objects.create(uon_id='1', status_name='Бронь', manager_name='Екатерина Макеева', is_archive=False)
+
+        update = make_update(chat_id=920)
+        context = make_context()
+        async_to_sync(cmd_summary)(update, context)
+
+        text = sent_texts(context)[0]
+        self.assertIn('Обращения в работе</b> — 1', text)
+        self.assertIn('Заявки в работе</b> — 1', text)
+        self.assertIn('Бронь: 1', text)
+        self.assertNotIn('Мой', text)  # ФИО клиента не должно быть в сводке — ТЗ 11.5, 152-ФЗ
+
+    def test_summary_shows_everything_for_head(self):
+        Lead.objects.create(name='Клиент', direction=self.direction, status=Lead.Status.NEW)
+        UonRequestRecord.objects.create(uon_id='1', status_name='Бронь', manager_name='Кто угодно', is_archive=False)
+
+        update = make_update(chat_id=921)
+        context = make_context()
+        async_to_sync(cmd_summary)(update, context)
+
+        text = sent_texts(context)[0]
+        self.assertIn('Обращения в работе</b> — 1', text)
+        self.assertIn('Заявки в работе</b> — 1', text)
+
+    def test_menu_summary_callback(self):
+        update, query = make_callback(chat_id=920, data='menu:summary')
+        context = make_context()
+        async_to_sync(on_callback)(update, context)
+
+        query.answer.assert_called_once()
+        self.assertIn('Обращения в работе', sent_texts(context)[0])

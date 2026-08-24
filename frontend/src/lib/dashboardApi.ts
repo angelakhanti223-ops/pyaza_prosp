@@ -69,3 +69,27 @@ export async function fetchPlan(params: { year?: number; month?: number } = {}):
   if (!res.ok) throw new Error("Не удалось загрузить план");
   return res.json();
 }
+
+export type WorkSummaryLeadRow = {
+  status: string;
+  status_display: string;
+  count: number;
+};
+
+export type WorkSummaryRequestRow = {
+  status_name: string;
+  count: number;
+};
+
+export type WorkSummaryData = {
+  leads_total: number;
+  leads_by_status: WorkSummaryLeadRow[];
+  requests_total: number;
+  requests_by_status: WorkSummaryRequestRow[];
+};
+
+export async function fetchWorkSummary(): Promise<WorkSummaryData> {
+  const res = await fetch(`${API_BASE_URL}/api/crm/summary/`, { credentials: "include" });
+  if (!res.ok) throw new Error("Не удалось загрузить сводку");
+  return res.json();
+}

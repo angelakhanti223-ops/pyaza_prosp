@@ -103,3 +103,21 @@ def format_plan_summary(year: int, month: int, rows: list, target_total, actual_
         lines.append(f'\n<b>Итого офис:</b> {format_money(actual_total)} / {format_money(target_total)} ({total_percent}%)')
 
     return '\n'.join(lines)
+
+
+def format_work_summary(data: dict) -> str:
+    """Обращения (Lead) и заявки (U-ON) в работе — общий формат для /summary
+    в боте и панели «Сводка» в CRM (см. leads.dashboard.work_summary_data)."""
+    lines = [f"📁 <b>Обращения в работе</b> — {data['leads_total']}"]
+    for row in data['leads_by_status']:
+        if row['count']:
+            lines.append(f"  {escape_html(row['status_display'])}: {row['count']}")
+
+    lines.append('')
+    lines.append(f"🧾 <b>Заявки в работе</b> — {data['requests_total']}")
+    if not data['requests_by_status']:
+        lines.append('  Нет заявок в работе')
+    for row in data['requests_by_status']:
+        lines.append(f"  {escape_html(row['status_name'])}: {row['count']}")
+
+    return '\n'.join(lines)

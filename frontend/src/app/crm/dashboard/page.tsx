@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchDashboard, fetchPlan, type DashboardData, type PlanData } from "@/lib/dashboardApi";
+import { fetchDashboard, fetchPlan, fetchWorkSummary, type DashboardData, type PlanData, type WorkSummaryData } from "@/lib/dashboardApi";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import SimpleBarChart from "@/components/dashboard/SimpleBarChart";
@@ -31,6 +31,7 @@ export default function CrmDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<PlanData | null>(null);
+  const [summary, setSummary] = useState<WorkSummaryData | null>(null);
 
   useEffect(() => {
     if (isHead) listManagers().then(setManagers);
@@ -38,6 +39,7 @@ export default function CrmDashboardPage() {
 
   useEffect(() => {
     fetchPlan().then(setPlan);
+    fetchWorkSummary().then(setSummary);
   }, []);
 
   useEffect(() => {
@@ -124,6 +126,44 @@ export default function CrmDashboardPage() {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {summary && (
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-black/5 bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Обращения в работе — {summary.leads_total}</h2>
+            {summary.leads_by_status.filter((row) => row.count > 0).length === 0 ? (
+              <p className="text-sm text-foreground/40">Нет обращений в работе</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {summary.leads_by_status
+                  .filter((row) => row.count > 0)
+                  .map((row) => (
+                    <div key={row.status} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground/70">{row.status_display}</span>
+                      <span className="font-semibold text-navy">{row.count}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-black/5 bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Заявки в работе — {summary.requests_total}</h2>
+            {summary.requests_by_status.length === 0 ? (
+              <p className="text-sm text-foreground/40">Нет заявок в работе</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {summary.requests_by_status.map((row) => (
+                  <div key={row.status_name} className="flex items-center justify-between text-sm">
+                    <span className="text-foreground/70">{row.status_name}</span>
+                    <span className="font-semibold text-navy">{row.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
