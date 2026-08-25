@@ -32,29 +32,61 @@ def _link_button(text: str, url: str) -> dict | None:
     return {'inline_keyboard': [[{'text': text, 'url': url}]]}
 
 
+TELEGRAM_MESSAGE_LIMIT = 4096
+
+
+def _split_message(text: str, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list[str]:
+    """Режет текст на части не длиннее лимита sendMessage — по границам строк,
+    чтобы не разорвать HTML-тег (у нас все теги открываются и закрываются в
+    пределах одной строки, см. telegrambot.services). Длинные дайджесты
+    (утренняя сводка, /tasks на полсотни задач) иначе Telegram отвергает
+    целиком с 400 Bad Request — как и произошло 25.08.2026."""
+    if len(text) <= limit:
+        return [text]
+    chunks = []
+    current = ''
+    for line in text.split('\n'):
+        candidate = f'{current}\n{line}' if current else line
+        if len(candidate) > limit:
+            if current:
+                chunks.append(current)
+            current = line
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def _send_telegram_message(chat_id: int, text: str, event_type: str, reply_markup: dict | None = None) -> None:
-    log = TelegramNotificationLog.objects.create(
-        chat_id=chat_id, event_type=event_type, status=TelegramNotificationLog.Status.PENDING,
-    )
-    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
-    if reply_markup is not None:
-        payload['reply_markup'] = reply_markup
-
-    try:
-        response = requests.post(
-            f'{settings.TELEGRAM_API_BASE_URL}/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage',
-            json=payload,
-            timeout=10,
+    chunks = _split_message(text)
+    for i, chunk in enumerate(chunks):
+        log = TelegramNotificationLog.objects.create(
+            chat_id=chat_id, event_type=event_type, status=TelegramNotificationLog.Status.PENDING,
         )
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        log.status = TelegramNotificationLog.Status.FAILED
-        log.error_message = str(exc)
-        log.save(update_fields=['status', 'error_message'])
-        raise TelegramSendError(str(exc)) from exc
+        payload = {'chat_id': chat_id, 'text': chunk, 'parse_mode': 'HTML'}
+        if reply_markup is not None and i == len(chunks) - 1:
+            payload['reply_markup'] = reply_markup
 
-    log.status = TelegramNotificationLog.Status.SUCCESS
-    log.save(update_fields=['status'])
+        try:
+            response = requests.post(
+                f'{settings.TELEGRAM_API_BASE_URL}/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage',
+                json=payload,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            # Тело ответа Telegram (поле description) обычно куда информативнее
+            # str(exc) — например, прямо называет причину вроде "message is too
+            # long", а не просто "400 Client Error".
+            detail = getattr(exc.response, 'text', '') if exc.response is not None else ''
+            log.status = TelegramNotificationLog.Status.FAILED
+            log.error_message = f'{exc}\n{detail}'.strip()
+            log.save(update_fields=['status', 'error_message'])
+            raise TelegramSendError(str(exc)) from exc
+
+        log.status = TelegramNotificationLog.Status.SUCCESS
+        log.save(update_fields=['status'])
 
 
 @shared_task(

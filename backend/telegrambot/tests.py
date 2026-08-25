@@ -31,6 +31,9 @@ from .services import (
     resolve_task_client_name,
 )
 from .tasks import (
+    TELEGRAM_MESSAGE_LIMIT,
+    _send_telegram_message,
+    _split_message,
     notify_lead_assignment,
     notify_lead_client_replied,
     notify_lead_status_change,
@@ -833,3 +836,63 @@ class SummaryBotTests(TestCase):
 
         query.answer.assert_called_once()
         self.assertTrue(query.answer.call_args.kwargs.get('show_alert'))
+
+
+class SplitMessageTests(TestCase):
+    """25.08.2026: утренняя сводка на 136 задач вышла за лимит Telegram
+    (4096 символов) и sendMessage отклонил её целиком с 400 Bad Request —
+    длинные сообщения теперь режутся на части по границам строк."""
+
+    def test_short_text_stays_a_single_chunk(self):
+        text = 'короткое сообщение'
+        self.assertEqual(_split_message(text), [text])
+
+    def test_long_text_is_split_under_the_limit(self):
+        line = 'x' * 100
+        text = '\n'.join([line] * 100)  # ~10100 символов
+        chunks = _split_message(text)
+
+        self.assertGreater(len(chunks), 1)
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), TELEGRAM_MESSAGE_LIMIT)
+        self.assertEqual('\n'.join(chunks), text)  # ни одна строка не потеряна
+
+    def test_split_never_breaks_a_single_line_html_tag(self):
+        # Каждая строка сама по себе короче лимита и содержит парный тег —
+        # резка по строкам не может разорвать <b>...</b> внутри одной строки.
+        line = '<b>задача</b> — статус'
+        text = '\n'.join([line] * 500)
+        for chunk in _split_message(text):
+            self.assertEqual(chunk.count('<b>'), chunk.count('</b>'))
+
+
+class SendTelegramMessageChunkingTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='chunkmanager', password='x')
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_sends_one_request_for_short_message(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+        _send_telegram_message(555, 'короткое сообщение', TelegramNotificationLog.EventType.TASK_ASSIGNED)
+        mock_post.assert_called_once()
+
+    @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
+    @patch('telegrambot.tasks.requests.post')
+    def test_sends_multiple_requests_for_long_message_and_puts_keyboard_on_last(self, mock_post):
+        mock_post.return_value.raise_for_status = MagicMock()
+        line = 'задача №' + 'x' * 90
+        long_text = '\n'.join([line] * 100)
+        markup = {'inline_keyboard': [[{'text': 'Открыть доску', 'url': 'https://example.com'}]]}
+
+        _send_telegram_message(555, long_text, TelegramNotificationLog.EventType.TASK_ASSIGNED, reply_markup=markup)
+
+        self.assertGreater(mock_post.call_count, 1)
+        payloads = [call.kwargs['json'] for call in mock_post.call_args_list]
+        for payload in payloads[:-1]:
+            self.assertNotIn('reply_markup', payload)
+        self.assertEqual(payloads[-1]['reply_markup'], markup)
+        self.assertEqual(
+            TelegramNotificationLog.objects.filter(chat_id=555, status=TelegramNotificationLog.Status.SUCCESS).count(),
+            mock_post.call_count,
+        )
