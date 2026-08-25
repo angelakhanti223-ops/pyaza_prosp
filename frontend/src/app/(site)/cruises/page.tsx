@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import CruiseWidget from "@/components/cruises/CruiseWidget";
 
 export const metadata: Metadata = {
   title: "Круизы — морские и речные туры | Слетать.ру",
@@ -47,6 +48,11 @@ export default function CruisesPage() {
           <OpenLeadFormButton className="rounded-full bg-navy px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue">
             Подобрать круиз
           </OpenLeadFormButton>
+        </div>
+
+        <div className="mt-16">
+          <h2 className="mb-6 text-center text-lg font-bold text-navy">Поиск и бронирование круизов онлайн</h2>
+          <CruiseWidget />
         </div>
       </div>
     </div>
