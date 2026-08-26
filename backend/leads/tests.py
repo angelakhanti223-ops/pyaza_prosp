@@ -9,7 +9,7 @@ from django.utils import timezone
 from integrations.models import UonLeadRecord, UonRequestRecord
 from kanban.models import KanbanColumn, Task
 
-from .dashboard import actual_commission_for_month, plan_progress_rows, task_counts_data, work_summary_data
+from .dashboard import _compute, actual_commission_for_month, plan_progress_rows, task_counts_data, work_summary_data
 from .models import Direction, Lead, MonthlyPlan
 from .tasks import check_stale_leads, create_new_lead_task
 
@@ -79,6 +79,18 @@ class LeadStatusChangeNotificationTests(TestCase):
         )
         self.client.patch(f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.PAID}, content_type='application/json')
         mock_delay.assert_called_once_with(lead.id, Lead.Status.PAID)
+
+    @patch('leads.views.notify_lead_status_change.delay')
+    def test_notifies_on_transition_to_closed_won(self, mock_delay):
+        # Добавлено 26.08.2026 — это и есть реальный момент получения денег
+        # в рабочем процессе команды, а не PAID.
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.BOOKED,
+        )
+        self.client.patch(
+            f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.CLOSED_WON}, content_type='application/json',
+        )
+        mock_delay.assert_called_once_with(lead.id, Lead.Status.CLOSED_WON)
 
     @patch('leads.views.notify_lead_status_change.delay')
     def test_notifies_on_transition_to_closed_lost(self, mock_delay):
@@ -225,11 +237,13 @@ class PlanProgressTests(TestCase):
         self.client.force_login(self.head)
 
     def _pay_lead(self, commission, manager=None):
+        # «Закрыта (успех)», не «Оплачено» — реальный момент получения денег
+        # в рабочем процессе этой команды (решение заказчика, 26.08.2026).
         lead = Lead.objects.create(
             name='Клиент', direction=self.direction, assigned_manager=manager or self.manager,
             status=Lead.Status.BOOKED, commission=commission,
         )
-        self.client.patch(f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.PAID}, content_type='application/json')
+        self.client.patch(f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.CLOSED_WON}, content_type='application/json')
         return lead
 
     def test_actual_commission_sums_paid_leads_this_month(self):
@@ -287,6 +301,51 @@ class PlanProgressTests(TestCase):
         rows = plan_progress_rows(today.year, today.month)
 
         self.assertEqual(rows[0]['salary'], 30000 + Decimal('0.15') * 20000)
+
+
+class DashboardCommissionTests(TestCase):
+    """Комиссия/сумма сделок считаются по статусу «Закрыта (успех)», не
+    «Оплачено» — этот шаг в рабочем процессе команды почти не используется
+    (решение заказчика, 26.08.2026)."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='dashcommhead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='dashcommmanager', password='x', role=User.Role.MANAGER)
+        self.direction = Direction.objects.create(name='ОАЭ')
+
+    def test_compute_counts_closed_won_not_paid(self):
+        Lead.objects.create(
+            name='Успех', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.CLOSED_WON, commission=15000, deal_amount=100000,
+        )
+        Lead.objects.create(
+            name='Оплачено-но-не-закрыта', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.PAID, commission=99999, deal_amount=999999,
+        )
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['commission_total'], 15000)
+        self.assertEqual(data['deal_amount_total'], 100000)
+
+    def test_commission_by_manager_endpoint_uses_closed_won(self):
+        Lead.objects.create(
+            name='Успех', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.CLOSED_WON, commission=15000,
+        )
+        Lead.objects.create(
+            name='Просто оплачена', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.PAID, commission=99999,
+        )
+        self.client.force_login(self.head)
+
+        response = self.client.get('/api/crm/dashboard/?period=30d')
+
+        self.assertEqual(response.status_code, 200)
+        by_manager = response.json()['commission_by_manager']
+        self.assertEqual(len(by_manager), 1)
+        self.assertEqual(float(by_manager[0]['commission']), 15000)
+        self.assertEqual(by_manager[0]['deals'], 1)
 
 
 class PlanViewTests(TestCase):

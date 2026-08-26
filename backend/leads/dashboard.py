@@ -53,8 +53,11 @@ def _compute(base_qs, date_from, date_to):
             'percent': round(reached / total * 100, 1) if total else 0,
         })
 
-    paid_leads = period_leads.filter(status=Lead.Status.PAID)
-    totals = paid_leads.aggregate(commission=Sum('commission'), deal_amount=Sum('deal_amount'))
+    # «Закрыта (успех)» — реальный момент получения денег в этой команде;
+    # «Оплачено» в рабочем процессе почти не используется как отдельный шаг
+    # (решение заказчика, 26.08.2026).
+    won_leads = period_leads.filter(status=Lead.Status.CLOSED_WON)
+    totals = won_leads.aggregate(commission=Sum('commission'), deal_amount=Sum('deal_amount'))
 
     daily = (
         period_leads.annotate(day=TruncDate('created_at'))
@@ -100,7 +103,7 @@ class DashboardView(APIView):
             by_manager = (
                 Lead.objects.filter(
                     created_at__gte=date_from, created_at__lte=date_to,
-                    status=Lead.Status.PAID, assigned_manager__isnull=False,
+                    status=Lead.Status.CLOSED_WON, assigned_manager__isnull=False,
                 )
                 .values('assigned_manager_id', 'assigned_manager__first_name', 'assigned_manager__last_name', 'assigned_manager__username')
                 .annotate(commission=Sum('commission'), deals=Count('id'))
@@ -132,11 +135,13 @@ def month_bounds(year, month):
 
 def actual_commission_for_month(manager, year, month):
     """Комиссия менеджера, засчитанная в план месяца — по дате перехода заявки в
-    статус «Оплачено» (LeadStatusHistory), а не по дате создания заявки."""
+    статус «Закрыта (успех)» (LeadStatusHistory), а не по дате создания заявки.
+    Это реальный момент получения денег в этой команде — «Оплачено» как
+    отдельный шаг почти не используется (решение заказчика, 26.08.2026)."""
     start, end = month_bounds(year, month)
     lead_ids = (
         LeadStatusHistory.objects.filter(
-            new_status=Lead.Status.PAID, changed_at__gte=start, changed_at__lte=end,
+            new_status=Lead.Status.CLOSED_WON, changed_at__gte=start, changed_at__lte=end,
             lead__assigned_manager=manager,
         )
         .values_list('lead_id', flat=True)

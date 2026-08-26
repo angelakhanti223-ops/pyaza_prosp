@@ -110,7 +110,9 @@ class LeadViewSet(
             )
             # Только ключевые для денег переходы — не на каждую смену статуса,
             # иначе уведомления превращаются в шум (решение заказчика, 19.08.2026).
-            if new_status in (Lead.Status.BOOKED, Lead.Status.PAID, Lead.Status.CLOSED_LOST):
+            # CLOSED_WON добавлен 26.08.2026 — выяснилось, что именно этот статус,
+            # а не PAID, означает реальное получение денег в рабочем процессе команды.
+            if new_status in (Lead.Status.BOOKED, Lead.Status.PAID, Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST):
                 notify_lead_status_change.delay(lead.id, new_status)
 
         if lead.assigned_manager_id and lead.assigned_manager_id != old_assigned_manager_id:
