@@ -50,6 +50,7 @@ export type PlanRow = {
   target: number;
   actual: number;
   percent: number;
+  salary: number;
 };
 
 export type PlanData = {
@@ -86,6 +87,7 @@ export type WorkSummaryData = {
   leads_by_status: WorkSummaryLeadRow[];
   requests_total: number;
   requests_by_status: WorkSummaryRequestRow[];
+  tasks: { today: number; overdue: number };
 };
 
 export async function fetchWorkSummary(): Promise<WorkSummaryData> {

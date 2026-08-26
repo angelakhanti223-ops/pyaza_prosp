@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
@@ -145,21 +146,34 @@ def actual_commission_for_month(manager, year, month):
 
 
 def plan_progress_rows(year, month, managers=None):
-    """Строки план/факт по комиссии за месяц. `managers=None` — по всем, у кого есть план."""
-    plans = MonthlyPlan.objects.filter(year=year, month=month).select_related('manager')
-    if managers is not None:
-        plans = plans.filter(manager__in=managers)
+    """Строки план/факт по комиссии за месяц + зарплата (оклад + % от своей
+    комиссии + % от суммарной комиссии остальных держателей плана в этом
+    месяце — см. MonthlyPlan). `managers=None` — по всем, у кого есть план;
+    «остальные» считаются от полного набора за месяц независимо от фильтра,
+    чтобы личная строка менеджера не искажала долю чужой комиссии."""
+    all_plans = list(MonthlyPlan.objects.filter(year=year, month=month).select_related('manager'))
+    commissions = {plan.manager_id: actual_commission_for_month(plan.manager, year, month) for plan in all_plans}
+    total_commission = sum(commissions.values(), Decimal('0'))
+
+    plans = all_plans if managers is None else [p for p in all_plans if p.manager in managers]
 
     rows = []
     for plan in plans:
-        actual = actual_commission_for_month(plan.manager, year, month)
+        actual = commissions[plan.manager_id]
         target = plan.target_commission
+        other_commission = total_commission - actual
+        salary = (
+            plan.base_salary
+            + (plan.commission_percent / Decimal('100')) * Decimal(actual)
+            + (plan.bonus_percent / Decimal('100')) * Decimal(other_commission)
+        )
         rows.append({
             'manager_id': plan.manager_id,
             'manager_name': plan.manager.get_full_name() or plan.manager.username,
             'target': target,
             'actual': actual,
             'percent': round(float(actual) / float(target) * 100, 1) if target else 0,
+            'salary': salary,
         })
     return rows
 
@@ -198,6 +212,26 @@ OPEN_LEAD_STATUSES = [
 ]
 
 
+def task_counts_data(user, head):
+    """Число открытых задач с дедлайном сегодня и просроченных — не заходит в
+    последнюю колонку доски («Готово»), как и утренняя сводка в боте
+    (telegrambot.tasks.notify_daily_deadlines)."""
+    from kanban.models import KanbanColumn, Task
+
+    today = timezone.localdate()
+    qs = Task.objects.filter(deadline__isnull=False, deadline__date__lte=today)
+    last_column = KanbanColumn.objects.order_by('-order').first()
+    if last_column is not None:
+        qs = qs.exclude(column_id=last_column.pk)
+    if not head:
+        qs = qs.filter(assignee=user)
+
+    return {
+        'today': qs.filter(deadline__date=today).count(),
+        'overdue': qs.filter(deadline__date__lt=today).count(),
+    }
+
+
 def work_summary_data(user, head):
     from integrations.models import UonRequestRecord
 
@@ -228,6 +262,7 @@ def work_summary_data(user, head):
         'leads_by_status': leads_by_status,
         'requests_total': requests_qs.count(),
         'requests_by_status': requests_by_status,
+        'tasks': task_counts_data(user, head),
     }
 
 

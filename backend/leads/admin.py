@@ -40,5 +40,8 @@ class DirectionAdmin(admin.ModelAdmin):
 
 @admin.register(MonthlyPlan)
 class MonthlyPlanAdmin(admin.ModelAdmin):
-    list_display = ('manager', 'year', 'month', 'target_commission')
+    list_display = (
+        'manager', 'year', 'month', 'target_commission', 'base_salary', 'commission_percent', 'bonus_percent',
+    )
+    list_editable = ('bonus_percent',)
     list_filter = ('year', 'month', 'manager')

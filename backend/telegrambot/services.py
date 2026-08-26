@@ -120,6 +120,8 @@ def format_plan_summary(year: int, month: int, rows: list, target_total, actual_
             f"{icon} {escape_html(row['manager_name'])}: "
             f"{format_money(row['actual'])} / {format_money(row['target'])} ({percent}%)"
         )
+        if 'salary' in row:
+            lines.append(f"   💰 Зарплата: {format_money(row['salary'])}")
 
     if len(rows) > 1:
         total_percent = round(float(actual_total) / float(target_total) * 100, 1) if target_total else 0

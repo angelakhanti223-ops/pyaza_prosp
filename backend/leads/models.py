@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
@@ -58,7 +60,15 @@ class Lead(models.Model):
 
 
 class MonthlyPlan(models.Model):
-    """Целевая комиссия менеджера на месяц — план/факт на дашборде CRM и в боте."""
+    """Целевая комиссия менеджера на месяц — план/факт на дашборде CRM и в боте,
+    плюс параметры расчёта зарплаты за тот же месяц (решение заказчика,
+    25.08.2026): оклад + commission_percent % от своей комиссии + bonus_percent %
+    от суммарной комиссии остальных держателей плана в этом месяце.
+
+    bonus_percent — единственное поле здесь, которое нельзя посчитать
+    автоматически: зависит от SLA и пропущенных ежедневных задач, а трекинга
+    этого в системе пока нет, поэтому руководитель выставляет его вручную
+    каждый месяц по своей оценке (3% / 1% / 0% — см. регламент)."""
 
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_plans',
@@ -66,6 +76,15 @@ class MonthlyPlan(models.Model):
     year = models.PositiveSmallIntegerField('Год')
     month = models.PositiveSmallIntegerField('Месяц')
     target_commission = models.DecimalField('Целевая комиссия', max_digits=10, decimal_places=2)
+    base_salary = models.DecimalField('Оклад', max_digits=10, decimal_places=2, default=Decimal('30000'))
+    commission_percent = models.DecimalField(
+        '% от своей комиссии', max_digits=5, decimal_places=2, default=Decimal('15'),
+    )
+    bonus_percent = models.DecimalField(
+        '% от комиссии остальных (SLA/ежедневные задачи)', max_digits=5, decimal_places=2, default=Decimal('0'),
+        help_text='Выставляется вручную по итогам месяца — 3% при выполненном SLA и не более 2 пропусков '
+                   'ежедневных задач, 1% при более серьёзных нарушениях, 0% при грубом нарушении.',
+    )
 
     class Meta:
         ordering = ['-year', '-month']

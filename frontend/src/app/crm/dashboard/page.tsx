@@ -115,6 +115,9 @@ export default function CrmDashboardPage() {
                     style={{ width: `${Math.min(row.percent, 100)}%` }}
                   />
                 </div>
+                <div className="mt-1 text-right text-xs font-semibold text-gold">
+                  Зарплата на сейчас: {formatMoney(row.salary)}
+                </div>
               </div>
             ))}
           </div>
@@ -130,7 +133,23 @@ export default function CrmDashboardPage() {
       )}
 
       {summary && (
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-black/5 bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Задачи</h2>
+            <div className="flex gap-4">
+              <div>
+                <p className="text-xs text-foreground/50">Сегодня</p>
+                <p className="mt-1 text-2xl font-bold text-navy">{summary.tasks.today}</p>
+              </div>
+              <div>
+                <p className="text-xs text-foreground/50">Просрочено</p>
+                <p className={`mt-1 text-2xl font-bold ${summary.tasks.overdue > 0 ? "text-red-600" : "text-navy"}`}>
+                  {summary.tasks.overdue}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-black/5 bg-white p-5">
             <h2 className="mb-4 text-sm font-semibold text-navy">Обращения в работе — {summary.leads_total}</h2>
             {summary.leads_by_status.filter((row) => row.count > 0).length === 0 ? (

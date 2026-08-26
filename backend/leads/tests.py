@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -8,7 +9,7 @@ from django.utils import timezone
 from integrations.models import UonLeadRecord, UonRequestRecord
 from kanban.models import KanbanColumn, Task
 
-from .dashboard import actual_commission_for_month, plan_progress_rows, work_summary_data
+from .dashboard import actual_commission_for_month, plan_progress_rows, task_counts_data, work_summary_data
 from .models import Direction, Lead, MonthlyPlan
 from .tasks import check_stale_leads, create_new_lead_task
 
@@ -257,6 +258,36 @@ class PlanProgressTests(TestCase):
         self.assertEqual(rows[0]['actual'], 30000)
         self.assertEqual(rows[0]['percent'], 50.0)
 
+    def test_salary_is_base_plus_own_commission_plus_bonus_from_others(self):
+        # 25.08.2026: оклад 30000 + 15% своей комиссии + bonus_percent % от
+        # суммарной комиссии остальных держателей плана в этом месяце.
+        other = User.objects.create_user(username='other_manager3', password='x')
+        today = timezone.now().date()
+        MonthlyPlan.objects.create(
+            manager=self.manager, year=today.year, month=today.month, target_commission=60000,
+            base_salary=30000, commission_percent=15, bonus_percent=3,
+        )
+        MonthlyPlan.objects.create(
+            manager=other, year=today.year, month=today.month, target_commission=60000,
+        )
+        self._pay_lead(40000)
+        self._pay_lead(10000, manager=other)
+
+        rows = plan_progress_rows(today.year, today.month, managers=[self.manager])
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['actual'], 40000)
+        self.assertEqual(rows[0]['salary'], 30000 + Decimal('0.15') * 40000 + Decimal('0.03') * 10000)
+
+    def test_salary_defaults_with_no_bonus(self):
+        today = timezone.now().date()
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, target_commission=60000)
+        self._pay_lead(20000)
+
+        rows = plan_progress_rows(today.year, today.month)
+
+        self.assertEqual(rows[0]['salary'], 30000 + Decimal('0.15') * 20000)
+
 
 class PlanViewTests(TestCase):
     def setUp(self):
@@ -344,6 +375,56 @@ class WorkSummaryTests(TestCase):
 
         self.assertEqual(data['leads_total'], 1)
         self.assertEqual(data['requests_total'], 1)
+
+    def test_includes_task_counts(self):
+        data = work_summary_data(self.head, head=True)
+        self.assertIn('tasks', data)
+        self.assertIn('today', data['tasks'])
+        self.assertIn('overdue', data['tasks'])
+
+
+class TaskCountsTests(TestCase):
+    def setUp(self):
+        self.head = User.objects.create_user(username='taskcounthead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='taskcountmanager', password='x', role=User.Role.MANAGER)
+        self.other = User.objects.create_user(username='taskcountother', password='x', role=User.Role.MANAGER)
+        self.column_new = KanbanColumn.objects.get(name='Новая')
+        self.column_done = KanbanColumn.objects.get(name='Готово')
+
+    def _task(self, assignee, deadline, column=None):
+        return Task.objects.create(
+            title='Задача', column=column or self.column_new, assignee=assignee, deadline=deadline,
+        )
+
+    def test_counts_today_and_overdue_excluding_done_column(self):
+        now = timezone.now()
+        self._task(self.manager, now)  # сегодня
+        self._task(self.manager, now - timedelta(days=2))  # просрочено
+        self._task(self.manager, now + timedelta(days=3))  # будущее — не считается
+        self._task(self.manager, now - timedelta(days=1), column=self.column_done)  # готово — не считается
+
+        data = task_counts_data(self.manager, head=False)
+
+        self.assertEqual(data['today'], 1)
+        self.assertEqual(data['overdue'], 1)
+
+    def test_manager_sees_only_own_tasks(self):
+        now = timezone.now()
+        self._task(self.manager, now)
+        self._task(self.other, now)
+
+        data = task_counts_data(self.manager, head=False)
+
+        self.assertEqual(data['today'], 1)
+
+    def test_head_sees_all_tasks(self):
+        now = timezone.now()
+        self._task(self.manager, now)
+        self._task(self.other, now)
+
+        data = task_counts_data(self.head, head=True)
+
+        self.assertEqual(data['today'], 2)
 
 
 class WorkSummaryViewTests(TestCase):
