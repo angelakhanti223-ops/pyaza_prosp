@@ -136,7 +136,11 @@ async function apiJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await apiFetch(path, { ...options, headers });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Ошибка запроса");
+    // DRF returns either {"detail": "..."} for non-field errors, or
+    // {"field": ["message", ...], ...} for validation errors — surface the
+    // real message either way instead of a generic fallback.
+    const fieldErrors = Object.values(data).flat().filter((v): v is string => typeof v === "string");
+    throw new Error(data.detail || fieldErrors.join(" ") || "Ошибка запроса");
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -175,6 +179,22 @@ export async function listLeads(params: { status?: string; search?: string } = {
 
 export async function getLead(id: number): Promise<LeadDetail> {
   return apiJson<LeadDetail>(`/api/crm/leads/${id}/`);
+}
+
+export async function createLead(data: {
+  name: string;
+  phone: string;
+  email?: string;
+  direction?: number | null;
+  initial_comment?: string;
+  source?: string;
+  assigned_manager?: number | null;
+  consent: boolean;
+}): Promise<LeadDetail> {
+  return apiJson<LeadDetail>("/api/crm/leads/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function updateLead(

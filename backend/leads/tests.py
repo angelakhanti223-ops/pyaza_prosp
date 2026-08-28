@@ -51,6 +51,85 @@ class LeadDetailUonLeadTests(TestCase):
         self.assertEqual(data['client_name'], 'Иван Иванов')
 
 
+class LeadCrmCreateTests(TestCase):
+    """Ручное создание обращения в CRM (со звонка) — второй путь появления
+    Lead в системе, наравне с публичной формой (решение заказчика, 27.08.2026)."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='crmcreatehead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='crmcreatemanager', password='x', role=User.Role.MANAGER)
+        self.other_manager = User.objects.create_user(username='crmcreateother', password='x', role=User.Role.MANAGER)
+        self.direction = Direction.objects.create(name='Турция')
+
+    @patch('telegrambot.tasks.notify_lead_assignment.delay')
+    @patch('leads.tasks.create_new_lead_task.delay')
+    @patch('integrations.tasks.sync_lead_to_uon.delay')
+    def test_manager_creates_lead_self_assigned_and_synced_to_uon(self, mock_sync, mock_task, mock_notify):
+        self.client.force_login(self.manager)
+
+        response = self.client.post('/api/crm/leads/', {
+            'name': 'Клиент', 'phone': '+79990000000', 'direction': self.direction.id,
+            'initial_comment': 'Звонил, интересует Турция', 'consent': True,
+        })
+
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        lead = Lead.objects.get(pk=data['id'])
+        self.assertEqual(lead.assigned_manager_id, self.manager.id)
+        self.assertEqual(lead.source, Lead.Source.PHONE_CALL)
+        self.assertIsNotNone(lead.consent_personal_data_at)
+        mock_sync.assert_called_once_with(lead.id)
+        mock_task.assert_called_once_with(lead.id)
+        mock_notify.assert_called_once_with(lead.id)
+
+    @patch('telegrambot.tasks.notify_lead_assignment.delay')
+    @patch('leads.tasks.create_new_lead_task.delay')
+    @patch('integrations.tasks.sync_lead_to_uon.delay')
+    def test_manager_cannot_assign_lead_to_someone_else(self, mock_sync, mock_task, mock_notify):
+        self.client.force_login(self.manager)
+
+        response = self.client.post('/api/crm/leads/', {
+            'name': 'Клиент', 'phone': '+79990000000', 'consent': True,
+            'assigned_manager': self.other_manager.id,
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Lead.objects.exists())
+        mock_sync.assert_not_called()
+
+    @patch('telegrambot.tasks.notify_lead_assignment.delay')
+    @patch('leads.tasks.create_new_lead_task.delay')
+    @patch('integrations.tasks.sync_lead_to_uon.delay')
+    def test_head_can_assign_lead_to_a_manager(self, mock_sync, mock_task, mock_notify):
+        self.client.force_login(self.head)
+
+        response = self.client.post('/api/crm/leads/', {
+            'name': 'Клиент', 'phone': '+79990000000', 'consent': True,
+            'assigned_manager': self.manager.id,
+        })
+
+        self.assertEqual(response.status_code, 201)
+        lead = Lead.objects.get(pk=response.json()['id'])
+        self.assertEqual(lead.assigned_manager_id, self.manager.id)
+        mock_notify.assert_called_once_with(lead.id)
+
+    def test_requires_consent(self):
+        self.client.force_login(self.manager)
+
+        response = self.client.post('/api/crm/leads/', {
+            'name': 'Клиент', 'phone': '+79990000000', 'consent': False,
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Lead.objects.exists())
+
+    def test_requires_authentication(self):
+        response = self.client.post('/api/crm/leads/', {
+            'name': 'Клиент', 'phone': '+79990000000', 'consent': True,
+        })
+        self.assertEqual(response.status_code, 403)
+
+
 class LeadStatusChangeNotificationTests(TestCase):
     """Пуш менеджеру только на ключевые для денег переходы (бронь/оплата/отказ) —
     не на каждую смену статуса, решение заказчика 19.08.2026."""

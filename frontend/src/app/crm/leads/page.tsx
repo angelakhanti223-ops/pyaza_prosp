@@ -5,12 +5,14 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { listLeads, STATUS_OPTIONS, type LeadListItem } from "@/lib/crmApi";
 import StatusBadge from "@/components/crm/StatusBadge";
+import NewLeadModal from "@/components/crm/NewLeadModal";
 
 export default function CrmLeadsPage() {
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -32,7 +34,23 @@ export default function CrmLeadsPage() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-xl font-bold text-navy">Заявки</h1>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue"
+        >
+          + Создать обращение
+        </button>
       </div>
+
+      {showCreate && (
+        <NewLeadModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(lead) => {
+            setShowCreate(false);
+            setLeads((prev) => [lead, ...prev]);
+          }}
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="relative">

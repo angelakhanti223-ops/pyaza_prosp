@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from accounts.permissions import is_head
 from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonSyncLog
 from integrations.serializers import UonLeadRecordSerializer
@@ -57,6 +58,57 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
 
 # --- Мини-CRM (внутренняя панель, ТЗ 5) ---
+
+
+class LeadCrmCreateSerializer(serializers.ModelSerializer):
+    """Ручное создание обращения сотрудником в CRM (например, со звонка) — те
+    же поля, что уходят в U-ON при создании обращения (source/u_name/u_phone/
+    u_email/note, см. integrations.adapters.build_ticket_payload), плюс
+    направление и ответственный, которых нет в публичной форме сайта.
+
+    consent остаётся обязательным полем и здесь: согласие на обработку ПДн
+    нужно в любом случае, просто на этом пути его подтверждает сотрудник,
+    получивший его на словах (по телефону), а не сам клиент чекбоксом."""
+
+    consent = serializers.BooleanField(write_only=True)
+
+    class Meta:
+        model = Lead
+        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'source', 'assigned_manager', 'consent']
+        read_only_fields = ['id']
+
+    def validate_consent(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'Подтвердите, что согласие клиента на обработку персональных данных получено.'
+            )
+        return value
+
+    def validate_assigned_manager(self, value):
+        request = self.context['request']
+        if value and value != request.user and not is_head(request.user):
+            raise serializers.ValidationError('Назначать заявку другому сотруднику может только руководитель.')
+        return value
+
+    def create(self, validated_data):
+        from integrations.tasks import sync_lead_to_uon
+        from telegrambot.tasks import notify_lead_assignment
+
+        from .tasks import create_new_lead_task
+
+        request = self.context['request']
+        validated_data.pop('consent')
+        validated_data.setdefault('source', Lead.Source.PHONE_CALL)
+        validated_data.setdefault('assigned_manager', request.user)
+        validated_data['consent_personal_data_at'] = timezone.now()
+        lead = super().create(validated_data)
+
+        sync_lead_to_uon.delay(lead.id)
+        create_new_lead_task.delay(lead.id)
+        if lead.assigned_manager_id:
+            notify_lead_assignment.delay(lead.id)
+
+        return lead
 
 
 class LeadCommentSerializer(serializers.ModelSerializer):

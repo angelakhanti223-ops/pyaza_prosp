@@ -16,6 +16,7 @@ from .serializers import (
     LeadAttachmentSerializer,
     LeadCommentSerializer,
     LeadCreateSerializer,
+    LeadCrmCreateSerializer,
     LeadDetailSerializer,
     LeadListSerializer,
     LeadUpdateSerializer,
@@ -43,15 +44,18 @@ class LeadCreateView(generics.CreateAPIView):
 class LeadViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Мини-CRM (ТЗ 5): список/карточка заявки, смена статуса, комментарии, файлы.
+    """Мини-CRM (ТЗ 5): список/карточка заявки, создание вручную, смена статуса,
+    комментарии, файлы.
 
     Менеджер видит и ведёт только свои заявки; руководитель/администратор — все
-    заявки и может переназначать ответственного (ТЗ 5.3). Leads are only ever
-    created via the public LeadCreateView or (later) a manual-entry flow — this
-    viewset intentionally has no create/destroy actions.
+    заявки и может переназначать ответственного (ТЗ 5.3). Ручное создание (см.
+    LeadCrmCreateSerializer) — второй путь появления Lead в системе, наравне с
+    публичной формой сайта (LeadCreateView); оба одинаково пушат обращение в
+    U-ON через sync_lead_to_uon.
     """
 
     permission_classes = [IsAuthenticated]
@@ -82,6 +86,8 @@ class LeadViewSet(
     def get_serializer_class(self):
         if self.action == 'list':
             return LeadListSerializer
+        if self.action == 'create':
+            return LeadCrmCreateSerializer
         if self.action == 'partial_update':
             return LeadUpdateSerializer
         if self.action == 'add_comment':
@@ -89,6 +95,12 @@ class LeadViewSet(
         if self.action == 'add_attachment':
             return LeadAttachmentSerializer
         return LeadDetailSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lead = serializer.save()
+        return Response(LeadDetailSerializer(lead).data, status=201)
 
     def partial_update(self, request, *args, **kwargs):
         lead = self.get_object()
