@@ -22,12 +22,21 @@ export type DashboardManagerCommission = {
   deals: number;
 };
 
+export type DashboardDirectionRow = {
+  direction: string;
+  count: number;
+};
+
 export type DashboardData = {
   new_leads_count: number;
   leads_by_status: DashboardStatusRow[];
   conversion: DashboardConversionRow[];
   commission_total: number;
   deal_amount_total: number;
+  deals_count: number;
+  avg_deal_amount: number;
+  avg_commission: number;
+  by_direction: DashboardDirectionRow[];
   daily_dynamics: DashboardDailyRow[];
   period: { from: string; to: string };
   scope: "personal" | "department";

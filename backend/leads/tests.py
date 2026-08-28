@@ -347,6 +347,27 @@ class DashboardCommissionTests(TestCase):
         self.assertEqual(float(by_manager[0]['commission']), 15000)
         self.assertEqual(by_manager[0]['deals'], 1)
 
+    def test_deal_stats_and_direction_breakdown(self):
+        turkey = Direction.objects.create(name='Турция')
+        Lead.objects.create(
+            name='А', direction=turkey, status=Lead.Status.CLOSED_WON, commission=10000, deal_amount=100000,
+        )
+        Lead.objects.create(
+            name='Б', direction=turkey, status=Lead.Status.CLOSED_WON, commission=20000, deal_amount=200000,
+        )
+        Lead.objects.create(
+            name='В', direction=self.direction, status=Lead.Status.CLOSED_WON, commission=30000, deal_amount=300000,
+        )
+        Lead.objects.create(name='Г', direction=self.direction, status=Lead.Status.NEW)  # не должна попасть
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['deals_count'], 3)
+        self.assertEqual(data['avg_deal_amount'], 200000)
+        self.assertEqual(data['avg_commission'], 20000)
+        by_direction = {row['direction']: row['count'] for row in data['by_direction']}
+        self.assertEqual(by_direction, {'Турция': 2, 'ОАЭ': 1})
+
 
 class PlanViewTests(TestCase):
     def setUp(self):

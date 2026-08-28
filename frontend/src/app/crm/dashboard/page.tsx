@@ -5,6 +5,7 @@ import { fetchDashboard, fetchPlan, fetchWorkSummary, type DashboardData, type P
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import SimpleBarChart from "@/components/dashboard/SimpleBarChart";
+import SimplePieChart from "@/components/dashboard/SimplePieChart";
 
 const PERIODS: { value: string; label: string }[] = [
   { value: "7d", label: "7 дней" },
@@ -246,6 +247,31 @@ export default function CrmDashboardPage() {
                 value: d.count,
               }))}
             />
+          </div>
+
+          <div className="rounded-2xl border border-black/5 bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Продажи туров</h2>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-foreground/50">Продано туров</p>
+                <p className="mt-1 text-2xl font-bold text-navy">{data.deals_count}</p>
+              </div>
+              <div>
+                <p className="text-xs text-foreground/50">Стоимость проданных туров</p>
+                <p className="mt-1 text-2xl font-bold text-navy">{formatMoney(data.deal_amount_total)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-foreground/50">Средняя стоимость тура</p>
+                <p className="mt-1 text-2xl font-bold text-navy">{formatMoney(data.avg_deal_amount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-foreground/50">Средняя комиссия</p>
+                <p className="mt-1 text-2xl font-bold text-gold">{formatMoney(data.avg_commission)}</p>
+              </div>
+            </div>
+
+            <h3 className="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-foreground/50">По странам</h3>
+            <SimplePieChart data={data.by_direction.map((row) => ({ label: row.direction, value: row.count }))} />
           </div>
 
           {data.commission_by_manager && (

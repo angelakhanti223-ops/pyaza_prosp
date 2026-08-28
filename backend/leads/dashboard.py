@@ -2,7 +2,7 @@ from calendar import monthrange
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
@@ -57,7 +57,18 @@ def _compute(base_qs, date_from, date_to):
     # «Оплачено» в рабочем процессе почти не используется как отдельный шаг
     # (решение заказчика, 26.08.2026).
     won_leads = period_leads.filter(status=Lead.Status.CLOSED_WON)
-    totals = won_leads.aggregate(commission=Sum('commission'), deal_amount=Sum('deal_amount'))
+    totals = won_leads.aggregate(
+        commission_sum=Sum('commission'), deal_amount_sum=Sum('deal_amount'),
+        avg_deal_amount=Avg('deal_amount'), avg_commission=Avg('commission'),
+        deals_count=Count('id'),
+    )
+
+    by_direction = (
+        won_leads.exclude(direction__isnull=True)
+        .values('direction__name')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
 
     daily = (
         period_leads.annotate(day=TruncDate('created_at'))
@@ -70,8 +81,14 @@ def _compute(base_qs, date_from, date_to):
         'new_leads_count': total,
         'leads_by_status': leads_by_status,
         'conversion': conversion,
-        'commission_total': totals['commission'] or 0,
-        'deal_amount_total': totals['deal_amount'] or 0,
+        'commission_total': totals['commission_sum'] or 0,
+        'deal_amount_total': totals['deal_amount_sum'] or 0,
+        'deals_count': totals['deals_count'],
+        'avg_deal_amount': totals['avg_deal_amount'] or 0,
+        'avg_commission': totals['avg_commission'] or 0,
+        'by_direction': [
+            {'direction': row['direction__name'], 'count': row['count']} for row in by_direction
+        ],
         'daily_dynamics': [{'date': row['day'].isoformat(), 'count': row['count']} for row in daily],
     }
 
