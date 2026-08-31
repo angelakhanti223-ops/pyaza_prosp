@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'emailing',
     'sitecontent',
     'telegrambot',
+    'knowledgebase',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

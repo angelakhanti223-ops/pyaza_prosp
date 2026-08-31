@@ -240,3 +240,55 @@ export function mediaUrl(path: string): string {
 export async function triggerUonSync(): Promise<{ detail: string }> {
   return apiJson<{ detail: string }>("/api/crm/integrations/uon-sync/", { method: "POST" });
 }
+
+// --- База знаний ---
+
+export type KnowledgeArticleListItem = {
+  id: number;
+  title: string;
+  direction: number | null;
+  direction_name: string | null;
+  author: CrmUser | null;
+  updated_at: string;
+};
+
+export type KnowledgeArticleDetail = KnowledgeArticleListItem & {
+  content: string;
+  created_at: string;
+};
+
+export async function listKnowledgeArticles(): Promise<KnowledgeArticleListItem[]> {
+  const data = await apiJson<KnowledgeArticleListItem[] | { results: KnowledgeArticleListItem[] }>(
+    "/api/crm/knowledge-base/"
+  );
+  return Array.isArray(data) ? data : data.results;
+}
+
+export async function getKnowledgeArticle(id: number): Promise<KnowledgeArticleDetail> {
+  return apiJson<KnowledgeArticleDetail>(`/api/crm/knowledge-base/${id}/`);
+}
+
+export async function createKnowledgeArticle(data: {
+  title: string;
+  direction?: number | null;
+  content: string;
+}): Promise<KnowledgeArticleDetail> {
+  return apiJson<KnowledgeArticleDetail>("/api/crm/knowledge-base/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateKnowledgeArticle(
+  id: number,
+  data: Partial<{ title: string; direction: number | null; content: string }>
+): Promise<KnowledgeArticleDetail> {
+  return apiJson<KnowledgeArticleDetail>(`/api/crm/knowledge-base/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteKnowledgeArticle(id: number): Promise<void> {
+  await apiJson<void>(`/api/crm/knowledge-base/${id}/`, { method: "DELETE" });
+}

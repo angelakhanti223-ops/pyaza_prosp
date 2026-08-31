@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/', include('kanban.urls')),
     path('api/', include('sitecontent.urls')),
     path('api/', include('integrations.urls')),
+    path('api/', include('knowledgebase.urls')),
 ]
 
 if settings.DEBUG:
