@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -68,6 +69,9 @@ function resolveTargetColumnId(overId: string | number, tasks: KanbanTask[]): nu
 
 export default function Board() {
   const { user } = useCrmAuth();
+  const searchParams = useSearchParams();
+  const taskParam = searchParams.get("task");
+  const openedFromQuery = useRef(false);
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [managers, setManagers] = useState<CrmUser[]>([]);
@@ -93,6 +97,19 @@ export default function Board() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (openedFromQuery.current || !taskParam || tasks.length === 0) return;
+    const match = tasks.find((t) => t.id === Number(taskParam));
+    if (match) {
+      openedFromQuery.current = true;
+      // Открытие модалки задачи по ссылке из карточки заявки (?task=id) — это
+      // единоразовая синхронизация с URL при монтировании (охраняется ref'ом
+      // выше), а не циклический побочный эффект, которого опасается это правило.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setModalState({ task: match, columnId: null });
+    }
+  }, [tasks, taskParam]);
 
   const tasksByColumn = useMemo(() => {
     const grouped: Record<number, KanbanTask[]> = {};

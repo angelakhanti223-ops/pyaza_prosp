@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
 import {
@@ -380,12 +381,17 @@ export default function CrmLeadDetailPage() {
             <h2 className="mb-3 text-sm font-semibold text-navy">Связанные задачи</h2>
             <ul className="flex flex-col gap-2">
               {lead.tasks.map((t) => (
-                <li key={t.id} className="rounded-xl bg-blue-light/30 p-3 text-sm">
-                  <p className="font-medium text-navy">{t.title}</p>
-                  <p className="text-xs text-foreground/50">
-                    {t.column}
-                    {t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}
-                  </p>
+                <li key={t.id}>
+                  <Link
+                    href={`/crm/kanban?task=${t.id}`}
+                    className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light"
+                  >
+                    <p className="font-medium text-navy">{t.title}</p>
+                    <p className="text-xs text-foreground/50">
+                      {t.column}
+                      {t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}
+                    </p>
+                  </Link>
                 </li>
               ))}
               {lead.tasks.length === 0 && (
