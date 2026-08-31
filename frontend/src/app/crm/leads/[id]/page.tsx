@@ -15,6 +15,7 @@ import {
   type LeadDetail,
   type LeadStatus,
 } from "@/lib/crmApi";
+import { fetchDirections, type Direction } from "@/lib/api";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
 
@@ -28,6 +29,7 @@ export default function CrmLeadDetailPage() {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [managers, setManagers] = useState<CrmUser[]>([]);
+  const [directions, setDirections] = useState<Direction[]>([]);
   const [comment, setComment] = useState("");
   const [savingField, setSavingField] = useState<string | null>(null);
 
@@ -63,6 +65,10 @@ export default function CrmLeadDetailPage() {
     if (isHead) listManagers().then(setManagers);
   }, [isHead]);
 
+  useEffect(() => {
+    fetchDirections().then(setDirections);
+  }, []);
+
   async function handleStatusChange(status: LeadStatus) {
     if (!lead) return;
     setSavingField("status");
@@ -90,6 +96,28 @@ export default function CrmLeadDetailPage() {
     setSavingField(field);
     try {
       const updated = await updateLead(lead.id, { [field]: value || undefined });
+      setLead(updated);
+    } finally {
+      setSavingField(null);
+    }
+  }
+
+  async function handleTextFieldSave(field: "name" | "phone" | "email" | "initial_comment", value: string) {
+    if (!lead || value === lead[field]) return;
+    setSavingField(field);
+    try {
+      const updated = await updateLead(lead.id, { [field]: value });
+      setLead(updated);
+    } finally {
+      setSavingField(null);
+    }
+  }
+
+  async function handleDirectionChange(directionId: string) {
+    if (!lead) return;
+    setSavingField("direction");
+    try {
+      const updated = await updateLead(lead.id, { direction: directionId ? Number(directionId) : null });
       setLead(updated);
     } finally {
       setSavingField(null);
@@ -149,25 +177,48 @@ export default function CrmLeadDetailPage() {
         <div className="lg:col-span-2">
           <div className="rounded-2xl border border-black/5 bg-white p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-bold text-navy">{lead.name}</h1>
-                <p className="mt-1 text-sm text-foreground/60">
-                  {lead.phone}
-                  {lead.email && <> · {lead.email}</>}
-                </p>
-                <p className="mt-1 text-xs text-foreground/40">
-                  Источник: {lead.source_display}
-                  {lead.direction_name && <> · {lead.direction_name}</>}
-                </p>
+              <div className="flex-1">
+                <input
+                  type="text"
+                  defaultValue={lead.name}
+                  onBlur={(e) => handleTextFieldSave("name", e.target.value)}
+                  disabled={savingField === "name"}
+                  className="-mx-1 w-full rounded-lg border border-transparent px-1 text-xl font-bold text-navy outline-none hover:border-black/10 focus:border-blue"
+                />
+                <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-foreground/60">
+                  <input
+                    type="tel"
+                    defaultValue={lead.phone}
+                    onBlur={(e) => handleTextFieldSave("phone", e.target.value)}
+                    disabled={savingField === "phone"}
+                    className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
+                  />
+                  <span>·</span>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    defaultValue={lead.email}
+                    onBlur={(e) => handleTextFieldSave("email", e.target.value)}
+                    disabled={savingField === "email"}
+                    className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-foreground/40">Источник: {lead.source_display}</p>
               </div>
               <StatusBadge status={lead.status} label={lead.status_display} />
             </div>
 
-            {lead.initial_comment && (
-              <p className="mt-4 rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70">
-                {lead.initial_comment}
-              </p>
-            )}
+            <div className="mt-4">
+              <label className="text-xs text-foreground/50">Комментарий</label>
+              <textarea
+                defaultValue={lead.initial_comment}
+                onBlur={(e) => handleTextFieldSave("initial_comment", e.target.value)}
+                disabled={savingField === "initial_comment"}
+                rows={2}
+                placeholder="Комментарий по заявке…"
+                className="mt-1 w-full resize-none rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70 outline-none focus:ring-1 focus:ring-blue"
+              />
+            </div>
 
             <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div>
@@ -227,6 +278,23 @@ export default function CrmLeadDetailPage() {
                   onBlur={(e) => handleDealFieldSave("commission", e.target.value)}
                   className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs text-foreground/50">Направление</label>
+                <select
+                  value={lead.direction ?? ""}
+                  disabled={savingField === "direction"}
+                  onChange={(e) => handleDirectionChange(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
+                >
+                  <option value="">Не указано</option>
+                  {directions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

@@ -130,6 +130,64 @@ class LeadCrmCreateTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class LeadFieldEditTests(TestCase):
+    """Контактные поля обращения (имя/телефон/email/направление/комментарий)
+    редактируются через PATCH — раньше были жёстко зашиты в LeadUpdateSerializer
+    как нередактируемые (решение заказчика, 28.08.2026)."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='editfieldshead', password='x', role=User.Role.HEAD)
+        self.manager = User.objects.create_user(username='editfieldsmanager', password='x', role=User.Role.MANAGER)
+        self.other_manager = User.objects.create_user(username='editfieldsother', password='x', role=User.Role.MANAGER)
+        self.direction = Direction.objects.create(name='Турция')
+        self.egypt = Direction.objects.create(name='Египет')
+
+    def test_manager_edits_contact_fields_on_own_lead(self):
+        lead = Lead.objects.create(
+            name='Старое имя', phone='+79990000000', direction=self.direction, assigned_manager=self.manager,
+        )
+        self.client.force_login(self.manager)
+
+        response = self.client.patch(
+            f'/api/crm/leads/{lead.id}/',
+            {'name': 'Новое имя', 'phone': '+79991112233', 'email': 'client@example.com', 'direction': self.egypt.id,
+             'initial_comment': 'Уточнённый комментарий'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead.refresh_from_db()
+        self.assertEqual(lead.name, 'Новое имя')
+        self.assertEqual(lead.phone, '+79991112233')
+        self.assertEqual(lead.email, 'client@example.com')
+        self.assertEqual(lead.direction_id, self.egypt.id)
+        self.assertEqual(lead.initial_comment, 'Уточнённый комментарий')
+
+    def test_manager_cannot_edit_someone_elses_lead(self):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.other_manager)
+        self.client.force_login(self.manager)
+
+        response = self.client.patch(
+            f'/api/crm/leads/{lead.id}/', {'name': 'Попытка правки'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 404)  # not in this manager's queryset at all
+        lead.refresh_from_db()
+        self.assertEqual(lead.name, 'Клиент')
+
+    def test_head_edits_any_lead(self):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager)
+        self.client.force_login(self.head)
+
+        response = self.client.patch(
+            f'/api/crm/leads/{lead.id}/', {'phone': '+79995556677'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead.refresh_from_db()
+        self.assertEqual(lead.phone, '+79995556677')
+
+
 class LeadStatusChangeNotificationTests(TestCase):
     """Пуш менеджеру только на ключевые для денег переходы (бронь/оплата/отказ) —
     не на каждую смену статуса, решение заказчика 19.08.2026."""

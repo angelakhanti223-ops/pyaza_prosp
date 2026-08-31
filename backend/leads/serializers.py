@@ -207,6 +207,18 @@ class LeadDetailSerializer(serializers.ModelSerializer):
 
 
 class LeadUpdateSerializer(serializers.ModelSerializer):
+    """Правка карточки обращения из CRM. Контактные поля (name/phone/email/
+    direction/initial_comment) редактирует любой, кому доступна сама заявка
+    (см. LeadViewSet.get_queryset — менеджер видит только свои); переназначение
+    ответственного (assigned_manager) по-прежнему только для руководителя,
+    проверка в LeadViewSet.partial_update.
+
+    Правки здесь НЕ уходят обратно в U-ON — у адаптера есть только create_ticket,
+    метода обновления обращения там нет (решение отложено, 28.08.2026)."""
+
     class Meta:
         model = Lead
-        fields = ['status', 'assigned_manager', 'deal_amount', 'commission']
+        fields = [
+            'name', 'phone', 'email', 'direction', 'initial_comment',
+            'status', 'assigned_manager', 'deal_amount', 'commission',
+        ]

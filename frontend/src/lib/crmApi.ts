@@ -199,7 +199,17 @@ export async function createLead(data: {
 
 export async function updateLead(
   id: number,
-  data: Partial<{ status: LeadStatus; assigned_manager: number; deal_amount: string; commission: string }>
+  data: Partial<{
+    name: string;
+    phone: string;
+    email: string;
+    direction: number | null;
+    initial_comment: string;
+    status: LeadStatus;
+    assigned_manager: number;
+    deal_amount: string;
+    commission: string;
+  }>
 ): Promise<LeadDetail> {
   return apiJson<LeadDetail>(`/api/crm/leads/${id}/`, {
     method: "PATCH",
