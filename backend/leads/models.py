@@ -47,6 +47,11 @@ class Lead(models.Model):
     deal_amount = models.DecimalField('Сумма сделки', max_digits=10, decimal_places=2, null=True, blank=True)
     commission = models.DecimalField('Комиссия', max_digits=10, decimal_places=2, null=True, blank=True)
     uon_ticket_id = models.CharField('ID обращения U-ON', max_length=64, blank=True)
+    uon_request_id = models.CharField(
+        'ID заявки U-ON', max_length=64, blank=True,
+        help_text='Заполняется при переводе обращения в заявку (POST /request/create.json) — '
+                   'отдельная сущность и ID-последовательность от uon_ticket_id.',
+    )
     initial_comment = models.TextField('Комментарий из формы', blank=True)
     consent_personal_data_at = models.DateTimeField('Согласие на обработку ПДн', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

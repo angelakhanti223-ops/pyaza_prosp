@@ -130,6 +130,60 @@ class LeadCrmCreateTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class LeadCreateUonRequestTests(TestCase):
+    """Перевод обращения в заявку U-ON (POST /request/create.json) — кнопка
+    «Создать заявку в U-ON» на карточке обращения (решение заказчика, 31.08.2026)."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='convrequesthead', password='x', role=User.Role.HEAD)
+        self.direction = Direction.objects.create(name='Турция')
+        self.client.force_login(self.head)
+
+    @patch('integrations.tasks.sync_uon_request')
+    @patch('integrations.adapters.get_uon_adapter')
+    def test_creates_uon_request_and_stores_id(self, mock_get_adapter, mock_sync):
+        mock_get_adapter.return_value.create_request.return_value = {'result': 200, 'id': '777'}
+        lead = Lead.objects.create(name='Клиент', phone='+79990000000', direction=self.direction)
+
+        response = self.client.post(f'/api/crm/leads/{lead.id}/create-uon-request/')
+
+        self.assertEqual(response.status_code, 200)
+        lead.refresh_from_db()
+        self.assertEqual(lead.uon_request_id, '777')
+        self.assertEqual(response.json()['uon_request_id'], '777')
+        mock_sync.assert_called_once_with('777')
+
+    def test_already_converted_returns_400(self):
+        lead = Lead.objects.create(
+            name='Клиент', phone='+79990000000', direction=self.direction, uon_request_id='555',
+        )
+
+        response = self.client.post(f'/api/crm/leads/{lead.id}/create-uon-request/')
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch('integrations.adapters.get_uon_adapter')
+    def test_adapter_error_returns_502_and_does_not_store_id(self, mock_get_adapter):
+        from integrations.adapters import UonAdapterError
+
+        mock_get_adapter.return_value.create_request.side_effect = UonAdapterError('boom')
+        lead = Lead.objects.create(name='Клиент', phone='+79990000000', direction=self.direction)
+
+        response = self.client.post(f'/api/crm/leads/{lead.id}/create-uon-request/')
+
+        self.assertEqual(response.status_code, 502)
+        lead.refresh_from_db()
+        self.assertEqual(lead.uon_request_id, '')
+
+    def test_anonymous_rejected(self):
+        self.client.logout()
+        lead = Lead.objects.create(name='Клиент', phone='+79990000000', direction=self.direction)
+
+        response = self.client.post(f'/api/crm/leads/{lead.id}/create-uon-request/')
+
+        self.assertEqual(response.status_code, 403)
+
+
 class LeadFieldEditTests(TestCase):
     """Контактные поля обращения (имя/телефон/email/направление/комментарий)
     редактируются через PATCH — раньше были жёстко зашиты в LeadUpdateSerializer

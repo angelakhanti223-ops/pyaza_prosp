@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
 import {
   addLeadComment,
+  createUonRequest,
   getLead,
   listManagers,
   mediaUrl,
@@ -33,6 +34,8 @@ export default function CrmLeadDetailPage() {
   const [directions, setDirections] = useState<Direction[]>([]);
   const [comment, setComment] = useState("");
   const [savingField, setSavingField] = useState<string | null>(null);
+  const [convertingToRequest, setConvertingToRequest] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -122,6 +125,20 @@ export default function CrmLeadDetailPage() {
       setLead(updated);
     } finally {
       setSavingField(null);
+    }
+  }
+
+  async function handleCreateUonRequest() {
+    if (!lead) return;
+    setConvertingToRequest(true);
+    setConvertError(null);
+    try {
+      const updated = await createUonRequest(lead.id);
+      setLead(updated);
+    } catch (err) {
+      setConvertError(err instanceof Error ? err.message : "Не удалось создать заявку в U-ON");
+    } finally {
+      setConvertingToRequest(false);
     }
   }
 
@@ -426,6 +443,52 @@ export default function CrmLeadDetailPage() {
               </p>
             </div>
           )}
+
+          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+            <h2 className="mb-3 text-sm font-semibold text-navy">Заявка в U-ON</h2>
+            {lead.uon_request_id ? (
+              <>
+                <p className="text-sm text-navy">ID заявки: {lead.uon_request_id}</p>
+                {lead.uon_request && (
+                  <dl className="mt-2 flex flex-col gap-2 text-sm">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-foreground/50">Статус в U-ON</dt>
+                      <dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-foreground/50">Менеджер в U-ON</dt>
+                      <dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-foreground/50">Номер брони</dt>
+                      <dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd>
+                    </div>
+                  </dl>
+                )}
+                <Link
+                  href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`}
+                  className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy"
+                >
+                  Открыть и редактировать в «Заявки U-ON»
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-foreground/50">
+                  Заявка в U-ON ещё не создана — переведите обращение в заявку, чтобы вести полноценную сделку
+                  (статус, бронирование) в U-ON.
+                </p>
+                <button
+                  onClick={handleCreateUonRequest}
+                  disabled={convertingToRequest}
+                  className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50"
+                >
+                  {convertingToRequest ? "Создание…" : "Создать заявку в U-ON"}
+                </button>
+                {convertError && <p className="mt-2 text-xs text-red-600">{convertError}</p>}
+              </>
+            )}
+          </div>
 
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2>

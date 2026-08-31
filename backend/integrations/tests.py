@@ -1169,3 +1169,123 @@ class AdvanceFollowupChainsTests(TestCase):
         advance_followup_chains()
 
         mock_get_adapter.return_value.get_lead.assert_not_called()
+
+
+class MockAdapterRequestMethodsTests(TestCase):
+    def test_create_request_returns_success_shape(self):
+        result = MockUonAdapter().create_request({'u_name': 'x'})
+        self.assertEqual(result['result'], 200)
+        self.assertTrue(result['id'].startswith('MOCK-REQUEST-'))
+
+    def test_update_request_returns_success_shape(self):
+        result = MockUonAdapter().update_request('61', {'request_status_id': '2'})
+        self.assertEqual(result['result'], 200)
+        self.assertEqual(result['id'], '61')
+
+    def test_list_statuses_returns_non_empty(self):
+        self.assertTrue(MockUonAdapter().list_statuses())
+
+    def test_list_managers_returns_non_empty(self):
+        self.assertTrue(MockUonAdapter().list_managers())
+
+
+class BuildRequestPayloadTests(TestCase):
+    def test_maps_lead_fields_to_confirmed_uon_field_names(self):
+        from decimal import Decimal
+
+        from integrations.adapters import build_request_payload
+
+        direction = Direction.objects.create(name='Турция')
+        lead = Lead.objects.create(
+            name='Иван Иванов', phone='+79990000000', email='ivan@example.com',
+            initial_comment='Хочу тур', direction=direction, deal_amount=Decimal('50000'),
+        )
+        payload = build_request_payload(lead)
+        self.assertEqual(payload['u_name'], 'Иван Иванов')
+        self.assertEqual(payload['u_phone'], '+79990000000')
+        self.assertEqual(payload['u_email'], 'ivan@example.com')
+        self.assertEqual(payload['note'], 'Хочу тур')
+        self.assertEqual(payload['source'], lead.get_source_display())
+        self.assertEqual(payload['price'], '50000')
+
+    def test_omits_price_when_no_deal_amount(self):
+        from integrations.adapters import build_request_payload
+
+        lead = Lead.objects.create(name='Клиент', phone='+79990000000')
+        payload = build_request_payload(lead)
+        self.assertNotIn('price', payload)
+
+
+class UonRequestPushUpdateViewTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='pushmanager', password='x', role=User.Role.MANAGER)
+        self.client.force_login(self.manager)
+        self.record = UonRequestRecord.objects.create(uon_id='61', client_name='Заявка')
+
+    @patch('integrations.views.sync_uon_request')
+    @patch('integrations.views.get_uon_adapter')
+    def test_pushes_status_and_refetches(self, mock_get_adapter, mock_sync):
+        response = self.client.post(
+            f'/api/crm/uon/requests/{self.record.id}/push-update/',
+            {'status_id': '3', 'manager_id': '7', 'reservation_number': 'RN-1'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_get_adapter.return_value.update_request.assert_called_once_with(
+            '61', {'request_status_id': '3', 'manager_id': '7', 'reservation_number': 'RN-1'},
+        )
+        mock_sync.assert_called_once_with('61')
+
+    def test_empty_payload_rejected(self):
+        response = self.client.post(f'/api/crm/uon/requests/{self.record.id}/push-update/', {})
+        self.assertEqual(response.status_code, 400)
+
+    @patch('integrations.views.sync_uon_request')
+    @patch('integrations.views.get_uon_adapter')
+    def test_adapter_error_returns_502(self, mock_get_adapter, mock_sync):
+        mock_get_adapter.return_value.update_request.side_effect = UonAdapterError('boom')
+
+        response = self.client.post(
+            f'/api/crm/uon/requests/{self.record.id}/push-update/', {'status_id': '3'},
+        )
+
+        self.assertEqual(response.status_code, 502)
+        mock_sync.assert_not_called()
+
+    def test_anonymous_rejected(self):
+        self.client.logout()
+        response = self.client.post(
+            f'/api/crm/uon/requests/{self.record.id}/push-update/', {'status_id': '3'},
+        )
+        self.assertEqual(response.status_code, 403)
+
+
+class UonCatalogListViewTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='cataloguser', password='x', role=User.Role.MANAGER)
+        self.client.force_login(self.manager)
+
+    @patch('integrations.views.get_uon_adapter')
+    def test_statuses_returns_adapter_data(self, mock_get_adapter):
+        mock_get_adapter.return_value.list_statuses.return_value = [{'id': '1', 'name': 'Новая'}]
+        response = self.client.get('/api/crm/uon/statuses/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{'id': '1', 'name': 'Новая'}])
+
+    @patch('integrations.views.get_uon_adapter')
+    def test_statuses_adapter_error_returns_502(self, mock_get_adapter):
+        mock_get_adapter.return_value.list_statuses.side_effect = UonAdapterError('boom')
+        response = self.client.get('/api/crm/uon/statuses/')
+        self.assertEqual(response.status_code, 502)
+
+    @patch('integrations.views.get_uon_adapter')
+    def test_managers_returns_adapter_data(self, mock_get_adapter):
+        mock_get_adapter.return_value.list_managers.return_value = [{'id': '1', 'name': 'Менеджер'}]
+        response = self.client.get('/api/crm/uon/managers/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{'id': '1', 'name': 'Менеджер'}])
+
+    def test_anonymous_rejected(self):
+        self.client.logout()
+        response = self.client.get('/api/crm/uon/statuses/')
+        self.assertEqual(response.status_code, 403)

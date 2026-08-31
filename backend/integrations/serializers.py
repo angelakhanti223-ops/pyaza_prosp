@@ -3,6 +3,22 @@ from rest_framework import serializers
 from .models import UonClient, UonLeadRecord, UonRequestRecord
 
 
+class UonRequestPushUpdateSerializer(serializers.Serializer):
+    """Вход для UonRequestViewSet.push_update — поля, которые реально
+    поддерживает POST /request/update/{id}.json (см. adapters.RealUonAdapter.
+    update_request): статус и ответственный — это ID из справочников U-ON
+    (/status, /manager), не свободный текст."""
+
+    status_id = serializers.CharField(required=False, allow_blank=False)
+    manager_id = serializers.CharField(required=False, allow_blank=False)
+    reservation_number = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Нужно передать хотя бы одно поле для обновления.')
+        return attrs
+
+
 class UonRequestRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = UonRequestRecord

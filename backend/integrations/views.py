@@ -1,13 +1,20 @@
 from django.conf import settings
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import is_head
 
+from .adapters import UonAdapterError, get_uon_adapter
 from .models import UonClient, UonLeadRecord, UonRequestRecord, UonWebhookLog
-from .serializers import UonClientSerializer, UonLeadRecordSerializer, UonRequestRecordSerializer
+from .serializers import (
+    UonClientSerializer,
+    UonLeadRecordSerializer,
+    UonRequestPushUpdateSerializer,
+    UonRequestRecordSerializer,
+)
 from .tasks import (
     handle_uon_chain_close,
     handle_uon_client_reply,
@@ -101,12 +108,65 @@ class UonWebhookView(APIView):
 
 class UonRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """Раздел «Заявки в U-ON» (панель на карточке нашей заявки, ТЗ по требованию
-    клиента) — read-only зеркало /request. Основная страница «Заявки» в CRM
-    по-прежнему работает с собственными Lead-записями, не с этим зеркалом."""
+    клиента) — зеркало /request, в основном read-only (данные приходят по
+    вебхуку/синхронизации), но статус/ответственного/номер брони можно
+    отправить обратно в U-ON через push_update (решение заказчика, 31.08.2026)."""
 
     queryset = UonRequestRecord.objects.all()
     serializer_class = UonRequestRecordSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['post'], url_path='push-update')
+    def push_update(self, request, pk=None):
+        record = self.get_object()
+        serializer = UonRequestPushUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        payload = {}
+        if 'status_id' in data:
+            payload['request_status_id'] = data['status_id']
+        if 'manager_id' in data:
+            payload['manager_id'] = data['manager_id']
+        if 'reservation_number' in data:
+            payload['reservation_number'] = data['reservation_number']
+
+        try:
+            get_uon_adapter().update_request(record.uon_id, payload)
+        except UonAdapterError as exc:
+            return Response({'detail': f'Не удалось обновить заявку в U-ON: {exc}'}, status=502)
+
+        # Синхронный вызов (не .delay) — сразу подтягиваем авторитетные данные
+        # обратно, чтобы ответ на этот запрос уже содержал актуальное зеркало.
+        sync_uon_request(record.uon_id)
+        record.refresh_from_db()
+        return Response(UonRequestRecordSerializer(record).data)
+
+
+class UonStatusListView(APIView):
+    """Справочник статусов заявки U-ON (/status.json) — для выпадающего списка
+    при редактировании статуса заявки в CRM (там принимается ID, не текст)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            return Response(get_uon_adapter().list_statuses())
+        except UonAdapterError as exc:
+            return Response({'detail': str(exc)}, status=502)
+
+
+class UonManagerListView(APIView):
+    """Справочник менеджеров U-ON (/manager.json) — для переназначения
+    ответственного по заявке из CRM."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            return Response(get_uon_adapter().list_managers())
+        except UonAdapterError as exc:
+            return Response({'detail': str(exc)}, status=502)
 
 
 class UonLeadViewSet(viewsets.ReadOnlyModelViewSet):

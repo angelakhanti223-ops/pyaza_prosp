@@ -153,3 +153,25 @@ class LeadViewSet(
         serializer.is_valid(raise_exception=True)
         serializer.save(lead=lead, uploaded_by=request.user)
         return Response(serializer.data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='create-uon-request')
+    def create_uon_request(self, request, pk=None):
+        lead = self.get_object()
+        if lead.uon_request_id:
+            return Response({'detail': 'Заявка уже создана в U-ON.'}, status=400)
+
+        from integrations.adapters import UonAdapterError, build_request_payload, get_uon_adapter
+        from integrations.tasks import sync_uon_request
+
+        payload = build_request_payload(lead)
+        try:
+            result = get_uon_adapter().create_request(payload)
+        except UonAdapterError as exc:
+            return Response({'detail': f'Не удалось создать заявку в U-ON: {exc}'}, status=502)
+
+        new_id = str(result.get('id'))
+        lead.uon_request_id = new_id
+        lead.save(update_fields=['uon_request_id'])
+        sync_uon_request(new_id)
+
+        return Response(LeadDetailSerializer(lead).data)

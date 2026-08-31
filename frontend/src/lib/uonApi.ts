@@ -75,6 +75,13 @@ export type UonClientRecord = {
   synced_at: string;
 };
 
+// Элемент справочника статусов/менеджеров U-ON (/status.json, /manager.json) —
+// точный состав полей ответа не подтверждён вживую, поэтому только id/name.
+export type UonCatalogItem = {
+  id: string;
+  name: string;
+};
+
 async function apiJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, { credentials: "include" });
   if (!res.ok) {
@@ -99,4 +106,12 @@ export function listUonLeads(): Promise<UonLeadRecord[]> {
 
 export function listUonClients(): Promise<UonClientRecord[]> {
   return listAll<UonClientRecord>("/api/crm/uon/clients/");
+}
+
+export function listUonStatuses(): Promise<UonCatalogItem[]> {
+  return apiJson<UonCatalogItem[]>("/api/crm/uon/statuses/");
+}
+
+export function listUonManagers(): Promise<UonCatalogItem[]> {
+  return apiJson<UonCatalogItem[]>("/api/crm/uon/managers/");
 }

@@ -3,7 +3,14 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
-import { listUonRequests, type UonRequestRecord } from "@/lib/uonApi";
+import {
+  listUonManagers,
+  listUonRequests,
+  listUonStatuses,
+  type UonCatalogItem,
+  type UonRequestRecord,
+} from "@/lib/uonApi";
+import { pushUonRequestUpdate } from "@/lib/crmApi";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -14,7 +21,67 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RequestDetailModal({ request, onClose }: { request: UonRequestRecord; onClose: () => void }) {
+function RequestDetailModal({
+  request,
+  onClose,
+  onUpdated,
+}: {
+  request: UonRequestRecord;
+  onClose: () => void;
+  onUpdated: (updated: UonRequestRecord) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [statuses, setStatuses] = useState<UonCatalogItem[]>([]);
+  const [managers, setManagers] = useState<UonCatalogItem[]>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(false);
+  const [statusId, setStatusId] = useState(request.status_id);
+  const [managerId, setManagerId] = useState("");
+  const [reservationNumber, setReservationNumber] = useState(request.reservation_number);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    setEditing(true);
+    setError(null);
+    setStatusId(request.status_id);
+    setManagerId("");
+    setReservationNumber(request.reservation_number);
+    if (statuses.length === 0 && managers.length === 0) {
+      setCatalogsLoading(true);
+      Promise.all([listUonStatuses(), listUonManagers()])
+        .then(([statusList, managerList]) => {
+          setStatuses(statusList);
+          setManagers(managerList);
+        })
+        .catch(() => setError("Не удалось загрузить справочники U-ON"))
+        .finally(() => setCatalogsLoading(false));
+    }
+  }
+
+  async function handleSave() {
+    const payload: Partial<{ status_id: string; manager_id: string; reservation_number: string }> = {};
+    if (statusId && statusId !== request.status_id) payload.status_id = statusId;
+    if (managerId) payload.manager_id = managerId;
+    if (reservationNumber !== request.reservation_number) payload.reservation_number = reservationNumber;
+
+    if (Object.keys(payload).length === 0) {
+      setEditing(false);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await pushUonRequestUpdate(request.id, payload);
+      onUpdated(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить изменения");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={onClose}>
       <div
@@ -34,20 +101,95 @@ function RequestDetailModal({ request, onClose }: { request: UonRequestRecord; o
         </h3>
         <p className="mb-4 text-xs text-foreground/40">Заявка в U-ON · ID: {request.uon_id}</p>
 
-        <dl>
-          <DetailRow label="Статус в U-ON" value={request.status_name} />
-          <DetailRow label="Менеджер" value={request.manager_name} />
-          <DetailRow label="Телефон" value={request.client_phone} />
-          <DetailRow label="Email" value={request.client_email} />
-          <DetailRow label="Номер брони" value={request.reservation_number} />
-          <DetailRow label="Источник" value={request.source_name} />
-          <DetailRow label="В архиве" value={request.is_archive ? "Да" : "Нет"} />
-          <DetailRow label="Заметки" value={request.notes} />
-          <DetailRow
-            label="Создано в U-ON"
-            value={request.uon_created_at ? new Date(request.uon_created_at).toLocaleString("ru-RU") : ""}
-          />
-        </dl>
+        {!editing ? (
+          <>
+            <dl>
+              <DetailRow label="Статус в U-ON" value={request.status_name} />
+              <DetailRow label="Менеджер" value={request.manager_name} />
+              <DetailRow label="Телефон" value={request.client_phone} />
+              <DetailRow label="Email" value={request.client_email} />
+              <DetailRow label="Номер брони" value={request.reservation_number} />
+              <DetailRow label="Источник" value={request.source_name} />
+              <DetailRow label="В архиве" value={request.is_archive ? "Да" : "Нет"} />
+              <DetailRow label="Заметки" value={request.notes} />
+              <DetailRow
+                label="Создано в U-ON"
+                value={request.uon_created_at ? new Date(request.uon_created_at).toLocaleString("ru-RU") : ""}
+              />
+            </dl>
+
+            <button
+              onClick={startEditing}
+              className="mt-4 rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white hover:bg-navy-dark"
+            >
+              Изменить статус / менеджера / номер брони
+            </button>
+          </>
+        ) : (
+          <div className="space-y-3">
+            {catalogsLoading && <p className="text-xs text-foreground/40">Загрузка справочников U-ON…</p>}
+
+            <label className="block text-xs text-foreground/50">
+              Статус
+              <select
+                value={statusId}
+                onChange={(e) => setStatusId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-navy"
+              >
+                <option value="">— не менять ({request.status_name || "нет"}) —</option>
+                {statuses.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-xs text-foreground/50">
+              Ответственный менеджер
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-navy"
+              >
+                <option value="">— не менять ({request.manager_name || "нет"}) —</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-xs text-foreground/50">
+              Номер брони
+              <input
+                value={reservationNumber}
+                onChange={(e) => setReservationNumber(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-navy"
+              />
+            </label>
+
+            {error && <p className="text-xs text-red-600">{error}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white hover:bg-navy-dark disabled:opacity-50"
+              >
+                {saving ? "Сохранение…" : "Сохранить в U-ON"}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-foreground/60 hover:bg-black/5"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
 
         <p className="mt-4 text-xs text-foreground/40">
           Обновлено: {new Date(request.synced_at).toLocaleString("ru-RU")}
@@ -90,10 +232,11 @@ function CrmUonRequestsContent() {
         <div>
           <h1 className="text-xl font-bold text-navy">Заявки U-ON</h1>
           <p className="mt-1 text-xs text-foreground/50">
-            Read-only зеркало заявок из U-ON — полноценные рабочие сделки (статус, бронирование, суммы), которые
-            менеджер уже ведёт. Не путать со страницей «Заявки» — там ваши собственные CRM-заявки с сайта. Данные
-            редактируются в U-ON, здесь только просмотр — обновляются кнопкой «Синхронизировать с U-ON» вверху
-            страницы или мгновенно вебхуком при изменении в U-ON. Нажмите на строку, чтобы увидеть все поля.
+            Зеркало заявок из U-ON — полноценные рабочие сделки (статус, бронирование, суммы), которые
+            менеджер уже ведёт. Не путать со страницей «Заявки» — там ваши собственные CRM-заявки с сайта. Большинство
+            полей приходят из U-ON и обновляются кнопкой «Синхронизировать с U-ON» вверху страницы или мгновенно
+            вебхуком; статус, ответственного и номер брони можно отправить обратно в U-ON прямо из карточки заявки.
+            Нажмите на строку, чтобы увидеть все поля.
           </p>
         </div>
       </div>
@@ -142,7 +285,16 @@ function CrmUonRequestsContent() {
         </table>
       </div>
 
-      {selected && <RequestDetailModal request={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <RequestDetailModal
+          request={selected}
+          onClose={() => setSelected(null)}
+          onUpdated={(updated) => {
+            setSelected(updated);
+            setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          }}
+        />
+      )}
     </div>
   );
 }

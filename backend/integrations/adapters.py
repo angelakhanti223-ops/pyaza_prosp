@@ -45,6 +45,25 @@ class BaseUonAdapter:
         — источник текста последнего исходящего сообщения для шаблона задачи."""
         raise NotImplementedError
 
+    def create_request(self, payload: dict) -> dict:
+        """Создать заявку (U-ON: POST /{key}/request/create.json) — перевод
+        обращения в заявку из CRM."""
+        raise NotImplementedError
+
+    def update_request(self, request_id: str, payload: dict) -> dict:
+        """Обновить заявку (U-ON: POST /{key}/request/update/{id}.json)."""
+        raise NotImplementedError
+
+    def list_statuses(self) -> list:
+        """Справочник статусов заявки (U-ON: GET /{key}/status.json) — нужен
+        для выбора нового статуса при обновлении, там принимаются ID, не текст."""
+        raise NotImplementedError
+
+    def list_managers(self) -> list:
+        """Справочник менеджеров компании (U-ON: GET /{key}/manager.json) —
+        аналогично, для переназначения ответственного по заявке."""
+        raise NotImplementedError
+
 
 class MockUonAdapter(BaseUonAdapter):
     """Used until a real U-ON API key is issued. Simulates a successful ticket creation."""
@@ -74,6 +93,24 @@ class MockUonAdapter(BaseUonAdapter):
 
     def list_request_actions(self, request_id: str) -> list:
         return []
+
+    def create_request(self, payload: dict) -> dict:
+        return {'result': 200, 'id': f'MOCK-REQUEST-{uuid.uuid4().hex[:10]}', 'mock': True, 'echo': payload}
+
+    def update_request(self, request_id: str, payload: dict) -> dict:
+        return {'result': 200, 'id': request_id, 'mock': True, 'echo': payload}
+
+    def list_statuses(self) -> list:
+        return [
+            {'id': '1', 'name': 'Новая'},
+            {'id': '2', 'name': 'В работе'},
+            {'id': '3', 'name': 'Бронь'},
+            {'id': '4', 'name': 'Закрыта (успех)'},
+            {'id': '5', 'name': 'Закрыта (отказ)'},
+        ]
+
+    def list_managers(self) -> list:
+        return [{'id': '1', 'name': 'Тестовый менеджер'}]
 
 
 class RealUonAdapter(BaseUonAdapter):
@@ -213,6 +250,68 @@ class RealUonAdapter(BaseUonAdapter):
             return data
         return data.get('request-action') or data.get('request_action') or []
 
+    def create_request(self, payload: dict) -> dict:
+        # Confirmed against the public API docs (api.u-on.ru/doc) and the
+        # third-party PHP client (github.com/DrTeamRocks/uon), NOT yet against
+        # a live call — same POST-form-body/{"result":200,"id":...} shape as
+        # create_ticket above, which IS confirmed live.
+        try:
+            response = requests.post(
+                f'{self.base_url}/{self.api_key}/request/create.json',
+                data=payload,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if str(data.get('result')) != '200':
+            raise UonAdapterError(f'U-ON request/create.json вернул ошибку: {data}')
+        return data
+
+    def update_request(self, request_id: str, payload: dict) -> dict:
+        # Same caveat as create_request — confirmed against docs/PHP client,
+        # not yet against a live call.
+        try:
+            response = requests.post(
+                f'{self.base_url}/{self.api_key}/request/update/{request_id}.json',
+                data=payload,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if str(data.get('result')) != '200':
+            raise UonAdapterError(f'U-ON request/update.json вернул ошибку: {data}')
+        return data
+
+    def list_statuses(self) -> list:
+        # Response wrapper key NOT confirmed live — guessing "status" by the
+        # same "singular endpoint noun" convention as /reminder, /request-action
+        # (see list_request_actions above), with a raw-list fallback.
+        try:
+            response = requests.get(f'{self.base_url}/{self.api_key}/status.json', timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        return data.get('status') or data.get('statuses') or []
+
+    def list_managers(self) -> list:
+        # Response wrapper key NOT confirmed live — same caveat as list_statuses.
+        try:
+            response = requests.get(f'{self.base_url}/{self.api_key}/manager.json', timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UonAdapterError(str(exc)) from exc
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        return data.get('manager') or data.get('managers') or []
+
 
 def get_uon_adapter() -> BaseUonAdapter:
     if settings.UON_MOCK_MODE:
@@ -232,3 +331,21 @@ def build_ticket_payload(lead) -> dict:
         'u_email': lead.email,
         'note': lead.initial_comment,
     }
+
+
+def build_request_payload(lead) -> dict:
+    """Перевод обращения (Lead) в заявку U-ON — POST /request/create.json.
+    Поля client (u_*) и note/source те же, что build_ticket_payload; price и
+    status_id добавлены отдельно, если на обращении уже есть сумма/статус,
+    которому есть соответствие в справочнике U-ON (см. leads.views —
+    вызывающий код передаёт status_id явно, отсюда он не пытается его угадать)."""
+    payload = {
+        'u_name': lead.name,
+        'u_phone': lead.phone,
+        'u_email': lead.email,
+        'note': lead.initial_comment,
+        'source': lead.get_source_display(),
+    }
+    if lead.deal_amount is not None:
+        payload['price'] = str(lead.deal_amount)
+    return payload

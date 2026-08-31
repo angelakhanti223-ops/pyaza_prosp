@@ -3,8 +3,8 @@ from rest_framework import serializers
 
 from accounts.permissions import is_head
 from accounts.serializers import UserSerializer
-from integrations.models import UonLeadRecord, UonSyncLog
-from integrations.serializers import UonLeadRecordSerializer
+from integrations.models import UonLeadRecord, UonRequestRecord, UonSyncLog
+from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSerializer
 
 from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
 
@@ -184,14 +184,15 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     tasks = LeadTaskSerializer(many=True, read_only=True)
     uon_sync_logs = LeadUonSyncLogSerializer(many=True, read_only=True)
     uon_lead = serializers.SerializerMethodField()
+    uon_request = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission', 'uon_ticket_id',
-            'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
-            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead',
+            'uon_request_id', 'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
+            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead', 'uon_request',
         ]
 
     def get_uon_lead(self, obj):
@@ -204,6 +205,14 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             return None
         record = UonLeadRecord.objects.filter(uon_id=obj.uon_ticket_id).first()
         return UonLeadRecordSerializer(record).data if record else None
+
+    def get_uon_request(self, obj):
+        """Данные заявки из U-ON-зеркала — заполняется после перевода обращения в
+        заявку через LeadViewSet.create_uon_request (POST /request/create.json)."""
+        if not obj.uon_request_id:
+            return None
+        record = UonRequestRecord.objects.filter(uon_id=obj.uon_request_id).first()
+        return UonRequestRecordSerializer(record).data if record else None
 
 
 class LeadUpdateSerializer(serializers.ModelSerializer):

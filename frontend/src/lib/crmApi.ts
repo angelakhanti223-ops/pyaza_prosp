@@ -1,4 +1,4 @@
-import type { UonLeadRecord } from "./uonApi";
+import type { UonLeadRecord, UonRequestRecord } from "./uonApi";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -88,6 +88,7 @@ export type LeadUonSyncLog = {
 
 export type LeadDetail = LeadListItem & {
   uon_ticket_id: string;
+  uon_request_id: string;
   initial_comment: string;
   consent_personal_data_at: string | null;
   updated_at: string;
@@ -97,6 +98,7 @@ export type LeadDetail = LeadListItem & {
   tasks: LeadTask[];
   uon_sync_logs: LeadUonSyncLog[];
   uon_lead: UonLeadRecord | null;
+  uon_request: UonRequestRecord | null;
 };
 
 function getCookie(name: string): string | null {
@@ -239,6 +241,20 @@ export function mediaUrl(path: string): string {
 
 export async function triggerUonSync(): Promise<{ detail: string }> {
   return apiJson<{ detail: string }>("/api/crm/integrations/uon-sync/", { method: "POST" });
+}
+
+export async function createUonRequest(leadId: number): Promise<LeadDetail> {
+  return apiJson<LeadDetail>(`/api/crm/leads/${leadId}/create-uon-request/`, { method: "POST" });
+}
+
+export async function pushUonRequestUpdate(
+  requestRecordId: number,
+  data: Partial<{ status_id: string; manager_id: string; reservation_number: string }>
+): Promise<UonRequestRecord> {
+  return apiJson<UonRequestRecord>(`/api/crm/uon/requests/${requestRecordId}/push-update/`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 // --- База знаний ---
