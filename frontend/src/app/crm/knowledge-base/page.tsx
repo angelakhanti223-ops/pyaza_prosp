@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 import { listKnowledgeArticles, type KnowledgeArticleListItem } from "@/lib/crmApi";
 
 export default function CrmKnowledgeBasePage() {
   const [articles, setArticles] = useState<KnowledgeArticleListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     listKnowledgeArticles().then((data) => {
@@ -16,9 +17,17 @@ export default function CrmKnowledgeBasePage() {
     });
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return articles;
+    return articles.filter(
+      (a) => a.title.toLowerCase().includes(q) || (a.direction_name ?? "").toLowerCase().includes(q)
+    );
+  }, [articles, search]);
+
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-navy">База знаний</h1>
         <Link
           href="/crm/knowledge-base/new"
@@ -28,13 +37,26 @@ export default function CrmKnowledgeBasePage() {
         </Link>
       </div>
 
+      <div className="relative mb-5 max-w-md">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+        <input
+          type="text"
+          placeholder="Поиск по названию или направлению…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue"
+        />
+      </div>
+
       {loading ? (
         <p className="text-sm text-foreground/50">Загрузка…</p>
       ) : articles.length === 0 ? (
         <p className="text-sm text-foreground/40">Статей пока нет</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-foreground/40">Ничего не найдено по «{search}»</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article) => (
+          {filtered.map((article) => (
             <Link
               key={article.id}
               href={`/crm/knowledge-base/${article.id}`}

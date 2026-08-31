@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Search, Trash2, X } from "lucide-react";
 import {
   deleteKnowledgeArticle,
   getKnowledgeArticle,
@@ -24,6 +24,18 @@ export default function CrmKnowledgeArticlePage() {
   const [directionId, setDirectionId] = useState("");
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Поиск внутри статьи сделан полностью императивно (refs, без useState) —
+  // в этой версии React повторный рендер сбрасывает dangerouslySetInnerHTML
+  // обратно к article.content, даже когда сама строка не изменилась, и любой
+  // setState здесь стирал бы только что вставленные <mark>.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const matchControlsRef = useRef<HTMLDivElement>(null);
+  const counterRef = useRef<HTMLSpanElement>(null);
+  const noResultsRef = useRef<HTMLParagraphElement>(null);
+  const matchCountValue = useRef(0);
+  const currentMatchValue = useRef(-1);
 
   useEffect(() => {
     let active = true;
@@ -63,6 +75,109 @@ export default function CrmKnowledgeArticlePage() {
     if (!confirm("Удалить статью безвозвратно?")) return;
     await deleteKnowledgeArticle(articleId);
     router.push("/crm/knowledge-base");
+  }
+
+  function clearHighlights() {
+    const container = contentRef.current;
+    if (!container) return;
+    container.querySelectorAll("mark.kb-highlight").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+      parent.normalize();
+    });
+  }
+
+  function updateCounterDisplay() {
+    if (counterRef.current) {
+      counterRef.current.textContent = `${currentMatchValue.current + 1}/${matchCountValue.current}`;
+    }
+    if (matchControlsRef.current) {
+      matchControlsRef.current.style.display = matchCountValue.current > 0 ? "flex" : "none";
+    }
+    if (noResultsRef.current) {
+      const query = searchInputRef.current?.value.trim() ?? "";
+      noResultsRef.current.style.display = query && matchCountValue.current === 0 ? "block" : "none";
+    }
+  }
+
+  function scrollToMatch(index: number, marks: NodeListOf<HTMLElement>) {
+    marks.forEach((m) => m.classList.remove("kb-highlight-active"));
+    const target = marks[index];
+    if (target) {
+      target.classList.add("kb-highlight-active");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function handleSearch() {
+    clearHighlights();
+    const container = contentRef.current;
+    const needle = (searchInputRef.current?.value ?? "").trim().toLowerCase();
+    if (!container || !needle) {
+      matchCountValue.current = 0;
+      currentMatchValue.current = -1;
+      updateCounterDisplay();
+      return;
+    }
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        const tag = node.parentElement?.tagName;
+        return tag === "SCRIPT" || tag === "STYLE" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const textNodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) textNodes.push(node as Text);
+
+    let count = 0;
+    for (const textNode of textNodes) {
+      const text = textNode.textContent || "";
+      const lower = text.toLowerCase();
+      if (!lower.includes(needle)) continue;
+
+      const frag = document.createDocumentFragment();
+      let lastIndex = 0;
+      let idx = lower.indexOf(needle);
+      while (idx !== -1) {
+        frag.appendChild(document.createTextNode(text.slice(lastIndex, idx)));
+        const mark = document.createElement("mark");
+        mark.className = "kb-highlight";
+        mark.textContent = text.slice(idx, idx + needle.length);
+        frag.appendChild(mark);
+        count += 1;
+        lastIndex = idx + needle.length;
+        idx = lower.indexOf(needle, lastIndex);
+      }
+      frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+      textNode.parentNode?.replaceChild(frag, textNode);
+    }
+
+    matchCountValue.current = count;
+    currentMatchValue.current = count > 0 ? 0 : -1;
+    updateCounterDisplay();
+    if (count > 0) {
+      scrollToMatch(0, container.querySelectorAll<HTMLElement>("mark.kb-highlight"));
+    }
+  }
+
+  function goToMatch(delta: number) {
+    const container = contentRef.current;
+    if (!container || matchCountValue.current === 0) return;
+    const marks = container.querySelectorAll<HTMLElement>("mark.kb-highlight");
+    const next = (currentMatchValue.current + delta + matchCountValue.current) % matchCountValue.current;
+    currentMatchValue.current = next;
+    updateCounterDisplay();
+    scrollToMatch(next, marks);
+  }
+
+  function handleClearSearch() {
+    if (searchInputRef.current) searchInputRef.current.value = "";
+    clearHighlights();
+    matchCountValue.current = 0;
+    currentMatchValue.current = -1;
+    updateCounterDisplay();
   }
 
   if (loading) {
@@ -159,8 +274,52 @@ export default function CrmKnowledgeArticlePage() {
               </div>
             </div>
 
+            <div className="relative mt-6 max-w-md">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Найти в тексте статьи…"
+                defaultValue=""
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-24 text-sm outline-none focus:border-blue"
+              />
+              <div ref={matchControlsRef} className="absolute right-9 top-1/2 hidden -translate-y-1/2 items-center gap-1">
+                <span ref={counterRef} className="mr-1 text-xs text-foreground/50" />
+                <button
+                  onClick={() => goToMatch(-1)}
+                  aria-label="Предыдущее совпадение"
+                  className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  onClick={() => goToMatch(1)}
+                  aria-label="Следующее совпадение"
+                  className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+              <button
+                onClick={handleClearSearch}
+                aria-label="Очистить поиск"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p ref={noResultsRef} className="mt-1.5 hidden text-xs text-foreground/40">Ничего не найдено.</p>
+
+            <style>{`
+              .kb-content nav#nav a { display: block; padding: 3px 0; }
+              .kb-content #q, .kb-content #hits { display: none; }
+              .kb-content mark.kb-highlight { background: #fde68a; border-radius: 2px; }
+              .kb-content mark.kb-highlight-active { background: #f59e0b; }
+            `}</style>
             <div
-              className="prose prose-sm mt-6 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-img:rounded-xl"
+              ref={contentRef}
+              className="kb-content prose prose-sm mt-4 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-img:rounded-xl"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
           </>
