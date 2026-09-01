@@ -1,3 +1,4 @@
+import type { ArticleCategory, ArticleTag } from "./articlesApi";
 import type { UonLeadRecord, UonRequestRecord } from "./uonApi";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -307,4 +308,102 @@ export async function updateKnowledgeArticle(
 
 export async function deleteKnowledgeArticle(id: number): Promise<void> {
   await apiJson<void>(`/api/crm/knowledge-base/${id}/`, { method: "DELETE" });
+}
+
+// --- Статьи (публичный блог сайта) ---
+
+export type ArticleStatus = "draft" | "published" | "archived";
+
+export const ARTICLE_STATUS_OPTIONS: { value: ArticleStatus; label: string }[] = [
+  { value: "draft", label: "Черновик" },
+  { value: "published", label: "Опубликовано" },
+  { value: "archived", label: "Архив" },
+];
+
+export type ArticleCrmListItem = {
+  id: number;
+  title: string;
+  slug: string;
+  status: ArticleStatus;
+  status_display: string;
+  category: number | null;
+  category_name: string | null;
+  author: CrmUser | null;
+  published_at: string | null;
+  updated_at: string;
+};
+
+export type ArticleCrmDetail = ArticleCrmListItem & {
+  excerpt: string;
+  content: string;
+  featured_image: string | null;
+  tags: ArticleTag[];
+  seo_title: string;
+  seo_description: string;
+  og_image: string | null;
+  created_at: string;
+};
+
+export type ArticleCrmInput = {
+  title: string;
+  slug?: string;
+  category?: number | null;
+  tag_names?: string[];
+  excerpt?: string;
+  content: string;
+  featured_image?: File | null;
+  status: ArticleStatus;
+  published_at?: string | null;
+  seo_title?: string;
+  seo_description?: string;
+  og_image?: File | null;
+};
+
+function articleFormData(data: ArticleCrmInput): FormData {
+  const formData = new FormData();
+  formData.append("title", data.title);
+  if (data.slug) formData.append("slug", data.slug);
+  if (data.category != null) formData.append("category", String(data.category));
+  for (const name of data.tag_names ?? []) formData.append("tag_names", name);
+  formData.append("excerpt", data.excerpt ?? "");
+  formData.append("content", data.content);
+  if (data.featured_image) formData.append("featured_image", data.featured_image);
+  formData.append("status", data.status);
+  if (data.published_at) formData.append("published_at", data.published_at);
+  formData.append("seo_title", data.seo_title ?? "");
+  formData.append("seo_description", data.seo_description ?? "");
+  if (data.og_image) formData.append("og_image", data.og_image);
+  return formData;
+}
+
+export async function listCrmArticles(): Promise<ArticleCrmListItem[]> {
+  const data = await apiJson<ArticleCrmListItem[] | { results: ArticleCrmListItem[] }>("/api/crm/articles/");
+  return Array.isArray(data) ? data : data.results;
+}
+
+export async function getCrmArticle(id: number): Promise<ArticleCrmDetail> {
+  return apiJson<ArticleCrmDetail>(`/api/crm/articles/${id}/`);
+}
+
+export async function createCrmArticle(data: ArticleCrmInput): Promise<ArticleCrmDetail> {
+  return apiJson<ArticleCrmDetail>("/api/crm/articles/", { method: "POST", body: articleFormData(data) });
+}
+
+export async function updateCrmArticle(id: number, data: ArticleCrmInput): Promise<ArticleCrmDetail> {
+  return apiJson<ArticleCrmDetail>(`/api/crm/articles/${id}/`, { method: "PATCH", body: articleFormData(data) });
+}
+
+export async function deleteCrmArticle(id: number): Promise<void> {
+  await apiJson<void>(`/api/crm/articles/${id}/`, { method: "DELETE" });
+}
+
+export async function listArticleCategoriesForCrm(): Promise<ArticleCategory[]> {
+  return apiJson<ArticleCategory[]>("/api/articles/categories/");
+}
+
+export async function createArticleCategory(name: string): Promise<ArticleCategory> {
+  return apiJson<ArticleCategory>("/api/crm/articles/categories/", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
 }

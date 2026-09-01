@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Columns3, FileText, Inbox, LayoutDashboard, LogOut, MessageSquare, RefreshCw, Users } from "lucide-react";
+import { BookOpen, Columns3, FileText, Inbox, LayoutDashboard, LogOut, MessageSquare, Newspaper, RefreshCw, Users } from "lucide-react";
 import { triggerUonSync } from "@/lib/crmApi";
 import { useCrmAuth } from "./CrmAuthProvider";
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: "/crm/clients", label: "Клиенты", icon: Users },
   { href: "/crm/kanban", label: "Канбан", icon: Columns3 },
   { href: "/crm/knowledge-base", label: "База знаний", icon: BookOpen },
+  { href: "/crm/articles", label: "Статьи", icon: Newspaper },
 ];
 
 export default function CrmShell({ children }: { children: React.ReactNode }) {

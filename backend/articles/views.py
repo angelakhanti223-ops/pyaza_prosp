@@ -1,10 +1,17 @@
 from django.utils import timezone
-from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from rest_framework import generics, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Article, Category
-from .serializers import ArticleDetailSerializer, ArticleListSerializer, CategorySerializer
+from .serializers import (
+    ArticleCrmDetailSerializer,
+    ArticleCrmListSerializer,
+    ArticleDetailSerializer,
+    ArticleListSerializer,
+    CategoryCrmCreateSerializer,
+    CategorySerializer,
+)
 
 
 def published_articles():
@@ -56,3 +63,29 @@ class ArticleDetailView(generics.RetrieveAPIView):
         data['related_articles'] = ArticleListSerializer(related[:3], many=True).data
 
         return Response(data)
+
+
+# --- CRM (авторинг статей сотрудниками — раздел «Статьи» в CRM, ТЗ по требованию
+# клиента, 01.09.2026, до этого правки шли только через /admin/) ---
+
+
+class ArticleCrmViewSet(viewsets.ModelViewSet):
+    """Полный CRUD для статей из CRM — доступен любому залогиненному сотруднику,
+    без разделения по ролям (общий, коллективно поддерживаемый блог, как и knowledgebase)."""
+
+    queryset = Article.objects.select_related('category', 'author').prefetch_related('tags')
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ArticleCrmListSerializer
+        return ArticleCrmDetailSerializer
+
+
+class CategoryCrmCreateView(generics.CreateAPIView):
+    """Быстрое добавление новой категории прямо из формы статьи в CRM — чтобы
+    завести категорию для блога не приходилось идти в /admin/."""
+
+    queryset = Category.objects.all()
+    serializer_class = CategoryCrmCreateSerializer
+    permission_classes = [IsAuthenticated]
