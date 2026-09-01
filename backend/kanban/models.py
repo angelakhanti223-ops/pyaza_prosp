@@ -16,8 +16,21 @@ class KanbanColumn(models.Model):
 
 
 class Task(models.Model):
+    class Status(models.TextChoices):
+        NEW = 'new', 'Новая'
+        IN_PROGRESS = 'in_progress', 'В работе'
+        POSTPONED = 'postponed', 'Отложено'
+        DONE = 'done', 'Выполнено'
+        CANCELLED = 'cancelled', 'Отменено'
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    status = models.CharField(
+        'Статус задачи', max_length=20, choices=Status.choices, default=Status.NEW,
+        help_text='Независим от колонки доски — просто рабочая пометка исполнителя. '
+                   'При переводе в «Отложено» дедлайн автоматически сдвигается на +3 дня '
+                   '(см. TaskUpdateSerializer.update).',
+    )
     column = models.ForeignKey(KanbanColumn, on_delete=models.PROTECT, related_name='tasks')
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='kanban_tasks',

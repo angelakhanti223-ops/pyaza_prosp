@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import { listLeads, listManagers, type CrmUser, type LeadListItem } from "@/lib/crmApi";
-import { createTask, deleteTask, updateTask, uonRecordUrl, type KanbanColumn, type KanbanTask } from "@/lib/kanbanApi";
+import {
+  createTask,
+  deleteTask,
+  TASK_STATUS_OPTIONS,
+  updateTask,
+  uonRecordUrl,
+  type KanbanColumn,
+  type KanbanTask,
+  type TaskStatus,
+} from "@/lib/kanbanApi";
 
 type Props = {
   columns: KanbanColumn[];
@@ -33,6 +42,7 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
   const [leadResults, setLeadResults] = useState<LeadListItem[]>([]);
   const [leadId, setLeadId] = useState<number | null>(task?.lead ?? null);
   const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
+  const [status, setStatus] = useState<TaskStatus>(task?.status ?? "new");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -68,6 +78,7 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
         await updateTask(task.id, {
           title,
           description,
+          status,
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           deadline: deadlineIso,
@@ -173,6 +184,25 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
                 </option>
               ))}
             </select>
+          )}
+
+          {isEdit && (
+            <div>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
+              >
+                {TASK_STATUS_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              {status === "postponed" && task?.status !== "postponed" && (
+                <p className="mt-1 text-xs text-foreground/40">Срок автоматически сдвинется на +3 дня</p>
+              )}
+            </div>
           )}
 
           <select

@@ -11,11 +11,22 @@ export type KanbanColumn = {
 export type TaskKind = "lead" | "appeal" | "general";
 export type TaskPriority = "urgent_important" | "important" | null;
 export type UonRecordKind = "request" | "lead" | "";
+export type TaskStatus = "new" | "in_progress" | "postponed" | "done" | "cancelled";
+
+export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
+  { value: "new", label: "Новая" },
+  { value: "in_progress", label: "В работе" },
+  { value: "postponed", label: "Отложено" },
+  { value: "done", label: "Выполнено" },
+  { value: "cancelled", label: "Отменено" },
+];
 
 export type KanbanTask = {
   id: number;
   title: string;
   description: string;
+  status: TaskStatus;
+  status_display: string;
   column: number;
   assignee: CrmUser | null;
   lead: number | null;
@@ -50,6 +61,7 @@ export type TaskInput = {
   lead?: number | null;
   deadline?: string | null;
   is_recurring?: boolean;
+  status?: TaskStatus;
 };
 
 function getCookie(name: string): string | null {

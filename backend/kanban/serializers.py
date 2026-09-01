@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
@@ -22,6 +25,7 @@ class TaskSerializer(serializers.ModelSerializer):
     )
     lead_name = serializers.CharField(source='lead.name', read_only=True, default=None)
     lead_status_display = serializers.CharField(source='lead.get_status_display', read_only=True, default=None)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     uon_status_name = serializers.SerializerMethodField()
     kind = serializers.ReadOnlyField()
     priority = serializers.ReadOnlyField()
@@ -29,24 +33,24 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = [
-            'id', 'title', 'description', 'column', 'assignee', 'assignee_id',
+            'id', 'title', 'description', 'status', 'status_display', 'column', 'assignee', 'assignee_id',
             'lead', 'lead_name', 'lead_status_display', 'deadline', 'is_recurring', 'kind', 'priority',
             'uon_record_kind', 'uon_record_id', 'uon_status_name', 'order', 'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'order', 'created_at', 'updated_at', 'kind', 'priority',
+            'id', 'status_display', 'order', 'created_at', 'updated_at', 'kind', 'priority',
             'uon_record_kind', 'uon_record_id',
         ]
 
     def get_uon_status_name(self, obj):
         """Статус связанной записи U-ON (заявки/обращения), к которой привязана задача —
-        для карточки на доске (ТЗ по требованию клиента, 31.08.2026: статуса у самой
-        задачи нет, только колонка, но пользователю нужно видеть статус заявки/обращения
-        не открывая её отдельно). TaskViewSet.list прогревает self.context прямо здесь
-        (`uon_request_status`/`uon_lead_status` — словари uon_id → status_name) одним
-        батч-запросом на весь список задач, чтобы не делать N+1; если словаря в context
-        нет (retrieve/partial_update/move — там сериализатор строится без контекста),
-        просто делаем один точечный запрос."""
+        для карточки на доске (ТЗ по требованию клиента, 31.08.2026), не путать с
+        собственным статусом задачи (Task.status, ТЗ 01.09.2026) — это статус СВЯЗАННОЙ
+        сущности, показывается рядом, без открытия её отдельно. TaskViewSet.list
+        прогревает self.context прямо здесь (`uon_request_status`/`uon_lead_status` —
+        словари uon_id → status_name) одним батч-запросом на весь список задач, чтобы не
+        делать N+1; если словаря в context нет (retrieve/partial_update/move — там
+        сериализатор строится без контекста), просто делаем один точечный запрос."""
         kind = obj.uon_record_kind
         if not kind or not obj.uon_record_id:
             return None
@@ -69,7 +73,23 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'assignee_id', 'lead', 'deadline', 'is_recurring']
+        fields = ['title', 'description', 'status', 'assignee_id', 'lead', 'deadline', 'is_recurring']
+
+    def update(self, instance, validated_data):
+        # Переход именно В «Отложено» (не повторное сохранение уже отложенной задачи)
+        # отодвигает дедлайн на +3 дня от текущего срока — решение заказчика, 01.09.2026.
+        # Сравниваем с ТЕКУЩИМ значением, а не просто с наличием ключа в payload: форма
+        # редактирования в CRM всегда шлёт deadline (это обычное controlled-поле, не
+        # опускается, если пользователь его не трогал) — проверка "ключа нет" никогда
+        # бы не срабатывала оттуда. Если пользователь реально выбрал НОВУЮ дату — она
+        # будет отличаться от instance.deadline, и мы её не перезапишем.
+        new_status = validated_data.get('status')
+        if new_status == Task.Status.POSTPONED and instance.status != Task.Status.POSTPONED:
+            submitted_deadline = validated_data.get('deadline', instance.deadline)
+            if submitted_deadline == instance.deadline:
+                base = instance.deadline or timezone.now()
+                validated_data['deadline'] = base + timedelta(days=3)
+        return super().update(instance, validated_data)
 
 
 class TaskMoveSerializer(serializers.Serializer):

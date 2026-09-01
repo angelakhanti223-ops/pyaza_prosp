@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from integrations.models import UonLeadRecord, UonRequestRecord
 from leads.models import Direction, Lead
@@ -143,3 +146,97 @@ class TaskStatusFieldsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['uon_status_name'], 'Бронь')
+
+
+class TaskStatusUpdateTests(TestCase):
+    """Свой статус задачи (не колонка, не связанное обращение/заявка) — исполнитель
+    проставляет вручную: Новая/В работе/Отложено/Выполнено/Отменено (решение
+    заказчика, 01.09.2026). Перевод в «Отложено» отодвигает дедлайн на +3 дня."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='statusupdatehead', password='x', role=User.Role.HEAD)
+        self.column = KanbanColumn.objects.get(name='Новая')
+        self.client.force_login(self.head)
+
+    def test_defaults_to_new(self):
+        task = Task.objects.create(title='Задача', column=self.column)
+        self.assertEqual(task.status, Task.Status.NEW)
+
+    def test_set_status_to_in_progress(self):
+        task = Task.objects.create(title='Задача', column=self.column)
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'status': 'in_progress'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'in_progress')
+        self.assertEqual(response.json()['status_display'], 'В работе')
+
+    def test_postponing_pushes_deadline_three_days_from_existing_deadline(self):
+        deadline = timezone.now().replace(microsecond=0)
+        task = Task.objects.create(title='Задача', column=self.column, deadline=deadline, status=Task.Status.NEW)
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'status': 'postponed'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.status, Task.Status.POSTPONED)
+        self.assertEqual(task.deadline, deadline + timedelta(days=3))
+
+    def test_postponing_without_existing_deadline_bases_on_now(self):
+        task = Task.objects.create(title='Задача', column=self.column, deadline=None)
+        before = timezone.now()
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'status': 'postponed'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertIsNotNone(task.deadline)
+        self.assertGreaterEqual(task.deadline, before + timedelta(days=3))
+
+    def test_explicit_deadline_in_same_request_overrides_auto_postpone(self):
+        deadline = timezone.now().replace(microsecond=0)
+        task = Task.objects.create(title='Задача', column=self.column, deadline=deadline)
+        explicit_deadline = deadline + timedelta(days=10)
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/',
+            {'status': 'postponed', 'deadline': explicit_deadline.isoformat()},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.deadline, explicit_deadline)
+
+    def test_resaving_already_postponed_task_does_not_push_deadline_again(self):
+        deadline = timezone.now().replace(microsecond=0)
+        task = Task.objects.create(
+            title='Задача', column=self.column, deadline=deadline, status=Task.Status.POSTPONED,
+        )
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'title': 'Задача (правка)'}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        task.refresh_from_db()
+        self.assertEqual(task.deadline, deadline)
+
+    def test_set_status_to_done_and_cancelled(self):
+        task = Task.objects.create(title='Задача', column=self.column)
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'status': 'done'}, content_type='application/json',
+        )
+        self.assertEqual(response.json()['status_display'], 'Выполнено')
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'status': 'cancelled'}, content_type='application/json',
+        )
+        self.assertEqual(response.json()['status_display'], 'Отменено')

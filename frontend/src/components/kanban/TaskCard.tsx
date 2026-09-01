@@ -3,7 +3,16 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, ExternalLink, Flame, Link2, Repeat } from "lucide-react";
-import { uonRecordUrl, type KanbanTask, type TaskKind } from "@/lib/kanbanApi";
+import { uonRecordUrl, type KanbanTask, type TaskKind, type TaskStatus } from "@/lib/kanbanApi";
+
+// "new" не показываем — это статус по умолчанию, бейдж по нему был бы шумом на
+// каждой карточке доски.
+const TASK_STATUS_STYLES: Partial<Record<TaskStatus, string>> = {
+  in_progress: "bg-blue-100 text-blue-700",
+  postponed: "bg-amber-100 text-amber-700",
+  done: "bg-green-100 text-green-700",
+  cancelled: "bg-black/10 text-foreground/50",
+};
 
 function deadlineStatus(deadline: string | null): "overdue" | "soon" | "normal" | null {
   if (!deadline) return null;
@@ -54,7 +63,18 @@ export default function TaskCard({
       onClick={onClick}
       className={`rounded-xl border border-black/5 p-3 text-sm shadow-sm ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${KIND_STYLES[task.kind]}`}
     >
-      <p className="font-medium text-navy">{task.title}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className={`font-medium text-navy ${task.status === "done" || task.status === "cancelled" ? "line-through opacity-60" : ""}`}>
+          {task.title}
+        </p>
+        {TASK_STATUS_STYLES[task.status] && (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${TASK_STATUS_STYLES[task.status]}`}
+          >
+            {task.status_display}
+          </span>
+        )}
+      </div>
       {task.lead_name && (
         <p className="mt-1 flex items-center gap-1 text-xs text-blue">
           <Link2 size={12} />
