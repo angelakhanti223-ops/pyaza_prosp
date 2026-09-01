@@ -20,12 +20,14 @@ export type KanbanTask = {
   assignee: CrmUser | null;
   lead: number | null;
   lead_name: string | null;
+  lead_status_display: string | null;
   deadline: string | null;
   is_recurring: boolean;
   kind: TaskKind;
   priority: TaskPriority;
   uon_record_kind: UonRecordKind;
   uon_record_id: string;
+  uon_status_name: string | null;
   order: number;
   created_at: string;
   updated_at: string;

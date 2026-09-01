@@ -103,6 +103,10 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
     }
   }
 
+  const linkedStatus = task ? (task.lead_status_display ?? task.uon_status_name) : null;
+  const recordUrl = task ? uonRecordUrl(task) : null;
+  const hasSubheader = Boolean(linkedStatus || recordUrl);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={onClose}>
       <form
@@ -119,12 +123,18 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
           <X size={20} />
         </button>
 
-        <h3 className={`text-lg font-bold text-navy ${task && uonRecordUrl(task) ? "mb-1" : "mb-4"}`}>
+        <h3 className={`text-lg font-bold text-navy ${hasSubheader ? "mb-1" : "mb-4"}`}>
           {isEdit ? "Задача" : "Новая задача"}
         </h3>
-        {task && uonRecordUrl(task) && (
+        {linkedStatus && (
+          <p className={recordUrl ? "mb-1 text-xs text-foreground/50" : "mb-4 text-xs text-foreground/50"}>
+            Статус {task?.uon_record_kind === "request" ? "заявки" : "обращения"}:{" "}
+            <span className="font-medium text-navy">{linkedStatus}</span>
+          </p>
+        )}
+        {recordUrl && (
           <a
-            href={uonRecordUrl(task) as string}
+            href={recordUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mb-4 flex items-center gap-1 text-xs font-medium text-blue hover:underline"

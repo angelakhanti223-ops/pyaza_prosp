@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import is_head
+from integrations.models import UonLeadRecord, UonRequestRecord
 from leads.models import Lead
 
 from .models import KanbanColumn, Task
@@ -73,6 +74,25 @@ class TaskViewSet(
         if self.action == 'move':
             return TaskMoveSerializer
         return TaskSerializer
+
+    def list(self, request, *args, **kwargs):
+        # Батч-запрос статусов U-ON для всей доски разом (одним list-вызовом), а не по
+        # задаче — на доске уже больше сотни синхронизированных задач, и точечный запрос
+        # на каждую в TaskSerializer.get_uon_status_name дал бы N+1 (см. её docstring).
+        tasks = list(self.filter_queryset(self.get_queryset()))
+        request_ids = {t.uon_record_id for t in tasks if t.uon_record_kind == 'request' and t.uon_record_id}
+        lead_ids = {t.uon_record_id for t in tasks if t.uon_record_kind == 'lead' and t.uon_record_id}
+
+        context = self.get_serializer_context()
+        context['uon_request_status'] = dict(
+            UonRequestRecord.objects.filter(uon_id__in=request_ids).values_list('uon_id', 'status_name'),
+        )
+        context['uon_lead_status'] = dict(
+            UonLeadRecord.objects.filter(uon_id__in=lead_ids).values_list('uon_id', 'status_name'),
+        )
+
+        serializer = TaskSerializer(tasks, many=True, context=context)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         column = serializer.validated_data['column']

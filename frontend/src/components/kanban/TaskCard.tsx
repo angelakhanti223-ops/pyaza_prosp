@@ -41,6 +41,9 @@ export default function TaskCard({
 
   const status = deadlineStatus(task.deadline);
   const recordUrl = uonRecordUrl(task);
+  // Статус связанного обращения/заявки — своей CRM (lead_status_display) или
+  // из U-ON-зеркала (uon_status_name), смотря что привязано к задаче.
+  const linkedStatus = task.lead_status_display ?? task.uon_status_name;
 
   return (
     <div
@@ -57,6 +60,11 @@ export default function TaskCard({
           <Link2 size={12} />
           {task.lead_name}
         </p>
+      )}
+      {linkedStatus && (
+        <span className="mt-1 inline-block rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-medium text-navy">
+          {linkedStatus}
+        </span>
       )}
       {recordUrl && (
         <a
