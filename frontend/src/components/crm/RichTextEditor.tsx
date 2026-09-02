@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEditor, EditorContent, Node, mergeAttributes, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import {
   Bold,
   Heading2,
@@ -17,8 +18,32 @@ import {
   ListOrdered,
   Quote,
   Redo,
+  Table as TableIcon,
   Undo,
 } from "lucide-react";
+
+// Пропускает произвольные <div style="..."> насквозь (например, цветные блоки
+// «совет эксперта»/CTA, вставленные напрямую в HTML статьи в обход редактора) —
+// без этого узла Tiptap/ProseMirror молча выбрасывает любые нераспознанные теги
+// при разборе HTML, и такой блок необратимо терялся бы при первом же сохранении
+// через этот редактор, даже если автор просто поправил соседний абзац.
+const RawDiv = Node.create({
+  name: "rawDiv",
+  group: "block",
+  content: "block+",
+  parseHTML() {
+    return [{ tag: "div" }];
+  },
+  addAttributes() {
+    return {
+      style: { default: null },
+      class: { default: null },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes), 0];
+  },
+});
 
 type ToolbarButtonProps = {
   onClick: () => void;
@@ -117,6 +142,12 @@ function Toolbar({ editor }: { editor: Editor }) {
       <ToolbarButton onClick={addImage} label="Изображение по ссылке">
         <ImageIcon size={15} />
       </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+        label="Вставить таблицу"
+      >
+        <TableIcon size={15} />
+      </ToolbarButton>
       <div className="mx-1 h-5 w-px bg-black/10" />
       <ToolbarButton onClick={() => editor.chain().focus().undo().run()} label="Отменить">
         <Undo size={15} />
@@ -144,13 +175,20 @@ export default function RichTextEditor({
       Link.configure({ openOnClick: false, autolink: true }),
       Image,
       Placeholder.configure({ placeholder: placeholder ?? "Текст статьи…" }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      RawDiv,
     ],
     content: value,
     editorProps: {
       attributes: {
         class:
           "prose prose-sm max-w-none px-3 py-2.5 text-foreground/80 prose-headings:text-navy prose-a:text-blue " +
-          "prose-img:rounded-xl min-h-[16rem] outline-none",
+          "prose-img:rounded-xl prose-table:text-xs min-h-[16rem] outline-none " +
+          "[&_table]:border-collapse [&_td]:border [&_td]:border-black/10 [&_td]:p-2 " +
+          "[&_th]:border [&_th]:border-black/10 [&_th]:bg-blue-light/40 [&_th]:p-2",
       },
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
