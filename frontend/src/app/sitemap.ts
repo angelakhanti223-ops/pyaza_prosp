@@ -11,6 +11,8 @@ const STATIC_PATHS = [
   "/promotions",
   "/blog",
   "/about",
+  "/team",
+  "/certificates",
   "/contacts",
   "/privacy",
   "/terms",

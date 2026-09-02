@@ -1,7 +1,21 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import SiteImages
+from .models import Certificate, SiteImages, TeamMember
+
+
+@admin.register(TeamMember)
+class TeamMemberAdmin(admin.ModelAdmin):
+    list_display = ('name', 'role', 'is_active', 'order')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'role')
+
+
+@admin.register(Certificate)
+class CertificateAdmin(admin.ModelAdmin):
+    list_display = ('title', 'is_active', 'order')
+    list_filter = ('is_active',)
+    search_fields = ('title',)
 
 
 @admin.register(SiteImages)

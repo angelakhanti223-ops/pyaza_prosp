@@ -407,3 +407,116 @@ export async function createArticleCategory(name: string): Promise<ArticleCatego
     body: JSON.stringify({ name }),
   });
 }
+
+// --- Команда (публичная страница «Команда») ---
+
+export type TeamMemberCrm = {
+  id: number;
+  name: string;
+  role: string;
+  bio: string;
+  photo: string | null;
+  phone: string;
+  email: string;
+  order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamMemberInput = {
+  name: string;
+  role: string;
+  bio?: string;
+  photo?: File | null;
+  phone?: string;
+  email?: string;
+  order?: number;
+  is_active?: boolean;
+};
+
+function teamMemberFormData(data: TeamMemberInput): FormData {
+  const formData = new FormData();
+  formData.append("name", data.name);
+  formData.append("role", data.role);
+  formData.append("bio", data.bio ?? "");
+  if (data.photo) formData.append("photo", data.photo);
+  formData.append("phone", data.phone ?? "");
+  formData.append("email", data.email ?? "");
+  formData.append("order", String(data.order ?? 0));
+  formData.append("is_active", String(data.is_active ?? true));
+  return formData;
+}
+
+export async function listCrmTeamMembers(): Promise<TeamMemberCrm[]> {
+  const data = await apiJson<TeamMemberCrm[] | { results: TeamMemberCrm[] }>("/api/crm/team/");
+  return Array.isArray(data) ? data : data.results;
+}
+
+export async function getCrmTeamMember(id: number): Promise<TeamMemberCrm> {
+  return apiJson<TeamMemberCrm>(`/api/crm/team/${id}/`);
+}
+
+export async function createCrmTeamMember(data: TeamMemberInput): Promise<TeamMemberCrm> {
+  return apiJson<TeamMemberCrm>("/api/crm/team/", { method: "POST", body: teamMemberFormData(data) });
+}
+
+export async function updateCrmTeamMember(id: number, data: TeamMemberInput): Promise<TeamMemberCrm> {
+  return apiJson<TeamMemberCrm>(`/api/crm/team/${id}/`, { method: "PATCH", body: teamMemberFormData(data) });
+}
+
+export async function deleteCrmTeamMember(id: number): Promise<void> {
+  await apiJson<void>(`/api/crm/team/${id}/`, { method: "DELETE" });
+}
+
+// --- Сертификаты (публичная страница «Сертификаты») ---
+
+export type CertificateCrm = {
+  id: number;
+  title: string;
+  image: string;
+  description: string;
+  order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CertificateInput = {
+  title: string;
+  image?: File | null;
+  description?: string;
+  order?: number;
+  is_active?: boolean;
+};
+
+function certificateFormData(data: CertificateInput): FormData {
+  const formData = new FormData();
+  formData.append("title", data.title);
+  if (data.image) formData.append("image", data.image);
+  formData.append("description", data.description ?? "");
+  formData.append("order", String(data.order ?? 0));
+  formData.append("is_active", String(data.is_active ?? true));
+  return formData;
+}
+
+export async function listCrmCertificates(): Promise<CertificateCrm[]> {
+  const data = await apiJson<CertificateCrm[] | { results: CertificateCrm[] }>("/api/crm/certificates/");
+  return Array.isArray(data) ? data : data.results;
+}
+
+export async function getCrmCertificate(id: number): Promise<CertificateCrm> {
+  return apiJson<CertificateCrm>(`/api/crm/certificates/${id}/`);
+}
+
+export async function createCrmCertificate(data: CertificateInput): Promise<CertificateCrm> {
+  return apiJson<CertificateCrm>("/api/crm/certificates/", { method: "POST", body: certificateFormData(data) });
+}
+
+export async function updateCrmCertificate(id: number, data: CertificateInput): Promise<CertificateCrm> {
+  return apiJson<CertificateCrm>(`/api/crm/certificates/${id}/`, { method: "PATCH", body: certificateFormData(data) });
+}
+
+export async function deleteCrmCertificate(id: number): Promise<void> {
+  await apiJson<void>(`/api/crm/certificates/${id}/`, { method: "DELETE" });
+}

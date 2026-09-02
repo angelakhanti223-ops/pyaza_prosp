@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 
@@ -44,6 +45,27 @@ export default function AboutPage() {
           Наш офис находится по адресу: г. Пенза, Пр-т Строителей, 49А, ТЦ «Проспект».
           Ежедневно с 9:00 до 21:00.
         </p>
+
+        <div className="mt-10 rounded-2xl border border-black/5 bg-blue-light/20 p-6">
+          <h2 className="mb-2 text-base font-bold text-navy">Наши партнёры</h2>
+          <p className="text-sm leading-relaxed text-foreground/70">
+            Мы сотрудничаем не только с крупнейшими туроператорами, но и с проверенными
+            специализированными партнёрами, которые глубоко работают с отдельными направлениями.
+          </p>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6 text-center">
+          <h2 className="mb-2 text-base font-bold text-navy">Кто подбирает вашу поездку</h2>
+          <p className="text-sm leading-relaxed text-foreground/70">
+            Познакомьтесь с командой Слетать.ру — кто и за какие направления отвечает.
+          </p>
+          <Link
+            href="/team"
+            className="mt-3 inline-block text-sm font-semibold text-blue hover:underline"
+          >
+            Наша команда →
+          </Link>
+        </div>
 
         <div className="mt-10 text-center">
           <OpenLeadFormButton className="rounded-full bg-navy px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue">

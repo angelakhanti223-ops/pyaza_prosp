@@ -12,6 +12,23 @@ export type Direction = {
   name: string;
 };
 
+export type TeamMember = {
+  id: number;
+  name: string;
+  role: string;
+  bio: string;
+  photo: string | null;
+  phone: string;
+  email: string;
+};
+
+export type Certificate = {
+  id: number;
+  title: string;
+  image: string;
+  description: string;
+};
+
 export type LeadPayload = {
   name: string;
   phone: string;
@@ -55,6 +72,26 @@ export async function fetchDirections(): Promise<Direction[]> {
     const res = await fetch(`${API_BASE_URL}/api/directions/`, {
       cache: "no-store",
     });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchTeamMembers(): Promise<TeamMember[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/team/`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchCertificates(): Promise<Certificate[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/certificates/`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch {

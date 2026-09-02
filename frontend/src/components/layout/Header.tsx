@@ -13,6 +13,8 @@ const NAV_LINKS = [
   { href: "/promotions", label: "Акции" },
   { href: "/blog", label: "Блог" },
   { href: "/about", label: "О нас" },
+  { href: "/team", label: "Команда" },
+  { href: "/certificates", label: "Сертификаты" },
   { href: "/contacts", label: "Контакты" },
 ];
 
