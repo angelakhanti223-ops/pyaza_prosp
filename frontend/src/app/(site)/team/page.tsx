@@ -42,7 +42,7 @@ export default async function TeamPage() {
                     </div>
                   </div>
                   {member.bio && (
-                    <p className="mt-4 text-sm leading-relaxed text-foreground/70">{member.bio}</p>
+                    <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-foreground/70">{member.bio}</p>
                   )}
                   {(member.phone || member.email) && (
                     <div className="mt-4 flex flex-col gap-1.5 text-sm text-foreground/60">
