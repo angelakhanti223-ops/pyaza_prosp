@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useEditor, EditorContent, Node, mergeAttributes, type Editor } from "@tiptap/react";
+import { useEditor, EditorContent, Extension, Node, mergeAttributes, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -42,6 +42,44 @@ const RawDiv = Node.create({
   },
   renderHTML({ HTMLAttributes }) {
     return ["div", mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+// RawDiv above only covers the outer wrapper — everything INSIDE it (headings,
+// paragraphs, bold text, lists) is still ordinary StarterKit nodes/marks, whose
+// default schema keeps only structural attributes (heading level and the like)
+// and drops any inline style="..."/class="..." on parse. That silently erased
+// the white text color set on <h2>/<strong> inside a dark CTA block the first
+// time the article was re-saved through this editor, even though the block's
+// own background survived — content looked fine in the editor (it doesn't
+// carry the site's dark-on-dark contrast case) but broke once rendered live.
+// Attaching style/class as global attributes on every node/mark actually used
+// here fixes that for ANY future content, not just this one article.
+const PreserveInlineStyle = Extension.create({
+  name: "preserveInlineStyle",
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          "heading", "paragraph", "bulletList", "orderedList", "listItem",
+          "blockquote", "bold", "italic", "tableCell", "tableHeader",
+        ],
+        attributes: {
+          style: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.getAttribute("style"),
+            renderHTML: (attributes: { style?: string | null }) =>
+              attributes.style ? { style: attributes.style } : {},
+          },
+          class: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.getAttribute("class"),
+            renderHTML: (attributes: { class?: string | null }) =>
+              attributes.class ? { class: attributes.class } : {},
+          },
+        },
+      },
+    ];
   },
 });
 
@@ -180,6 +218,7 @@ export default function RichTextEditor({
       TableHeader,
       TableCell,
       RawDiv,
+      PreserveInlineStyle,
     ],
     content: value,
     editorProps: {
