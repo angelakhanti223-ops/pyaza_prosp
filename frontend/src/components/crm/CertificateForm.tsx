@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileText } from "lucide-react";
 import { mediaUrl, type CertificateCrm, type CertificateInput } from "@/lib/crmApi";
 
 export default function CertificateForm({
@@ -45,15 +46,27 @@ export default function CertificateForm({
       </div>
 
       <div>
-        <label className="mb-1 block text-xs text-foreground/50">Скан/фото сертификата</label>
+        <label className="mb-1 block text-xs text-foreground/50">Скан/фото сертификата (изображение или PDF)</label>
         {initial?.image && !image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl(initial.image)} alt="" className="mb-2 h-32 rounded-lg object-cover" />
+          initial.image.toLowerCase().endsWith(".pdf") ? (
+            <a
+              href={mediaUrl(initial.image)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-2 flex items-center gap-1 text-sm text-blue hover:underline"
+            >
+              <FileText size={16} />
+              Текущий PDF-файл
+            </a>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={mediaUrl(initial.image)} alt="" className="mb-2 h-32 rounded-lg object-cover" />
+          )
         )}
         <input
           required={!initial}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           onChange={(e) => setImage(e.target.files?.[0] ?? null)}
           className="text-sm"
         />

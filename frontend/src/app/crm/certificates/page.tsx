@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Award } from "lucide-react";
+import { Award, FileText } from "lucide-react";
 import { listCrmCertificates, mediaUrl, type CertificateCrm } from "@/lib/crmApi";
 
 export default function CrmCertificatesPage() {
@@ -40,7 +40,11 @@ export default function CrmCertificatesPage() {
               href={`/crm/certificates/${cert.id}`}
               className="overflow-hidden rounded-2xl border border-black/5 bg-white transition-colors hover:border-blue/30 hover:bg-blue-light/20"
             >
-              {cert.image ? (
+              {cert.image && cert.image.toLowerCase().endsWith(".pdf") ? (
+                <div className="flex h-32 w-full items-center justify-center bg-blue-light text-blue">
+                  <FileText size={24} />
+                </div>
+              ) : cert.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={mediaUrl(cert.image)} alt={cert.title} className="h-32 w-full object-cover" />
               ) : (

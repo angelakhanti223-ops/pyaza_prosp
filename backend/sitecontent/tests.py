@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from .models import Certificate, TeamMember
@@ -113,3 +114,18 @@ class CertificateCrmViewSetTests(TestCase):
         self.client.logout()
         response = self.client.get('/api/crm/certificates/')
         self.assertEqual(response.status_code, 403)
+
+    def test_pdf_upload_accepted(self):
+        pdf = SimpleUploadedFile('attestation.pdf', b'%PDF-1.4 fake content', content_type='application/pdf')
+
+        response = self.client.post('/api/crm/certificates/', {'title': 'Аттестация', 'image': pdf})
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertTrue(response.json()['image'].endswith('.pdf'))
+
+    def test_disallowed_file_extension_rejected(self):
+        exe = SimpleUploadedFile('virus.exe', b'not a real exe', content_type='application/octet-stream')
+
+        response = self.client.post('/api/crm/certificates/', {'title': 'Плохой файл', 'image': exe})
+
+        self.assertEqual(response.status_code, 400)

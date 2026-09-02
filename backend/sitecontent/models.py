@@ -1,3 +1,4 @@
+from django.core.validators import FileExtensionValidator
 from django.db import models
 
 
@@ -31,7 +32,13 @@ class Certificate(models.Model):
     например аттестация Екатерины Макеевой — ТЗ по требованию клиента, 01.09.2026)."""
 
     title = models.CharField('Название', max_length=255)
-    image = models.ImageField('Скан/фото сертификата', upload_to='certificates/')
+    # Обычный FileField, не ImageField — сканы сертификатов часто приходят PDF
+    # (запрос заказчика, 02.09.2026), а ImageField такой файл отклонил бы на
+    # валидации Pillow. Фронтенд решает, как показывать файл, по расширению.
+    image = models.FileField(
+        'Скан/фото сертификата (изображение или PDF)', upload_to='certificates/',
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'webp', 'pdf'])],
+    )
     description = models.TextField('Описание', blank=True)
     order = models.PositiveIntegerField('Порядок отображения', default=0)
     is_active = models.BooleanField('Показывать на сайте', default=True)
