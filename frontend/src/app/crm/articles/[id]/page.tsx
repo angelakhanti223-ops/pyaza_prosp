@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, Trash2 } from "lucide-react";
 import { deleteCrmArticle, getCrmArticle, updateCrmArticle, type ArticleCrmDetail, type ArticleCrmInput } from "@/lib/crmApi";
 import ArticleForm from "@/components/crm/ArticleForm";
 
@@ -61,7 +61,13 @@ export default function CrmArticlePage() {
 
       <div className="max-w-2xl rounded-2xl border border-black/5 bg-white p-6 sm:p-8">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-xl font-bold text-navy">{article.title}</h1>
+          <div>
+            <h1 className="text-xl font-bold text-navy">{article.title}</h1>
+            <p className="mt-1 flex items-center gap-1 text-xs text-foreground/50">
+              <Eye size={13} />
+              {article.views} просмотров
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             {article.status === "published" && (
               <a

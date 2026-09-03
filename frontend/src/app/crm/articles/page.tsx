@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Newspaper, Search } from "lucide-react";
+import { Eye, Newspaper, Search } from "lucide-react";
 import { listCrmArticles, type ArticleCrmListItem, type ArticleStatus } from "@/lib/crmApi";
 
 const STATUS_STYLES: Record<ArticleStatus, string> = {
@@ -68,6 +68,7 @@ export default function CrmArticlesPage() {
                 <th className="px-4 py-3 font-medium">Заголовок</th>
                 <th className="px-4 py-3 font-medium">Категория</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
+                <th className="px-4 py-3 font-medium">Просмотры</th>
                 <th className="px-4 py-3 font-medium">Автор</th>
                 <th className="px-4 py-3 font-medium">Обновлено</th>
               </tr>
@@ -85,6 +86,12 @@ export default function CrmArticlesPage() {
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[article.status]}`}>
                       {article.status_display}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-foreground/60">
+                    <span className="flex items-center gap-1.5">
+                      <Eye size={13} className="text-foreground/30" />
+                      {article.views}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-foreground/50">{article.author?.full_name ?? "—"}</td>

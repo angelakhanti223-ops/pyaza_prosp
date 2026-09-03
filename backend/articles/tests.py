@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from .models import Article, Category, Tag
 from .utils import transliterate, unique_slug
@@ -155,3 +156,64 @@ class CategoryCrmCreateViewTests(TestCase):
             '/api/crm/articles/categories/', {'name': 'Пляжный отдых'}, content_type='application/json',
         )
         self.assertEqual(response.status_code, 403)
+
+
+class ArticleViewCounterTests(TestCase):
+    """Простой счётчик просмотров (без дедупликации по IP/сессии) — растёт
+    при каждом открытии страницы статьи на сайте (ТЗ по требованию клиента,
+    03.09.2026), виден в CRM рядом со статьёй."""
+
+    def setUp(self):
+        self.article = Article.objects.create(
+            title='Статья', slug='statya', status=Article.Status.PUBLISHED, published_at=timezone.now(),
+        )
+
+    def test_public_detail_view_increments_views(self):
+        self.assertEqual(self.article.views, 0)
+
+        self.client.get(f'/api/articles/{self.article.slug}/')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.views, 1)
+
+        self.client.get(f'/api/articles/{self.article.slug}/')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.views, 2)
+
+    def test_public_list_view_does_not_increment_views(self):
+        self.client.get('/api/articles/')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.views, 0)
+
+    def test_crm_edit_does_not_increment_views(self):
+        manager = User.objects.create_user(username='viewsmanager', password='x', role=User.Role.MANAGER)
+        self.client.force_login(manager)
+
+        self.client.get(f'/api/crm/articles/{self.article.id}/')
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.views, 0)
+
+    def test_views_field_visible_in_crm_list_and_detail(self):
+        manager = User.objects.create_user(username='viewslistmanager', password='x', role=User.Role.MANAGER)
+        self.client.force_login(manager)
+        self.client.get(f'/api/articles/{self.article.slug}/')  # 1 просмотр
+
+        list_response = self.client.get('/api/crm/articles/')
+        list_data = list_response.json()
+        list_items = list_data if isinstance(list_data, list) else list_data['results']
+        self.assertEqual(next(a for a in list_items if a['id'] == self.article.id)['views'], 1)
+
+        detail_response = self.client.get(f'/api/crm/articles/{self.article.id}/')
+        self.assertEqual(detail_response.json()['views'], 1)
+
+    def test_views_read_only_in_crm_cannot_be_set_directly(self):
+        manager = User.objects.create_user(username='viewsreadonlymanager', password='x', role=User.Role.MANAGER)
+        self.client.force_login(manager)
+
+        response = self.client.patch(
+            f'/api/crm/articles/{self.article.id}/', {'views': 9999}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.views, 0)

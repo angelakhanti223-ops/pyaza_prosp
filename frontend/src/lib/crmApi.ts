@@ -329,6 +329,7 @@ export type ArticleCrmListItem = {
   category: number | null;
   category_name: string | null;
   author: CrmUser | null;
+  views: number;
   published_at: string | null;
   updated_at: string;
 };

@@ -47,6 +47,11 @@ class Article(models.Model):
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     published_at = models.DateTimeField(null=True, blank=True)
+    views = models.PositiveIntegerField(
+        'Просмотров', default=0,
+        help_text='Растёт при каждом открытии страницы статьи на сайте (ArticleDetailView) — '
+                   'без дедупликации по IP/сессии, простой счётчик (ТЗ по требованию клиента, 03.09.2026).',
+    )
 
     # SEO (ТЗ 4.1)
     seo_title = models.CharField(max_length=255, blank=True)

@@ -59,7 +59,7 @@ class ArticleCrmListSerializer(serializers.ModelSerializer):
         model = Article
         fields = [
             'id', 'title', 'slug', 'status', 'status_display', 'category', 'category_name',
-            'author', 'published_at', 'updated_at',
+            'author', 'views', 'published_at', 'updated_at',
         ]
 
 
@@ -76,10 +76,10 @@ class ArticleCrmDetailSerializer(serializers.ModelSerializer):
         model = Article
         fields = [
             'id', 'title', 'slug', 'category', 'category_name', 'tags', 'tag_names', 'excerpt', 'content',
-            'featured_image', 'author', 'status', 'status_display', 'published_at',
+            'featured_image', 'author', 'status', 'status_display', 'views', 'published_at',
             'seo_title', 'seo_description', 'og_image', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'author', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'author', 'views', 'created_at', 'updated_at']
         extra_kwargs = {'slug': {'required': False}}
 
     def validate_slug(self, value):
