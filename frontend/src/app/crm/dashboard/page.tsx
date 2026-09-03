@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchDashboard, fetchPlan, fetchWorkSummary, type DashboardData, type PlanData, type WorkSummaryData } from "@/lib/dashboardApi";
+import {
+  fetchDashboard,
+  fetchPlan,
+  fetchWorkSummary,
+  type DashboardData,
+  type DashboardPeriod,
+  type PlanData,
+  type WorkSummaryData,
+} from "@/lib/dashboardApi";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import SimpleBarChart from "@/components/dashboard/SimpleBarChart";
 import SimplePieChart from "@/components/dashboard/SimplePieChart";
 
-const PERIODS: { value: string; label: string }[] = [
-  { value: "7d", label: "7 дней" },
-  { value: "30d", label: "30 дней" },
-  { value: "90d", label: "90 дней" },
+const PERIODS: { value: DashboardPeriod; label: string }[] = [
+  { value: "current_month", label: "Текущий месяц" },
+  { value: "last_month", label: "Прошлый месяц" },
 ];
 
 function formatMoney(value: number): string {
@@ -26,7 +33,7 @@ export default function CrmDashboardPage() {
   const { user } = useCrmAuth();
   const isHead = user?.is_head ?? false;
 
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useState<DashboardPeriod>("current_month");
   const [managerId, setManagerId] = useState<string>("");
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -63,9 +70,16 @@ export default function CrmDashboardPage() {
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-navy">
-          Дашборд {data?.scope === "department" ? "отдела" : "менеджера"}
-        </h1>
+        <div>
+          <h1 className="text-xl font-bold text-navy">
+            Дашборд {data?.scope === "department" ? "отдела" : "менеджера"}
+          </h1>
+          {data && (
+            <p className="mt-0.5 text-xs text-foreground/50">
+              {MONTH_LABELS[data.period.month]} {data.period.year}
+            </p>
+          )}
+        </div>
 
         <div className="flex gap-2">
           {isHead && (
@@ -193,15 +207,15 @@ export default function CrmDashboardPage() {
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-black/5 bg-white p-5">
-              <p className="text-xs text-foreground/50">Новых заявок за период</p>
+              <p className="text-xs text-foreground/50">Новых заявок за месяц</p>
               <p className="mt-1 text-2xl font-bold text-navy">{data.new_leads_count}</p>
             </div>
             <div className="rounded-2xl border border-black/5 bg-white p-5">
-              <p className="text-xs text-foreground/50">Сумма сделок (оплачено)</p>
+              <p className="text-xs text-foreground/50">Сумма сделок, закрытых в этом месяце</p>
               <p className="mt-1 text-2xl font-bold text-navy">{formatMoney(data.deal_amount_total)}</p>
             </div>
             <div className="rounded-2xl border border-black/5 bg-white p-5">
-              <p className="text-xs text-foreground/50">Комиссия</p>
+              <p className="text-xs text-foreground/50">Комиссия за месяц</p>
               <p className="mt-1 text-2xl font-bold text-gold">{formatMoney(data.commission_total)}</p>
             </div>
           </div>
@@ -278,7 +292,7 @@ export default function CrmDashboardPage() {
             <div className="rounded-2xl border border-black/5 bg-white p-5">
               <h2 className="mb-4 text-sm font-semibold text-navy">Комиссия по менеджерам</h2>
               {data.commission_by_manager.length === 0 ? (
-                <p className="text-sm text-foreground/40">Нет оплаченных заявок за период</p>
+                <p className="text-sm text-foreground/40">Нет закрытых заявок за этот месяц</p>
               ) : (
                 <table className="w-full text-left text-sm">
                   <thead className="text-xs text-foreground/50">

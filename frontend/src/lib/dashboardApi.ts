@@ -27,6 +27,8 @@ export type DashboardDirectionRow = {
   count: number;
 };
 
+export type DashboardPeriod = "current_month" | "last_month";
+
 export type DashboardData = {
   new_leads_count: number;
   leads_by_status: DashboardStatusRow[];
@@ -38,14 +40,16 @@ export type DashboardData = {
   avg_commission: number;
   by_direction: DashboardDirectionRow[];
   daily_dynamics: DashboardDailyRow[];
-  period: { from: string; to: string };
+  period: { from: string; to: string; year: number; month: number };
   scope: "personal" | "department";
   commission_by_manager?: DashboardManagerCommission[];
 };
 
-export async function fetchDashboard(params: { period?: string; manager?: number } = {}): Promise<DashboardData> {
+export async function fetchDashboard(
+  params: { period?: DashboardPeriod; manager?: number } = {}
+): Promise<DashboardData> {
   const qs = new URLSearchParams();
-  qs.set("period", params.period ?? "30d");
+  qs.set("period", params.period ?? "current_month");
   if (params.manager) qs.set("manager", String(params.manager));
 
   const res = await fetch(`${API_BASE_URL}/api/crm/dashboard/?${qs.toString()}`, { credentials: "include" });

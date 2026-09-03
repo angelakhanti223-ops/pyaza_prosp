@@ -10,7 +10,7 @@ from integrations.models import UonLeadRecord, UonRequestRecord
 from kanban.models import KanbanColumn, Task
 
 from .dashboard import _compute, actual_commission_for_month, plan_progress_rows, task_counts_data, work_summary_data
-from .models import Direction, Lead, MonthlyPlan
+from .models import Direction, Lead, LeadStatusHistory, MonthlyPlan
 from .tasks import check_stale_leads, create_new_lead_task
 
 User = get_user_model()
@@ -504,10 +504,19 @@ class DashboardCommissionTests(TestCase):
         self.manager = User.objects.create_user(username='dashcommmanager', password='x', role=User.Role.MANAGER)
         self.direction = Direction.objects.create(name='ОАЭ')
 
+    def _close_won(self, **kwargs):
+        """Создаёт заявку сразу в CLOSED_WON + соответствующую запись
+        LeadStatusHistory — с 02.09.2026 денежные показатели дашборда считаются
+        по дате смены статуса (см. _closed_won_qs), не по дате создания заявки,
+        так что без этой записи заявка не попала бы в комиссию за период."""
+        lead = Lead.objects.create(status=Lead.Status.CLOSED_WON, **kwargs)
+        LeadStatusHistory.objects.create(lead=lead, old_status=Lead.Status.NEW, new_status=Lead.Status.CLOSED_WON)
+        return lead
+
     def test_compute_counts_closed_won_not_paid(self):
-        Lead.objects.create(
+        self._close_won(
             name='Успех', direction=self.direction, assigned_manager=self.manager,
-            status=Lead.Status.CLOSED_WON, commission=15000, deal_amount=100000,
+            commission=15000, deal_amount=100000,
         )
         Lead.objects.create(
             name='Оплачено-но-не-закрыта', direction=self.direction, assigned_manager=self.manager,
@@ -520,9 +529,8 @@ class DashboardCommissionTests(TestCase):
         self.assertEqual(data['deal_amount_total'], 100000)
 
     def test_commission_by_manager_endpoint_uses_closed_won(self):
-        Lead.objects.create(
-            name='Успех', direction=self.direction, assigned_manager=self.manager,
-            status=Lead.Status.CLOSED_WON, commission=15000,
+        self._close_won(
+            name='Успех', direction=self.direction, assigned_manager=self.manager, commission=15000,
         )
         Lead.objects.create(
             name='Просто оплачена', direction=self.direction, assigned_manager=self.manager,
@@ -530,7 +538,7 @@ class DashboardCommissionTests(TestCase):
         )
         self.client.force_login(self.head)
 
-        response = self.client.get('/api/crm/dashboard/?period=30d')
+        response = self.client.get('/api/crm/dashboard/')
 
         self.assertEqual(response.status_code, 200)
         by_manager = response.json()['commission_by_manager']
@@ -540,15 +548,9 @@ class DashboardCommissionTests(TestCase):
 
     def test_deal_stats_and_direction_breakdown(self):
         turkey = Direction.objects.create(name='Турция')
-        Lead.objects.create(
-            name='А', direction=turkey, status=Lead.Status.CLOSED_WON, commission=10000, deal_amount=100000,
-        )
-        Lead.objects.create(
-            name='Б', direction=turkey, status=Lead.Status.CLOSED_WON, commission=20000, deal_amount=200000,
-        )
-        Lead.objects.create(
-            name='В', direction=self.direction, status=Lead.Status.CLOSED_WON, commission=30000, deal_amount=300000,
-        )
+        self._close_won(name='А', direction=turkey, commission=10000, deal_amount=100000)
+        self._close_won(name='Б', direction=turkey, commission=20000, deal_amount=200000)
+        self._close_won(name='В', direction=self.direction, commission=30000, deal_amount=300000)
         Lead.objects.create(name='Г', direction=self.direction, status=Lead.Status.NEW)  # не должна попасть
 
         data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
@@ -558,6 +560,109 @@ class DashboardCommissionTests(TestCase):
         self.assertEqual(data['avg_commission'], 20000)
         by_direction = {row['direction']: row['count'] for row in data['by_direction']}
         self.assertEqual(by_direction, {'Турция': 2, 'ОАЭ': 1})
+
+    def test_commission_counted_by_close_date_not_creation_date(self):
+        """Заявка, заведённая задолго до периода, но закрытая внутри него,
+        обязана попасть в комиссию за период — это и была исходная проблема:
+        раньше _compute фильтровал по created_at, и такая сделка не
+        учитывалась, хотя деньги реально пришли в этом периоде."""
+        old_lead = Lead.objects.create(
+            name='Старая заявка, закрыта сейчас', direction=self.direction,
+            assigned_manager=self.manager, status=Lead.Status.CLOSED_WON, commission=20000,
+        )
+        Lead.objects.filter(pk=old_lead.pk).update(created_at=timezone.now() - timedelta(days=90))
+        LeadStatusHistory.objects.create(lead=old_lead, new_status=Lead.Status.CLOSED_WON)
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['commission_total'], 20000)
+        self.assertEqual(data['deals_count'], 1)
+
+    def test_commission_excludes_deal_closed_outside_period(self):
+        """Обратный случай: заявка закрыта ДО начала периода — не должна
+        учитываться в комиссии этого периода, даже если она всё ещё CLOSED_WON."""
+        lead = self._close_won(name='Закрыта давно', direction=self.direction, commission=99999)
+        LeadStatusHistory.objects.filter(lead=lead).update(changed_at=timezone.now() - timedelta(days=90))
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['commission_total'], 0)
+        self.assertEqual(data['deals_count'], 0)
+
+    def test_commission_falls_back_to_updated_at_without_status_history(self):
+        """Заявка, закрытая в обход CRM (например, правкой в Django admin —
+        LeadStatusHistory там не создаётся, только в LeadViewSet.partial_update),
+        всё равно должна попасть в комиссию месяца — по updated_at."""
+        Lead.objects.create(
+            name='Закрыта в обход CRM', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.CLOSED_WON, commission=25000,
+        )
+        # Никакой LeadStatusHistory не создаём — имитируем правку в обход CRM.
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['commission_total'], 25000)
+        self.assertEqual(data['deals_count'], 1)
+
+    def test_history_takes_priority_over_updated_at_fallback_no_double_count(self):
+        """Заявка с реальной записью истории не должна учитываться дважды
+        (один раз по истории, один раз по фолбэку на updated_at)."""
+        lead = self._close_won(name='Через CRM', direction=self.direction, commission=10000)
+        # updated_at этой заявки тоже попадает в период (она только что создана) —
+        # фолбэк не должен добавить её в выборку повторно.
+
+        data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
+
+        self.assertEqual(data['commission_total'], 10000)
+        self.assertEqual(data['deals_count'], 1)
+
+
+class DashboardPeriodViewTests(TestCase):
+    """Дашборд теперь выбирает ровно между двумя календарными месяцами —
+    текущим и прошлым — вместо плавающего окна 7/30/90 дней (решение
+    заказчика, 02.09.2026): не совпадало с логикой плана и путало, когда
+    заявка была заведена раньше окна, но закрыта внутри него."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(username='dashperiodhead', password='x', role=User.Role.HEAD)
+        self.direction = Direction.objects.create(name='Египет')
+        self.client.force_login(self.head)
+
+    def test_current_month_is_default(self):
+        response = self.client.get('/api/crm/dashboard/')
+        self.assertEqual(response.status_code, 200)
+        today = timezone.localdate()
+        self.assertEqual(response.json()['period']['month'], today.month)
+        self.assertEqual(response.json()['period']['year'], today.year)
+
+    def test_last_month_shifts_correctly_including_year_boundary(self):
+        response = self.client.get('/api/crm/dashboard/?period=last_month')
+        self.assertEqual(response.status_code, 200)
+        today = timezone.localdate()
+        expected_year, expected_month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+        self.assertEqual(response.json()['period']['month'], expected_month)
+        self.assertEqual(response.json()['period']['year'], expected_year)
+
+    def test_deal_closed_last_month_not_counted_in_current_month(self):
+        from .dashboard import month_bounds
+
+        today = timezone.localdate()
+        last_year, last_month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+        last_month_mid, _ = month_bounds(last_year, last_month)
+        last_month_mid = last_month_mid + timedelta(days=10)
+
+        lead = Lead.objects.create(
+            name='Закрыта в прошлом месяце', direction=self.direction,
+            status=Lead.Status.CLOSED_WON, commission=15000,
+        )
+        history = LeadStatusHistory.objects.create(lead=lead, new_status=Lead.Status.CLOSED_WON)
+        LeadStatusHistory.objects.filter(pk=history.pk).update(changed_at=last_month_mid)
+
+        current = self.client.get('/api/crm/dashboard/').json()
+        last = self.client.get('/api/crm/dashboard/?period=last_month').json()
+
+        self.assertEqual(current['commission_total'], 0)
+        self.assertEqual(last['commission_total'], 15000)
 
 
 class PlanViewTests(TestCase):

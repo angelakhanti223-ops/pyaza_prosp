@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from django.db.models import Avg, Count, Q, Sum
@@ -13,8 +13,6 @@ from accounts.permissions import is_head
 
 from .models import Lead, LeadStatusHistory, MonthlyPlan
 
-PERIOD_DAYS = {'7d': 7, '30d': 30, '90d': 90}
-
 # Порядок этапов воронки для конверсии (ТЗ 7). Закрытые "в отказ" заявки не
 # входят в положительную воронку — это отдельный, негативный, исход.
 FUNNEL_STAGES = [
@@ -25,6 +23,41 @@ FUNNEL_STAGES = [
     Lead.Status.PAID,
     Lead.Status.CLOSED_WON,
 ]
+
+
+def month_bounds(year, month):
+    """Границы календарного месяца в текущей таймзоне проекта (Europe/Moscow)."""
+    start = timezone.make_aware(datetime(year, month, 1))
+    last_day = monthrange(year, month)[1]
+    end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59, 999999))
+    return start, end
+
+
+def _closed_won_qs(base_qs, date_from, date_to):
+    """Заявки (в рамках base_qs), у которых переход в «Закрыта (успех)» пришёлся
+    на этот период — по дате смены статуса (LeadStatusHistory), а не по дате
+    создания заявки. Раньше денежные показатели дашборда (commission_total и
+    т.д.) считались из period_leads (created_at внутри периода), из-за чего
+    сделка, реально закрытая в этом месяце по заявке, заведённой раньше,
+    выпадала из «Комиссии за период» — те же деньги План/факт (ниже,
+    actual_commission_for_month) уже показывал корректно, теперь это одна
+    и та же логика (решение заказчика, 02.09.2026)."""
+    history_ids = set(
+        LeadStatusHistory.objects.filter(
+            new_status=Lead.Status.CLOSED_WON, changed_at__gte=date_from, changed_at__lte=date_to,
+        ).values_list('lead_id', flat=True)
+    )
+    # LeadStatusHistory заполняется только в LeadViewSet.partial_update — заявка,
+    # закрытая в обход CRM (например, правкой статуса в Django admin или прямым
+    # апдейтом в БД), не оставит там записи и молча выпала бы из комиссии за
+    # месяц. Для заявок вообще без единой записи истории берём updated_at как
+    # разумную оценку момента закрытия — это подстраховка, а не основной путь.
+    fallback_ids = set(
+        base_qs.filter(status=Lead.Status.CLOSED_WON, updated_at__gte=date_from, updated_at__lte=date_to)
+        .exclude(status_history__new_status=Lead.Status.CLOSED_WON)
+        .values_list('id', flat=True)
+    )
+    return base_qs.filter(id__in=history_ids | fallback_ids)
 
 
 def _compute(base_qs, date_from, date_to):
@@ -55,8 +88,10 @@ def _compute(base_qs, date_from, date_to):
 
     # «Закрыта (успех)» — реальный момент получения денег в этой команде;
     # «Оплачено» в рабочем процессе почти не используется как отдельный шаг
-    # (решение заказчика, 26.08.2026).
-    won_leads = period_leads.filter(status=Lead.Status.CLOSED_WON)
+    # (решение заказчика, 26.08.2026). Считаем по дате закрытия (см.
+    # _closed_won_qs), не по дате создания заявки — иначе сделка, заведённая
+    # в прошлом периоде и закрытая в этом, не попадала бы в комиссию за период.
+    won_leads = _closed_won_qs(base_qs, date_from, date_to)
     totals = won_leads.aggregate(
         commission_sum=Sum('commission'), deal_amount_sum=Sum('deal_amount'),
         avg_deal_amount=Avg('deal_amount'), avg_commission=Avg('commission'),
@@ -99,9 +134,17 @@ class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        days = PERIOD_DAYS.get(request.query_params.get('period'), 30)
-        date_to = timezone.now()
-        date_from = date_to - timedelta(days=days)
+        # Раньше это было плавающее окно 7/30/90 дней от текущего момента — не
+        # совпадало с тем, как считается план (календарный месяц), и запутывало:
+        # заявка, заведённая до окна, но закрытая внутри него, всё равно не
+        # покрывалась «по дате создания» логикой ниже. Теперь только два
+        # календарных месяца — текущий и прошлый (решение заказчика, 02.09.2026).
+        today = timezone.localdate()
+        if request.query_params.get('period') == 'last_month':
+            year, month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+        else:
+            year, month = today.year, today.month
+        date_from, date_to = month_bounds(year, month)
 
         head = is_head(request.user)
         manager_filter = request.query_params.get('manager')
@@ -113,15 +156,12 @@ class DashboardView(APIView):
             base_qs = base_qs.filter(assigned_manager_id=manager_filter)
 
         data = _compute(base_qs, date_from, date_to)
-        data['period'] = {'from': date_from.isoformat(), 'to': date_to.isoformat()}
+        data['period'] = {'from': date_from.isoformat(), 'to': date_to.isoformat(), 'year': year, 'month': month}
         data['scope'] = 'department' if (head and not manager_filter) else 'personal'
 
         if head and not manager_filter:
             by_manager = (
-                Lead.objects.filter(
-                    created_at__gte=date_from, created_at__lte=date_to,
-                    status=Lead.Status.CLOSED_WON, assigned_manager__isnull=False,
-                )
+                _closed_won_qs(Lead.objects.filter(assigned_manager__isnull=False), date_from, date_to)
                 .values('assigned_manager_id', 'assigned_manager__first_name', 'assigned_manager__last_name', 'assigned_manager__username')
                 .annotate(commission=Sum('commission'), deals=Count('id'))
                 .order_by('-commission')
@@ -140,14 +180,6 @@ class DashboardView(APIView):
             ]
 
         return Response(data)
-
-
-def month_bounds(year, month):
-    """Границы календарного месяца в текущей таймзоне проекта (Europe/Moscow)."""
-    start = timezone.make_aware(datetime(year, month, 1))
-    last_day = monthrange(year, month)[1]
-    end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59, 999999))
-    return start, end
 
 
 def actual_commission_for_month(manager, year, month):
