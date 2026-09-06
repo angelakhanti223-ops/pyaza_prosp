@@ -20,6 +20,10 @@ type Props = {
   task: KanbanTask | null;
   onClose: () => void;
   onSaved: () => void;
+  // Заполнение задачи с карточки обращения/заявки — только при создании (isEdit
+  // проверяется отдельно ниже), сама связь после создания уже не меняется.
+  presetLead?: { id: number; name: string } | null;
+  presetUonRecord?: { kind: "request" | "lead"; id: string; label: string } | null;
 };
 
 function toLocalInputValue(iso: string | null): string {
@@ -29,7 +33,15 @@ function toLocalInputValue(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function TaskModal({ columns, defaultColumnId, task, onClose, onSaved }: Props) {
+export default function TaskModal({
+  columns,
+  defaultColumnId,
+  task,
+  onClose,
+  onSaved,
+  presetLead,
+  presetUonRecord,
+}: Props) {
   const isEdit = Boolean(task);
 
   const [title, setTitle] = useState(task?.title ?? "");
@@ -38,9 +50,9 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
   const [assigneeId, setAssigneeId] = useState<string>(task?.assignee ? String(task.assignee.id) : "");
   const [deadline, setDeadline] = useState(toLocalInputValue(task?.deadline ?? null));
   const [managers, setManagers] = useState<CrmUser[]>([]);
-  const [leadQuery, setLeadQuery] = useState(task?.lead_name ?? "");
+  const [leadQuery, setLeadQuery] = useState(task?.lead_name ?? presetLead?.name ?? "");
   const [leadResults, setLeadResults] = useState<LeadListItem[]>([]);
-  const [leadId, setLeadId] = useState<number | null>(task?.lead ?? null);
+  const [leadId, setLeadId] = useState<number | null>(task?.lead ?? presetLead?.id ?? null);
   const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "new");
   const [saving, setSaving] = useState(false);
@@ -93,6 +105,8 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
           lead: leadId,
           deadline: deadlineIso,
           is_recurring: isRecurring,
+          uon_record_kind: presetUonRecord?.kind,
+          uon_record_id: presetUonRecord?.id,
         });
       }
       onSaved();
@@ -235,37 +249,48 @@ export default function TaskModal({ columns, defaultColumnId, task, onClose, onS
             Ежедневная задача (при переносе в последнюю колонку создаётся копия на завтра)
           </label>
 
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Привязать заявку (поиск по имени/телефону)"
-              value={leadQuery}
-              onChange={(e) => {
-                setLeadQuery(e.target.value);
-                setLeadId(null);
-              }}
-              className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
-            />
-            {leadResults.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded-xl border border-black/10 bg-white shadow-lg">
-                {leadResults.map((lead) => (
-                  <li key={lead.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLeadId(lead.id);
-                        setLeadQuery(lead.name);
-                        setLeadResults([]);
-                      }}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-light"
-                    >
-                      {lead.name} · {lead.phone}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {presetLead ? (
+            <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">
+              Привязана к обращению: <strong>{presetLead.name}</strong>
+            </p>
+          ) : presetUonRecord ? (
+            <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">
+              Привязана к {presetUonRecord.kind === "request" ? "заявке" : "обращению"} U-ON:{" "}
+              <strong>{presetUonRecord.label}</strong>
+            </p>
+          ) : (
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Привязать заявку (поиск по имени/телефону)"
+                value={leadQuery}
+                onChange={(e) => {
+                  setLeadQuery(e.target.value);
+                  setLeadId(null);
+                }}
+                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
+              />
+              {leadResults.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full rounded-xl border border-black/10 bg-white shadow-lg">
+                  {leadResults.map((lead) => (
+                    <li key={lead.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeadId(lead.id);
+                          setLeadQuery(lead.name);
+                          setLeadResults([]);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-light"
+                      >
+                        {lead.name} · {lead.phone}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

@@ -62,6 +62,11 @@ export type TaskInput = {
   deadline?: string | null;
   is_recurring?: boolean;
   status?: TaskStatus;
+  // Только для создания — связь с обращением/заявкой U-ON, у которой нет своего
+  // Lead в нашей базе (карточка на /crm/appeals или /crm/uon-requests). После
+  // создания эту связь уже не поменять — PATCH их не принимает (см. бэкенд).
+  uon_record_kind?: "request" | "lead";
+  uon_record_id?: string;
 };
 
 function getCookie(name: string): string | null {
@@ -122,7 +127,7 @@ export async function createTask(input: TaskInput): Promise<KanbanTask> {
 
 export async function updateTask(
   id: number,
-  input: Partial<Omit<TaskInput, "column">>
+  input: Partial<Omit<TaskInput, "column" | "uon_record_kind" | "uon_record_id">>
 ): Promise<KanbanTask> {
   return apiJson<KanbanTask>(`/api/crm/kanban/tasks/${id}/`, {
     method: "PATCH",

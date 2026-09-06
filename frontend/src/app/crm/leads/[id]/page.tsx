@@ -18,8 +18,10 @@ import {
   type LeadStatus,
 } from "@/lib/crmApi";
 import { fetchDirections, type Direction } from "@/lib/api";
+import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
+import TaskModal from "@/components/kanban/TaskModal";
 
 export default function CrmLeadDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,6 +38,8 @@ export default function CrmLeadDetailPage() {
   const [savingField, setSavingField] = useState<string | null>(null);
   const [convertingToRequest, setConvertingToRequest] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
+  const [columns, setColumns] = useState<KanbanColumn[]>([]);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +75,10 @@ export default function CrmLeadDetailPage() {
 
   useEffect(() => {
     fetchDirections().then(setDirections);
+  }, []);
+
+  useEffect(() => {
+    listColumns().then(setColumns);
   }, []);
 
   async function handleStatusChange(status: LeadStatus) {
@@ -395,7 +403,15 @@ export default function CrmLeadDetailPage() {
           </div>
 
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-            <h2 className="mb-3 text-sm font-semibold text-navy">Связанные задачи</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-navy">Связанные задачи</h2>
+              <button
+                onClick={() => setShowTaskModal(true)}
+                className="text-xs font-semibold text-blue hover:underline"
+              >
+                + Создать задачу
+              </button>
+            </div>
             <ul className="flex flex-col gap-2">
               {lead.tasks.map((t) => (
                 <li key={t.id}>
@@ -513,6 +529,20 @@ export default function CrmLeadDetailPage() {
           </div>
         </div>
       </div>
+
+      {showTaskModal && (
+        <TaskModal
+          columns={columns}
+          defaultColumnId={columns[0]?.id ?? null}
+          task={null}
+          presetLead={{ id: lead.id, name: lead.name }}
+          onClose={() => setShowTaskModal(false)}
+          onSaved={() => {
+            setShowTaskModal(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }

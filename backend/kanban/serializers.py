@@ -64,6 +64,26 @@ class TaskSerializer(serializers.ModelSerializer):
         return record.status_name if record else None
 
 
+class TaskCreateSerializer(TaskSerializer):
+    """POST /api/crm/kanban/tasks/ — в отличие от TaskSerializer (карточка/список,
+    где uon_record_kind/uon_record_id только для чтения — их обычно расставляет
+    синхронизация с U-ON), здесь их можно задать вручную. Это путь ручного создания
+    задачи прямо с карточки обращения или заявки U-ON, у которой нет своего Lead в
+    нашей базе (ТЗ по требованию клиента, 04.09.2026). uon_reminder_id сюда не
+    входит и никогда не выставляется вручную — это ключ дедупликации синхронизации
+    с U-ON, коллизия с ним задвоила бы будущий импорт того же напоминания."""
+
+    class Meta(TaskSerializer.Meta):
+        read_only_fields = [f for f in TaskSerializer.Meta.read_only_fields if f not in ('uon_record_kind', 'uon_record_id')]
+
+    def validate(self, attrs):
+        kind = attrs.get('uon_record_kind', '')
+        record_id = attrs.get('uon_record_id', '')
+        if bool(kind) != bool(record_id):
+            raise serializers.ValidationError('uon_record_kind и uon_record_id нужно указывать вместе.')
+        return attrs
+
+
 class TaskUpdateSerializer(serializers.ModelSerializer):
     """PATCH: edit task fields, but never column/order directly — use the move action instead."""
 

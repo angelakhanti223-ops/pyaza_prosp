@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import {
   listUonManagers,
   listUonRequests,
@@ -11,6 +11,8 @@ import {
   type UonRequestRecord,
 } from "@/lib/uonApi";
 import { pushUonRequestUpdate } from "@/lib/crmApi";
+import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
+import TaskModal from "@/components/kanban/TaskModal";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -23,10 +25,12 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function RequestDetailModal({
   request,
+  columns,
   onClose,
   onUpdated,
 }: {
   request: UonRequestRecord;
+  columns: KanbanColumn[];
   onClose: () => void;
   onUpdated: (updated: UonRequestRecord) => void;
 }) {
@@ -39,6 +43,8 @@ function RequestDetailModal({
   const [reservationNumber, setReservationNumber] = useState(request.reservation_number);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskCreated, setTaskCreated] = useState(false);
 
   function startEditing() {
     setEditing(true);
@@ -194,7 +200,39 @@ function RequestDetailModal({
         <p className="mt-4 text-xs text-foreground/40">
           Обновлено: {new Date(request.synced_at).toLocaleString("ru-RU")}
         </p>
+
+        <div className="mt-4 border-t border-black/5 pt-4">
+          <button
+            onClick={() => {
+              setShowTaskModal(true);
+              setTaskCreated(false);
+            }}
+            className="rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white hover:bg-blue"
+          >
+            + Создать задачу
+          </button>
+          {taskCreated && (
+            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-green-700">
+              <Check size={13} />
+              Задача создана — найдёте её на канбан-доске
+            </p>
+          )}
+        </div>
       </div>
+
+      {showTaskModal && (
+        <TaskModal
+          columns={columns}
+          defaultColumnId={columns[0]?.id ?? null}
+          task={null}
+          presetUonRecord={{ kind: "request", id: request.uon_id, label: request.client_name || `#${request.uon_id}` }}
+          onClose={() => setShowTaskModal(false)}
+          onSaved={() => {
+            setShowTaskModal(false);
+            setTaskCreated(true);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -203,8 +241,13 @@ function CrmUonRequestsContent() {
   const [requests, setRequests] = useState<UonRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<UonRequestRecord | null>(null);
+  const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("uon_id");
+
+  useEffect(() => {
+    listColumns().then(setColumns);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -288,6 +331,7 @@ function CrmUonRequestsContent() {
       {selected && (
         <RequestDetailModal
           request={selected}
+          columns={columns}
           onClose={() => setSelected(null)}
           onUpdated={(updated) => {
             setSelected(updated);

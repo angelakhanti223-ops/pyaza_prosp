@@ -240,3 +240,73 @@ class TaskStatusUpdateTests(TestCase):
             f'/api/crm/kanban/tasks/{task.id}/', {'status': 'cancelled'}, content_type='application/json',
         )
         self.assertEqual(response.json()['status_display'], 'Отменено')
+
+
+class CreateTaskFromCardTests(TestCase):
+    """Создание задачи прямо с карточки обращения/заявки в U-ON (кнопка «+ Создать
+    задачу» на /crm/appeals и /crm/uon-requests) — у этих записей нет своего Lead
+    в нашей базе, поэтому связь идёт через uon_record_kind/uon_record_id, которые
+    обычно выставляет только синхронизация (ТЗ по требованию клиента, 04.09.2026)."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(username='createfromcardmanager', password='x', role=User.Role.MANAGER)
+        self.column = KanbanColumn.objects.get(name='Новая')
+        self.direction = Direction.objects.create(name='Турция')
+        self.client.force_login(self.manager)
+
+    def test_create_task_linked_to_uon_request_record(self):
+        response = self.client.post('/api/crm/kanban/tasks/', {
+            'title': 'Уточнить даты у клиента', 'column': self.column.id,
+            'uon_record_kind': 'request', 'uon_record_id': '777',
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        data = response.json()
+        self.assertEqual(data['uon_record_kind'], 'request')
+        self.assertEqual(data['uon_record_id'], '777')
+        task = Task.objects.get(pk=data['id'])
+        self.assertIsNone(task.lead)
+        self.assertIsNone(task.uon_reminder_id)
+
+    def test_create_task_linked_to_uon_lead_record(self):
+        response = self.client.post('/api/crm/kanban/tasks/', {
+            'title': 'Перезвонить по обращению', 'column': self.column.id,
+            'uon_record_kind': 'lead', 'uon_record_id': '199',
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['uon_record_kind'], 'lead')
+
+    def test_create_task_still_supports_plain_lead_link(self):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction)
+
+        response = self.client.post('/api/crm/kanban/tasks/', {
+            'title': 'Позвонить', 'column': self.column.id, 'lead': lead.id,
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['lead'], lead.id)
+
+    def test_uon_record_id_without_kind_rejected(self):
+        response = self.client.post('/api/crm/kanban/tasks/', {
+            'title': 'Задача', 'column': self.column.id, 'uon_record_id': '777',
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_change_uon_link_after_creation(self):
+        """PATCH идёт через TaskUpdateSerializer, где этих полей вообще нет в
+        fields — задать связь с U-ON можно только при создании."""
+        task = Task.objects.create(
+            title='Задача', column=self.column, uon_record_kind='request', uon_record_id='777',
+        )
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'uon_record_kind': 'lead', 'uon_record_id': '199'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        task.refresh_from_db()
+        self.assertEqual(task.uon_record_kind, 'request')
+        self.assertEqual(task.uon_record_id, '777')

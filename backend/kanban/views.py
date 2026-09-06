@@ -8,7 +8,13 @@ from integrations.models import UonLeadRecord, UonRequestRecord
 from leads.models import Lead
 
 from .models import KanbanColumn, Task
-from .serializers import KanbanColumnSerializer, TaskMoveSerializer, TaskSerializer, TaskUpdateSerializer
+from .serializers import (
+    KanbanColumnSerializer,
+    TaskCreateSerializer,
+    TaskMoveSerializer,
+    TaskSerializer,
+    TaskUpdateSerializer,
+)
 from .services import next_order_in_column, reposition_task
 from telegrambot.tasks import notify_task_assignment
 
@@ -70,6 +76,8 @@ class TaskViewSet(
         return qs
 
     def get_serializer_class(self):
+        if self.action == 'create':
+            return TaskCreateSerializer
         if self.action == 'partial_update':
             return TaskUpdateSerializer
         if self.action == 'move':
