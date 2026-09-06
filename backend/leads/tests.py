@@ -217,17 +217,33 @@ class LeadFieldEditTests(TestCase):
         self.assertEqual(lead.direction_id, self.egypt.id)
         self.assertEqual(lead.initial_comment, 'Уточнённый комментарий')
 
-    def test_manager_cannot_edit_someone_elses_lead(self):
+    def test_manager_can_see_and_edit_contact_fields_on_someone_elses_lead(self):
+        """С 04.09.2026 (решение заказчика) все заявки видны и редактируемы любым
+        залогиненным менеджером — раньше чужая заявка была не видна вообще (404).
+        Переназначать ответственного по-прежнему может только руководитель —
+        см. test_manager_cannot_reassign_someone_elses_lead ниже."""
         lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.other_manager)
         self.client.force_login(self.manager)
 
         response = self.client.patch(
-            f'/api/crm/leads/{lead.id}/', {'name': 'Попытка правки'}, content_type='application/json',
+            f'/api/crm/leads/{lead.id}/', {'name': 'Новое имя'}, content_type='application/json',
         )
 
-        self.assertEqual(response.status_code, 404)  # not in this manager's queryset at all
+        self.assertEqual(response.status_code, 200)
         lead.refresh_from_db()
-        self.assertEqual(lead.name, 'Клиент')
+        self.assertEqual(lead.name, 'Новое имя')
+
+    def test_manager_cannot_reassign_someone_elses_lead(self):
+        lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.other_manager)
+        self.client.force_login(self.manager)
+
+        response = self.client.patch(
+            f'/api/crm/leads/{lead.id}/', {'assigned_manager': self.manager.id}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        lead.refresh_from_db()
+        self.assertEqual(lead.assigned_manager_id, self.other_manager.id)
 
     def test_head_edits_any_lead(self):
         lead = Lead.objects.create(name='Клиент', direction=self.direction, assigned_manager=self.manager)

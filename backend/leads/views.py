@@ -62,7 +62,10 @@ class LeadViewSet(
     http_method_names = ['get', 'patch', 'post', 'head', 'options']
 
     def get_queryset(self):
-        user = self.request.user
+        # Раньше менеджер видел только свои заявки (assigned_manager=user), заявки
+        # других — только руководитель. По решению заказчика (04.09.2026) все
+        # заявки теперь видны всем залогиненным сотрудникам — переназначать
+        # ответственного по-прежнему может только руководитель (см. partial_update).
         qs = (
             Lead.objects.select_related('assigned_manager', 'direction')
             .prefetch_related(
@@ -70,8 +73,10 @@ class LeadViewSet(
                 'tasks__column', 'uon_sync_logs',
             )
         )
-        if not is_head(user):
-            qs = qs.filter(assigned_manager=user)
+
+        assigned_manager_id = self.request.query_params.get('assigned_manager')
+        if assigned_manager_id:
+            qs = qs.filter(assigned_manager_id=assigned_manager_id)
 
         status_param = self.request.query_params.get('status')
         if status_param:

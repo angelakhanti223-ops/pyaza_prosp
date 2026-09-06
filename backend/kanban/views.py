@@ -4,7 +4,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from accounts.permissions import is_head
 from integrations.models import UonLeadRecord, UonRequestRecord
 from leads.models import Lead
 
@@ -44,12 +43,14 @@ class TaskViewSet(
     pagination_class = None
 
     def get_queryset(self):
+        # Раньше менеджер видел только свои задачи (assignee=user), доска целиком —
+        # только руководитель. По решению заказчика (04.09.2026) вся доска теперь
+        # видна всем залогиненным сотрудникам; ?assignee= остаётся — сузить список
+        # до конкретного исполнителя может теперь любой, не только руководитель.
         qs = Task.objects.select_related('column', 'assignee', 'lead')
-        if not is_head(self.request.user):
-            qs = qs.filter(assignee=self.request.user)
 
         assignee_id = self.request.query_params.get('assignee')
-        if assignee_id and is_head(self.request.user):
+        if assignee_id:
             qs = qs.filter(assignee_id=assignee_id)
 
         # Обращения (задачи, пришедшие из синхронизации напоминаний U-ON), привязанные
