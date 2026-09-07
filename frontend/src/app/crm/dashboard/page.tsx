@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import {
   fetchDashboard,
   fetchPlan,
+  fetchWorkSchedule,
   fetchWorkSummary,
   type DashboardData,
   type DashboardPeriod,
   type PlanData,
+  type WorkScheduleData,
   type WorkSummaryData,
 } from "@/lib/dashboardApi";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
@@ -29,6 +31,20 @@ const MONTH_LABELS = [
   "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
 ];
 
+const MONTH_GENITIVE = [
+  "", "января", "февраля", "марта", "апреля", "мая", "июня",
+  "июля", "августа", "сентября", "октября", "ноября", "декабря",
+];
+
+function formatScheduleRange(dateFrom: string, dateTo: string): string {
+  const from = new Date(`${dateFrom}T00:00:00`);
+  const to = new Date(`${dateTo}T00:00:00`);
+  const monthTo = MONTH_GENITIVE[to.getMonth() + 1];
+  if (dateFrom === dateTo) return `${from.getDate()} ${monthTo}`;
+  if (from.getMonth() === to.getMonth()) return `${from.getDate()}–${to.getDate()} ${monthTo}`;
+  return `${from.getDate()} ${MONTH_GENITIVE[from.getMonth() + 1]} – ${to.getDate()} ${monthTo}`;
+}
+
 export default function CrmDashboardPage() {
   const { user } = useCrmAuth();
   const isHead = user?.is_head ?? false;
@@ -40,6 +56,7 @@ export default function CrmDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<PlanData | null>(null);
   const [summary, setSummary] = useState<WorkSummaryData | null>(null);
+  const [schedule, setSchedule] = useState<WorkScheduleData | null>(null);
 
   useEffect(() => {
     if (isHead) listManagers().then(setManagers);
@@ -49,6 +66,12 @@ export default function CrmDashboardPage() {
     fetchPlan().then(setPlan);
     fetchWorkSummary().then(setSummary);
   }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    fetchWorkSchedule({ year: data.period.year, month: data.period.month }).then(setSchedule);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.period.year, data?.period.month]);
 
   useEffect(() => {
     let active = true;
@@ -313,6 +336,32 @@ export default function CrmDashboardPage() {
                   </tbody>
                 </table>
               )}
+            </div>
+          )}
+
+          {schedule && schedule.rows.length > 0 && (
+            <div className="rounded-2xl border border-black/5 bg-white p-5">
+              <h2 className="mb-4 text-sm font-semibold text-navy">
+                Рабочий график — {MONTH_LABELS[schedule.month]} {schedule.year}
+              </h2>
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-foreground/50">
+                  <tr>
+                    <th className="pb-2 font-medium">Даты</th>
+                    <th className="pb-2 font-medium">Кто работает</th>
+                    <th className="pb-2 text-right font-medium">Рабочих дней подряд</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.rows.map((row, i) => (
+                    <tr key={i} className="border-t border-black/5">
+                      <td className="py-2 text-navy">{formatScheduleRange(row.date_from, row.date_to)}</td>
+                      <td className="py-2 text-foreground/70">{row.manager_name}</td>
+                      <td className="py-2 text-right text-foreground/70">{row.days}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

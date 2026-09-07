@@ -9,8 +9,15 @@ from django.utils import timezone
 from integrations.models import UonLeadRecord, UonRequestRecord
 from kanban.models import KanbanColumn, Task
 
-from .dashboard import _compute, actual_commission_for_month, plan_progress_rows, task_counts_data, work_summary_data
-from .models import Direction, Lead, LeadStatusHistory, MonthlyPlan
+from .dashboard import (
+    _compute,
+    actual_commission_for_month,
+    plan_progress_rows,
+    task_counts_data,
+    work_schedule_rows,
+    work_summary_data,
+)
+from .models import Direction, Lead, LeadStatusHistory, MonthlyPlan, WorkShift
 from .tasks import check_stale_leads, create_new_lead_task
 
 User = get_user_model()
@@ -706,6 +713,74 @@ class PlanViewTests(TestCase):
         self.assertEqual(len(data['rows']), 1)
         self.assertEqual(data['rows'][0]['manager_id'], self.manager1.id)
         self.assertEqual(float(data['target_total']), 60000)
+
+
+class WorkScheduleTests(TestCase):
+    """Группировка WorkShift в диапазоны подряд идущих дней одного менеджера
+    для отображения на дашборде (ТЗ 07.09.2026)."""
+
+    def setUp(self):
+        self.elena = User.objects.create_user(username='schedelena', password='x', role=User.Role.HEAD, first_name='Елена')
+        self.katya = User.objects.create_user(username='schedkatya', password='x', role=User.Role.MANAGER, first_name='Екатерина')
+
+    def test_consecutive_days_same_manager_grouped(self):
+        for day in (2, 3, 4, 5):
+            WorkShift.objects.create(date=f'2026-09-0{day}', manager=self.elena)
+
+        rows = work_schedule_rows(2026, 9)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['manager_id'], self.elena.id)
+        self.assertEqual(rows[0]['date_from'], '2026-09-02')
+        self.assertEqual(rows[0]['date_to'], '2026-09-05')
+        self.assertEqual(rows[0]['days'], 4)
+
+    def test_manager_switch_breaks_the_range(self):
+        WorkShift.objects.create(date='2026-09-01', manager=self.katya)
+        for day in (2, 3):
+            WorkShift.objects.create(date=f'2026-09-0{day}', manager=self.elena)
+        WorkShift.objects.create(date='2026-09-04', manager=self.katya)
+
+        rows = work_schedule_rows(2026, 9)
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual([r['manager_id'] for r in rows], [self.katya.id, self.elena.id, self.katya.id])
+        self.assertEqual(rows[1]['days'], 2)
+
+    def test_gap_breaks_the_range_even_for_same_manager(self):
+        WorkShift.objects.create(date='2026-09-01', manager=self.elena)
+        WorkShift.objects.create(date='2026-09-03', manager=self.elena)
+
+        rows = work_schedule_rows(2026, 9)
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['days'], 1)
+        self.assertEqual(rows[1]['days'], 1)
+
+    def test_shifts_outside_month_excluded(self):
+        WorkShift.objects.create(date='2026-08-31', manager=self.elena)
+        WorkShift.objects.create(date='2026-09-01', manager=self.elena)
+        WorkShift.objects.create(date='2026-10-01', manager=self.elena)
+
+        rows = work_schedule_rows(2026, 9)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['date_from'], '2026-09-01')
+        self.assertEqual(rows[0]['date_to'], '2026-09-01')
+
+
+class WorkScheduleViewTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='schedviewer', password='x', role=User.Role.MANAGER)
+        WorkShift.objects.create(date='2026-09-01', manager=self.manager)
+        self.client.force_login(self.manager)
+
+    def test_returns_rows_for_requested_month(self):
+        response = self.client.get('/api/crm/work-schedule/?year=2026&month=9')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['rows']), 1)
+        self.assertEqual(data['rows'][0]['manager_id'], self.manager.id)
 
 
 class WorkSummaryTests(TestCase):

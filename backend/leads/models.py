@@ -101,6 +101,23 @@ class MonthlyPlan(models.Model):
         return f'{self.manager} — {self.month:02d}.{self.year}: {self.target_commission} ₽'
 
 
+class WorkShift(models.Model):
+    """Рабочий график менеджеров по дням — кто в этот день на смене, показывается
+    внизу дашборда CRM (решение заказчика, 07.09.2026). Редактируется через
+    Django admin, по одной записи на день."""
+
+    date = models.DateField('Дата', unique=True)
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_shifts',
+    )
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return f'{self.date}: {self.manager}'
+
+
 class LeadComment(models.Model):
     """Лента комментариев менеджера по ходу работы с заявкой (ТЗ 5.1, 5.4)."""
 

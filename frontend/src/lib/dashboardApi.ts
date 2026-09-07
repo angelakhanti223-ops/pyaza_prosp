@@ -108,3 +108,27 @@ export async function fetchWorkSummary(): Promise<WorkSummaryData> {
   if (!res.ok) throw new Error("Не удалось загрузить сводку");
   return res.json();
 }
+
+export type WorkScheduleRow = {
+  manager_id: number;
+  manager_name: string;
+  date_from: string;
+  date_to: string;
+  days: number;
+};
+
+export type WorkScheduleData = {
+  year: number;
+  month: number;
+  rows: WorkScheduleRow[];
+};
+
+export async function fetchWorkSchedule(params: { year?: number; month?: number } = {}): Promise<WorkScheduleData> {
+  const qs = new URLSearchParams();
+  if (params.year) qs.set("year", String(params.year));
+  if (params.month) qs.set("month", String(params.month));
+
+  const res = await fetch(`${API_BASE_URL}/api/crm/work-schedule/?${qs.toString()}`, { credentials: "include" });
+  if (!res.ok) throw new Error("Не удалось загрузить рабочий график");
+  return res.json();
+}

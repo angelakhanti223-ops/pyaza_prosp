@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import is_head
 
-from .models import Lead, LeadStatusHistory, MonthlyPlan
+from .models import Lead, LeadStatusHistory, MonthlyPlan, WorkShift
 
 # Порядок этапов воронки для конверсии (ТЗ 7). Закрытые "в отказ" заявки не
 # входят в положительную воронку — это отдельный, негативный, исход.
@@ -328,3 +328,51 @@ class WorkSummaryView(APIView):
 
     def get(self, request):
         return Response(work_summary_data(request.user, is_head(request.user)))
+
+
+def work_schedule_rows(year, month):
+    """Рабочий график на месяц, сгруппированный в диапазоны подряд идущих дней
+    одного менеджера (как в таблице, которую руководитель ведёт вручную) —
+    отдельные записи WorkShift редактируются в Django admin по одной на день,
+    здесь только группировка для отображения (ТЗ 07.09.2026)."""
+    start, end = month_bounds(year, month)
+    shifts = list(
+        WorkShift.objects.filter(date__gte=start.date(), date__lte=end.date())
+        .select_related('manager').order_by('date'),
+    )
+
+    rows = []
+    for shift in shifts:
+        last = rows[-1] if rows else None
+        if last and last['manager_id'] == shift.manager_id and (shift.date - last['date_to']).days == 1:
+            last['date_to'] = shift.date
+            last['days'] += 1
+        else:
+            rows.append({
+                'manager_id': shift.manager_id,
+                'manager_name': shift.manager.get_full_name() or shift.manager.username,
+                'date_from': shift.date,
+                'date_to': shift.date,
+                'days': 1,
+            })
+
+    return [
+        {**row, 'date_from': row['date_from'].isoformat(), 'date_to': row['date_to'].isoformat()}
+        for row in rows
+    ]
+
+
+class WorkScheduleView(APIView):
+    """Рабочий график на месяц (кто в какие дни на смене) — блок внизу дашборда."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except ValueError:
+            year, month = today.year, today.month
+
+        return Response({'year': year, 'month': month, 'rows': work_schedule_rows(year, month)})

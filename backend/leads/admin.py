@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan
+from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan, WorkShift
 
 
 class LeadCommentInline(admin.TabularInline):
@@ -45,3 +45,12 @@ class MonthlyPlanAdmin(admin.ModelAdmin):
     )
     list_editable = ('bonus_percent',)
     list_filter = ('year', 'month', 'manager')
+
+
+@admin.register(WorkShift)
+class WorkShiftAdmin(admin.ModelAdmin):
+    list_display = ('date', 'manager')
+    list_editable = ('manager',)
+    list_filter = ('manager',)
+    date_hierarchy = 'date'
+    ordering = ('date',)
