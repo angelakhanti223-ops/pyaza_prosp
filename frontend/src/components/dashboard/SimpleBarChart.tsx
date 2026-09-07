@@ -10,7 +10,7 @@ export default function SimpleBarChart({ data }: Props) {
   }
 
   return (
-    <div className="flex h-40 items-end gap-1.5">
+    <div className="flex h-40 gap-1.5">
       {data.map((d) => (
         <div key={d.label} className="flex flex-1 flex-col items-center gap-1.5">
           <div className="flex w-full flex-1 items-end">
