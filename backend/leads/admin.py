@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan, WorkShift
+from .models import CommissionTier, Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan, WorkShift
 
 
 class LeadCommentInline(admin.TabularInline):
@@ -38,11 +38,16 @@ class DirectionAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
+@admin.register(CommissionTier)
+class CommissionTierAdmin(admin.ModelAdmin):
+    list_display = ('name', 'threshold', 'commission_percent')
+    list_editable = ('threshold', 'commission_percent')
+    ordering = ('threshold',)
+
+
 @admin.register(MonthlyPlan)
 class MonthlyPlanAdmin(admin.ModelAdmin):
-    list_display = (
-        'manager', 'year', 'month', 'target_commission', 'base_salary', 'commission_percent', 'bonus_percent',
-    )
+    list_display = ('manager', 'year', 'month', 'base_salary', 'bonus_percent')
     list_editable = ('bonus_percent',)
     list_filter = ('year', 'month', 'manager')
 

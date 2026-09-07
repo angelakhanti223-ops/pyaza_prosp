@@ -631,8 +631,8 @@ class PlanBotTests(TestCase):
         self.manager1_account = TelegramAccount.objects.create(user=self.manager1, chat_id=902)
         today = timezone.localdate()
         self.year, self.month = today.year, today.month
-        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month, target_commission=60000)
-        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month, target_commission=80000)
+        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month)
+        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month)
 
     def test_manager_sees_only_own_row(self):
         update = make_update(chat_id=902)
@@ -641,19 +641,19 @@ class PlanBotTests(TestCase):
 
         text = sent_texts(context)[0]
         self.assertIn('60 000', text)
-        self.assertNotIn('80 000', text)
         self.assertNotIn('Итого офис', text)
 
     def test_head_sees_all_rows_and_total(self):
+        # Ни у кого нет проведённых сделок в этом месяце — оба ниже уровня
+        # «Минимум» (60 000), у обоих одна и та же цель — дойти до его порога.
         update = make_update(chat_id=901)
         context = make_context()
         async_to_sync(cmd_plan)(update, context)
 
         text = sent_texts(context)[0]
         self.assertIn('60 000', text)
-        self.assertIn('80 000', text)
         self.assertIn('Итого офис', text)
-        self.assertIn('140 000', text)
+        self.assertIn('120 000', text)
 
     def test_unlinked_chat_gets_not_linked_message(self):
         update = make_update(chat_id=999)
@@ -672,7 +672,7 @@ class NotifyWeeklyPlanProgressTests(TestCase):
         self.manager_account = TelegramAccount.objects.create(user=self.manager, chat_id=912)
         today = timezone.localdate()
         self.year, self.month = today.year, today.month
-        MonthlyPlan.objects.create(manager=self.manager, year=self.year, month=self.month, target_commission=60000)
+        MonthlyPlan.objects.create(manager=self.manager, year=self.year, month=self.month)
 
     @override_settings(TELEGRAM_BOT_ENABLED=True, TELEGRAM_BOT_TOKEN='test-token')
     @patch('telegrambot.tasks.requests.post')

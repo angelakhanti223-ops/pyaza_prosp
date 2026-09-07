@@ -475,8 +475,11 @@ class PlanProgressTests(TestCase):
         self.assertEqual(total, 0)
 
     def test_plan_progress_rows_computes_percent(self):
+        # Ниже порога самого нижнего уровня (Минимум, 60 000) «цель» —
+        # достичь этого уровня (решение заказчика, 07.09.2026: единая лестница
+        # CommissionTier вместо персональной target_commission).
         today = timezone.now().date()
-        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, target_commission=60000)
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month)
         self._pay_lead(30000)
 
         rows = plan_progress_rows(today.year, today.month)
@@ -485,19 +488,19 @@ class PlanProgressTests(TestCase):
         self.assertEqual(rows[0]['target'], 60000)
         self.assertEqual(rows[0]['actual'], 30000)
         self.assertEqual(rows[0]['percent'], 50.0)
+        self.assertIsNone(rows[0]['tier_name'])
+        self.assertEqual(rows[0]['next_tier_name'], 'Минимум')
 
     def test_salary_is_base_plus_own_commission_plus_bonus_from_others(self):
-        # 25.08.2026: оклад 30000 + 15% своей комиссии + bonus_percent % от
+        # 25.08.2026: оклад 30000 + % своей комиссии (по уровню CommissionTier,
+        # ниже 60 000 действует % уровня «Минимум» — 15%) + bonus_percent % от
         # суммарной комиссии остальных держателей плана в этом месяце.
         other = User.objects.create_user(username='other_manager3', password='x')
         today = timezone.now().date()
         MonthlyPlan.objects.create(
-            manager=self.manager, year=today.year, month=today.month, target_commission=60000,
-            base_salary=30000, commission_percent=15, bonus_percent=3,
+            manager=self.manager, year=today.year, month=today.month, base_salary=30000, bonus_percent=3,
         )
-        MonthlyPlan.objects.create(
-            manager=other, year=today.year, month=today.month, target_commission=60000,
-        )
+        MonthlyPlan.objects.create(manager=other, year=today.year, month=today.month)
         self._pay_lead(40000)
         self._pay_lead(10000, manager=other)
 
@@ -509,12 +512,37 @@ class PlanProgressTests(TestCase):
 
     def test_salary_defaults_with_no_bonus(self):
         today = timezone.now().date()
-        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, target_commission=60000)
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month)
         self._pay_lead(20000)
 
         rows = plan_progress_rows(today.year, today.month)
 
         self.assertEqual(rows[0]['salary'], 30000 + Decimal('0.15') * 20000)
+
+    def test_commission_percent_steps_up_with_tier(self):
+        """100 000 своей комиссии — уровень «Базовый» (16%), не «Минимум» (15%)."""
+        today = timezone.now().date()
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, base_salary=0)
+        self._pay_lead(100000)
+
+        rows = plan_progress_rows(today.year, today.month)
+
+        self.assertEqual(rows[0]['tier_name'], 'Базовый')
+        self.assertEqual(rows[0]['next_tier_name'], 'Развитие')
+        self.assertEqual(rows[0]['target'], 150000)
+        self.assertEqual(rows[0]['salary'], Decimal('0.16') * 100000)
+
+    def test_top_tier_has_no_next_and_target_is_its_own_threshold(self):
+        today = timezone.now().date()
+        MonthlyPlan.objects.create(manager=self.manager, year=today.year, month=today.month, base_salary=0)
+        self._pay_lead(200000)
+
+        rows = plan_progress_rows(today.year, today.month)
+
+        self.assertEqual(rows[0]['tier_name'], 'Развитие')
+        self.assertIsNone(rows[0]['next_tier_name'])
+        self.assertEqual(rows[0]['target'], 150000)
+        self.assertEqual(rows[0]['salary'], Decimal('0.17') * 200000)
 
 
 class DashboardCommissionTests(TestCase):
@@ -695,16 +723,18 @@ class PlanViewTests(TestCase):
         self.manager2 = User.objects.create_user(username='planmanager5', password='x', role=User.Role.MANAGER)
         today = timezone.now().date()
         self.year, self.month = today.year, today.month
-        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month, target_commission=60000)
-        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month, target_commission=80000)
+        MonthlyPlan.objects.create(manager=self.manager1, year=self.year, month=self.month)
+        MonthlyPlan.objects.create(manager=self.manager2, year=self.year, month=self.month)
 
     def test_head_sees_all_managers(self):
+        # Ни у кого нет проведённых сделок — оба ниже уровня «Минимум», у обоих
+        # цель (target) — достичь его порога (60 000), итого 120 000 на двоих.
         self.client.force_login(self.head)
         response = self.client.get('/api/crm/plan/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['rows']), 2)
-        self.assertEqual(float(data['target_total']), 140000)
+        self.assertEqual(float(data['target_total']), 120000)
 
     def test_manager_sees_only_own_row(self):
         self.client.force_login(self.manager1)

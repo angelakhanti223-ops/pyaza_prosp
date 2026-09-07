@@ -162,6 +162,13 @@ export default function CrmDashboardPage() {
                     style={{ width: `${Math.min(row.percent, 100)}%` }}
                   />
                 </div>
+                <div className="mt-1 text-xs text-foreground/50">
+                  Уровень: <span className="font-medium text-navy">{row.tier_name ?? "ниже «Минимума»"}</span>
+                  {" "}({row.commission_percent}% от своей комиссии)
+                  {row.next_tier_name && (
+                    <> · до «{row.next_tier_name}» осталось {formatMoney(Math.max(row.target - row.actual, 0))}</>
+                  )}
+                </div>
                 <div className="mt-1 text-right text-xs font-semibold text-gold">
                   Зарплата на сейчас: {formatMoney(row.salary)}
                 </div>

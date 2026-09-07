@@ -64,11 +64,32 @@ class Lead(models.Model):
         return f'{self.name} ({self.phone})'
 
 
+class CommissionTier(models.Model):
+    """Единая (одна на всех менеджеров и на все месяцы) лестница уровней плана —
+    заменяет собой персональную «Целевую комиссию» и фиксированный
+    commission_percent на MonthlyPlan (решение заказчика, 07.09.2026).
+    threshold — сумма СВОЕЙ комиссии за месяц, начиная с которой засчитан этот
+    уровень; commission_percent — % от своей комиссии, идущий в зарплату, пока
+    держится этот уровень (см. plan_progress_rows). Ниже порога самого нижнего
+    уровня всё равно применяется его commission_percent — отдельной, более
+    низкой ступени для «не дотянул» нет."""
+
+    name = models.CharField('Название уровня', max_length=50, unique=True)
+    threshold = models.DecimalField('Порог (своя комиссия за месяц)', max_digits=10, decimal_places=2, unique=True)
+    commission_percent = models.DecimalField('% от своей комиссии на этом уровне', max_digits=5, decimal_places=2)
+
+    class Meta:
+        ordering = ['threshold']
+
+    def __str__(self):
+        return f'{self.name} (от {self.threshold} ₽ — {self.commission_percent}%)'
+
+
 class MonthlyPlan(models.Model):
-    """Целевая комиссия менеджера на месяц — план/факт на дашборде CRM и в боте,
-    плюс параметры расчёта зарплаты за тот же месяц (решение заказчика,
-    25.08.2026): оклад + commission_percent % от своей комиссии + bonus_percent %
-    от суммарной комиссии остальных держателей плана в этом месяце.
+    """Параметры расчёта зарплаты менеджера за месяц (решение заказчика,
+    25.08.2026): оклад + % от своей комиссии (по уровню из CommissionTier,
+    см. plan_progress_rows) + bonus_percent % от суммарной комиссии остальных
+    держателей плана в этом месяце.
 
     bonus_percent — единственное поле здесь, которое нельзя посчитать
     автоматически: зависит от SLA и пропущенных ежедневных задач, а трекинга
@@ -80,11 +101,7 @@ class MonthlyPlan(models.Model):
     )
     year = models.PositiveSmallIntegerField('Год')
     month = models.PositiveSmallIntegerField('Месяц')
-    target_commission = models.DecimalField('Целевая комиссия', max_digits=10, decimal_places=2)
     base_salary = models.DecimalField('Оклад', max_digits=10, decimal_places=2, default=Decimal('30000'))
-    commission_percent = models.DecimalField(
-        '% от своей комиссии', max_digits=5, decimal_places=2, default=Decimal('15'),
-    )
     bonus_percent = models.DecimalField(
         '% от комиссии остальных (SLA/ежедневные задачи)', max_digits=5, decimal_places=2, default=Decimal('3'),
         help_text='По умолчанию 3% — SLA считается выполненным, если руководитель явно не указал иное. '
@@ -98,7 +115,7 @@ class MonthlyPlan(models.Model):
         unique_together = ('manager', 'year', 'month')
 
     def __str__(self):
-        return f'{self.manager} — {self.month:02d}.{self.year}: {self.target_commission} ₽'
+        return f'{self.manager} — {self.month:02d}.{self.year}'
 
 
 class WorkShift(models.Model):

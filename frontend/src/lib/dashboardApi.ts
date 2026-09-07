@@ -64,6 +64,9 @@ export type PlanRow = {
   actual: number;
   percent: number;
   salary: number;
+  tier_name: string | null;
+  next_tier_name: string | null;
+  commission_percent: number;
 };
 
 export type PlanData = {

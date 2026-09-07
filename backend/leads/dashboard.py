@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import is_head
 
-from .models import Lead, LeadStatusHistory, MonthlyPlan, WorkShift
+from .models import CommissionTier, Lead, LeadStatusHistory, MonthlyPlan, WorkShift
 
 # Порядок этапов воронки для конверсии (ТЗ 7). Закрытые "в отказ" заявки не
 # входят в положительную воронку — это отдельный, негативный, исход.
@@ -199,26 +199,54 @@ def actual_commission_for_month(manager, year, month):
     return Lead.objects.filter(id__in=lead_ids).aggregate(total=Sum('commission'))['total'] or 0
 
 
+def _tier_lookup(actual, tiers):
+    """tiers — CommissionTier по возрастанию threshold. Возвращает (достигнутый
+    уровень или None, следующий уровень или None, % от своей комиссии).
+    Ниже порога самого нижнего уровня всё равно действует его %, а «следующий»
+    уровень для прогресс-бара — этот же нижний (решение заказчика, 07.09.2026:
+    единая лестница уровней на всех менеджеров вместо персонального target_commission
+    и commission_percent на MonthlyPlan)."""
+    if not tiers:
+        return None, None, Decimal('0')
+
+    reached = None
+    for tier in tiers:
+        if actual >= tier.threshold:
+            reached = tier
+        else:
+            break
+
+    if reached is None:
+        return None, tiers[0], tiers[0].commission_percent
+
+    next_tier = next((t for t in tiers if t.threshold > reached.threshold), None)
+    return reached, next_tier, reached.commission_percent
+
+
 def plan_progress_rows(year, month, managers=None):
     """Строки план/факт по комиссии за месяц + зарплата (оклад + % от своей
-    комиссии + % от суммарной комиссии остальных держателей плана в этом
-    месяце — см. MonthlyPlan). `managers=None` — по всем, у кого есть план;
-    «остальные» считаются от полного набора за месяц независимо от фильтра,
-    чтобы личная строка менеджера не искажала долю чужой комиссии."""
+    комиссии по достигнутому уровню CommissionTier + % от суммарной комиссии
+    остальных держателей плана в этом месяце — см. MonthlyPlan/CommissionTier).
+    `managers=None` — по всем, у кого есть план; «остальные» считаются от
+    полного набора за месяц независимо от фильтра, чтобы личная строка
+    менеджера не искажала долю чужой комиссии."""
     all_plans = list(MonthlyPlan.objects.filter(year=year, month=month).select_related('manager'))
     commissions = {plan.manager_id: actual_commission_for_month(plan.manager, year, month) for plan in all_plans}
     total_commission = sum(commissions.values(), Decimal('0'))
+    tiers = list(CommissionTier.objects.order_by('threshold'))
 
     plans = all_plans if managers is None else [p for p in all_plans if p.manager in managers]
 
     rows = []
     for plan in plans:
         actual = commissions[plan.manager_id]
-        target = plan.target_commission
         other_commission = total_commission - actual
+        reached_tier, next_tier, commission_percent = _tier_lookup(Decimal(actual), tiers)
+        target = next_tier.threshold if next_tier else (reached_tier.threshold if reached_tier else Decimal('0'))
+
         salary = (
             plan.base_salary
-            + (plan.commission_percent / Decimal('100')) * Decimal(actual)
+            + (commission_percent / Decimal('100')) * Decimal(actual)
             + (plan.bonus_percent / Decimal('100')) * Decimal(other_commission)
         )
         rows.append({
@@ -228,6 +256,9 @@ def plan_progress_rows(year, month, managers=None):
             'actual': actual,
             'percent': round(float(actual) / float(target) * 100, 1) if target else 0,
             'salary': salary,
+            'tier_name': reached_tier.name if reached_tier else None,
+            'next_tier_name': next_tier.name if next_tier else None,
+            'commission_percent': commission_percent,
         })
     return rows
 
