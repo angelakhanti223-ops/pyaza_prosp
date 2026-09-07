@@ -7,7 +7,7 @@ from rest_framework import serializers
 from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonRequestRecord
 
-from .models import KanbanColumn, Task
+from .models import KanbanColumn, Task, TaskAttachment
 
 User = get_user_model()
 
@@ -16,6 +16,15 @@ class KanbanColumnSerializer(serializers.ModelSerializer):
     class Meta:
         model = KanbanColumn
         fields = ['id', 'name', 'order']
+
+
+class TaskAttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = TaskAttachment
+        fields = ['id', 'file', 'uploaded_by', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_by', 'uploaded_at']
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -29,17 +38,19 @@ class TaskSerializer(serializers.ModelSerializer):
     uon_status_name = serializers.SerializerMethodField()
     kind = serializers.ReadOnlyField()
     priority = serializers.ReadOnlyField()
+    attachments = TaskAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Task
         fields = [
             'id', 'title', 'description', 'status', 'status_display', 'column', 'assignee', 'assignee_id',
             'lead', 'lead_name', 'lead_status_display', 'deadline', 'is_recurring', 'kind', 'priority',
-            'uon_record_kind', 'uon_record_id', 'uon_status_name', 'order', 'created_at', 'updated_at',
+            'uon_record_kind', 'uon_record_id', 'uon_status_name', 'attachments', 'order', 'created_at',
+            'updated_at',
         ]
         read_only_fields = [
             'id', 'status_display', 'order', 'created_at', 'updated_at', 'kind', 'priority',
-            'uon_record_kind', 'uon_record_id',
+            'uon_record_kind', 'uon_record_id', 'attachments',
         ]
 
     def get_uon_status_name(self, obj):

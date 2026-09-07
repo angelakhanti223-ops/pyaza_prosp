@@ -1,5 +1,7 @@
 import type { CrmUser } from "./crmApi";
 
+export { mediaUrl } from "./crmApi";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export type KanbanColumn = {
@@ -21,6 +23,13 @@ export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: "cancelled", label: "Отменено" },
 ];
 
+export type TaskAttachment = {
+  id: number;
+  file: string;
+  uploaded_by: CrmUser | null;
+  uploaded_at: string;
+};
+
 export type KanbanTask = {
   id: number;
   title: string;
@@ -39,6 +48,7 @@ export type KanbanTask = {
   uon_record_kind: UonRecordKind;
   uon_record_id: string;
   uon_status_name: string | null;
+  attachments: TaskAttachment[];
   order: number;
   created_at: string;
   updated_at: string;
@@ -96,7 +106,9 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
 
 async function apiJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   const res = await apiFetch(path, { ...options, headers });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -144,4 +156,13 @@ export async function moveTask(id: number, column: number, order: number): Promi
 
 export async function deleteTask(id: number): Promise<void> {
   await apiJson(`/api/crm/kanban/tasks/${id}/`, { method: "DELETE" });
+}
+
+export async function uploadTaskAttachment(id: number, file: File): Promise<TaskAttachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiJson<TaskAttachment>(`/api/crm/kanban/tasks/${id}/attachments/`, {
+    method: "POST",
+    body: formData,
+  });
 }

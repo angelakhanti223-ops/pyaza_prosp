@@ -1,6 +1,7 @@
 from django.db.models import Q
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -10,6 +11,7 @@ from leads.models import Lead
 from .models import KanbanColumn, Task
 from .serializers import (
     KanbanColumnSerializer,
+    TaskAttachmentSerializer,
     TaskCreateSerializer,
     TaskMoveSerializer,
     TaskSerializer,
@@ -82,6 +84,8 @@ class TaskViewSet(
             return TaskUpdateSerializer
         if self.action == 'move':
             return TaskMoveSerializer
+        if self.action == 'add_attachment':
+            return TaskAttachmentSerializer
         return TaskSerializer
 
     def list(self, request, *args, **kwargs):
@@ -130,3 +134,14 @@ class TaskViewSet(
         reposition_task(task, serializer.validated_data['column'], serializer.validated_data['order'])
         task.refresh_from_db()
         return Response(TaskSerializer(task).data)
+
+    @action(
+        detail=True, methods=['post'], url_path='attachments',
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def add_attachment(self, request, pk=None):
+        task = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(task=task, uploaded_by=request.user)
+        return Response(serializer.data, status=201)

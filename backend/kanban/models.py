@@ -81,3 +81,17 @@ class Task(models.Model):
         if self.is_recurring:
             return 'important'
         return None
+
+
+class TaskAttachment(models.Model):
+    """Файлы, прикреплённые к задаче на канбан-доске (по аналогии с leads.LeadAttachment)."""
+
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='task_attachments/%Y/%m/')
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+',
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name

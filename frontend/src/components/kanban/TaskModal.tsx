@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, X } from "lucide-react";
+import { ExternalLink, Paperclip, X } from "lucide-react";
 import { listLeads, listManagers, type CrmUser, type LeadListItem } from "@/lib/crmApi";
 import {
   createTask,
   deleteTask,
+  mediaUrl,
   TASK_STATUS_OPTIONS,
   updateTask,
   uonRecordUrl,
+  uploadTaskAttachment,
   type KanbanColumn,
   type KanbanTask,
+  type TaskAttachment,
   type TaskStatus,
 } from "@/lib/kanbanApi";
 
@@ -57,6 +60,8 @@ export default function TaskModal({
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "new");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [attachments, setAttachments] = useState<TaskAttachment[]>(task?.attachments ?? []);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     listManagers().then(setManagers);
@@ -114,6 +119,18 @@ export default function TaskModal({
       setError("Не удалось сохранить задачу");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!task || !e.target.files?.length) return;
+    setUploading(true);
+    try {
+      const uploaded = await uploadTaskAttachment(task.id, e.target.files[0]);
+      setAttachments((prev) => [...prev, uploaded]);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
   }
 
@@ -289,6 +306,33 @@ export default function TaskModal({
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+
+          {isEdit && task && (
+            <div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/15 px-3 py-2.5 text-sm text-foreground/60 hover:border-blue hover:text-blue">
+                <Paperclip size={15} />
+                {uploading ? "Загрузка…" : "Прикрепить файл"}
+                <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+              </label>
+              <ul className="mt-2 flex flex-col gap-1">
+                {attachments.map((a) => (
+                  <li key={a.id}>
+                    <a
+                      href={mediaUrl(a.file)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue underline underline-offset-2 hover:text-navy"
+                    >
+                      {a.file.split("/").pop()}
+                    </a>
+                  </li>
+                ))}
+                {attachments.length === 0 && (
+                  <p className="text-xs text-foreground/40">Файлов пока нет</p>
+                )}
+              </ul>
             </div>
           )}
         </div>

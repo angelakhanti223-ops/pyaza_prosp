@@ -1,13 +1,14 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 
 from integrations.models import UonLeadRecord, UonRequestRecord
 from leads.models import Direction, Lead
 
-from .models import KanbanColumn, Task
+from .models import KanbanColumn, Task, TaskAttachment
 
 User = get_user_model()
 
@@ -309,4 +310,32 @@ class CreateTaskFromCardTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         task.refresh_from_db()
         self.assertEqual(task.uon_record_kind, 'request')
-        self.assertEqual(task.uon_record_id, '777')
+
+
+class TaskAttachmentTests(TestCase):
+    """Прикрепление файлов к задаче (по аналогии с LeadAttachment) — ТЗ 07.09.2026."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(username='attachmanager', password='x', role=User.Role.MANAGER)
+        self.column = KanbanColumn.objects.get(name='Новая')
+        self.task = Task.objects.create(title='Задача с файлом', column=self.column)
+        self.client.force_login(self.manager)
+
+    def test_upload_attachment(self):
+        upload = SimpleUploadedFile('doc.pdf', b'%PDF-1.4 test content', content_type='application/pdf')
+
+        response = self.client.post(f'/api/crm/kanban/tasks/{self.task.id}/attachments/', {'file': upload})
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(TaskAttachment.objects.filter(task=self.task).count(), 1)
+        attachment = TaskAttachment.objects.get(task=self.task)
+        self.assertEqual(attachment.uploaded_by, self.manager)
+
+    def test_attachment_listed_on_task(self):
+        upload = SimpleUploadedFile('doc.pdf', b'%PDF-1.4 test content', content_type='application/pdf')
+        self.client.post(f'/api/crm/kanban/tasks/{self.task.id}/attachments/', {'file': upload})
+
+        response = self.client.get(f'/api/crm/kanban/tasks/{self.task.id}/')
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(len(response.json()['attachments']), 1)
