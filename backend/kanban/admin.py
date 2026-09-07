@@ -16,7 +16,9 @@ class TaskAttachmentInline(admin.TabularInline):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'column', 'assignee', 'lead', 'is_recurring', 'deadline', 'order')
-    list_filter = ('column', 'assignee', 'is_recurring')
+    list_display = (
+        'title', 'column', 'assignee', 'lead', 'preferred_contact_channel', 'is_recurring', 'deadline', 'order',
+    )
+    list_filter = ('column', 'assignee', 'is_recurring', 'preferred_contact_channel')
     search_fields = ('title', 'description')
     inlines = [TaskAttachmentInline]

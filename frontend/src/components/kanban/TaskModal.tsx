@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Paperclip, X } from "lucide-react";
 import { listLeads, listManagers, type CrmUser, type LeadListItem } from "@/lib/crmApi";
 import {
+  CONTACT_CHANNEL_OPTIONS,
   createTask,
   deleteTask,
   mediaUrl,
@@ -11,6 +12,7 @@ import {
   updateTask,
   uonRecordUrl,
   uploadTaskAttachment,
+  type ContactChannel,
   type KanbanColumn,
   type KanbanTask,
   type TaskAttachment,
@@ -58,6 +60,7 @@ export default function TaskModal({
   const [leadId, setLeadId] = useState<number | null>(task?.lead ?? presetLead?.id ?? null);
   const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "new");
+  const [contactChannel, setContactChannel] = useState<ContactChannel>(task?.preferred_contact_channel ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [attachments, setAttachments] = useState<TaskAttachment[]>(task?.attachments ?? []);
@@ -100,6 +103,7 @@ export default function TaskModal({
           lead: leadId,
           deadline: deadlineIso,
           is_recurring: isRecurring,
+          preferred_contact_channel: contactChannel,
         });
       } else {
         await createTask({
@@ -110,6 +114,7 @@ export default function TaskModal({
           lead: leadId,
           deadline: deadlineIso,
           is_recurring: isRecurring,
+          preferred_contact_channel: contactChannel,
           uon_record_kind: presetUonRecord?.kind,
           uon_record_id: presetUonRecord?.id,
         });
@@ -255,6 +260,19 @@ export default function TaskModal({
             onChange={(e) => setDeadline(e.target.value)}
             className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
           />
+
+          <select
+            value={contactChannel}
+            onChange={(e) => setContactChannel(e.target.value as ContactChannel)}
+            className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
+          >
+            <option value="">Приоритетный канал связи не указан</option>
+            {CONTACT_CHANNEL_OPTIONS.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
 
           <label className="flex items-center gap-2 text-sm text-foreground/70">
             <input

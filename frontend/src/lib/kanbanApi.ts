@@ -23,6 +23,17 @@ export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: "cancelled", label: "Отменено" },
 ];
 
+export type ContactChannel = "phone" | "email" | "max" | "telegram" | "whatsapp" | "vk" | "";
+
+export const CONTACT_CHANNEL_OPTIONS: { value: ContactChannel; label: string }[] = [
+  { value: "phone", label: "Телефон" },
+  { value: "email", label: "e-mail" },
+  { value: "max", label: "MAX" },
+  { value: "telegram", label: "Telegram" },
+  { value: "whatsapp", label: "Whatsapp" },
+  { value: "vk", label: "VK" },
+];
+
 export type TaskAttachment = {
   id: number;
   file: string;
@@ -48,6 +59,8 @@ export type KanbanTask = {
   uon_record_kind: UonRecordKind;
   uon_record_id: string;
   uon_status_name: string | null;
+  preferred_contact_channel: ContactChannel;
+  preferred_contact_channel_display: string;
   attachments: TaskAttachment[];
   order: number;
   created_at: string;
@@ -72,6 +85,7 @@ export type TaskInput = {
   deadline?: string | null;
   is_recurring?: boolean;
   status?: TaskStatus;
+  preferred_contact_channel?: ContactChannel;
   // Только для создания — связь с обращением/заявкой U-ON, у которой нет своего
   // Lead в нашей базе (карточка на /crm/appeals или /crm/uon-requests). После
   // создания эту связь уже не поменять — PATCH их не принимает (см. бэкенд).

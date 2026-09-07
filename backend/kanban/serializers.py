@@ -35,6 +35,9 @@ class TaskSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True, default=None)
     lead_status_display = serializers.CharField(source='lead.get_status_display', read_only=True, default=None)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    preferred_contact_channel_display = serializers.CharField(
+        source='get_preferred_contact_channel_display', read_only=True,
+    )
     uon_status_name = serializers.SerializerMethodField()
     kind = serializers.ReadOnlyField()
     priority = serializers.ReadOnlyField()
@@ -45,12 +48,13 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'status', 'status_display', 'column', 'assignee', 'assignee_id',
             'lead', 'lead_name', 'lead_status_display', 'deadline', 'is_recurring', 'kind', 'priority',
+            'preferred_contact_channel', 'preferred_contact_channel_display',
             'uon_record_kind', 'uon_record_id', 'uon_status_name', 'attachments', 'order', 'created_at',
             'updated_at',
         ]
         read_only_fields = [
-            'id', 'status_display', 'order', 'created_at', 'updated_at', 'kind', 'priority',
-            'uon_record_kind', 'uon_record_id', 'attachments',
+            'id', 'status_display', 'preferred_contact_channel_display', 'order', 'created_at', 'updated_at',
+            'kind', 'priority', 'uon_record_kind', 'uon_record_id', 'attachments',
         ]
 
     def get_uon_status_name(self, obj):
@@ -104,7 +108,10 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'status', 'assignee_id', 'lead', 'deadline', 'is_recurring']
+        fields = [
+            'title', 'description', 'status', 'assignee_id', 'lead', 'deadline', 'is_recurring',
+            'preferred_contact_channel',
+        ]
 
     def update(self, instance, validated_data):
         # Переход именно В «Отложено» (не повторное сохранение уже отложенной задачи)

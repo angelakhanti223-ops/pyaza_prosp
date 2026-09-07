@@ -23,6 +23,14 @@ class Task(models.Model):
         DONE = 'done', 'Выполнено'
         CANCELLED = 'cancelled', 'Отменено'
 
+    class ContactChannel(models.TextChoices):
+        PHONE = 'phone', 'Телефон'
+        EMAIL = 'email', 'e-mail'
+        MAX = 'max', 'MAX'
+        TELEGRAM = 'telegram', 'Telegram'
+        WHATSAPP = 'whatsapp', 'Whatsapp'
+        VK = 'vk', 'VK'
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     status = models.CharField(
@@ -30,6 +38,9 @@ class Task(models.Model):
         help_text='Независим от колонки доски — просто рабочая пометка исполнителя. '
                    'При переводе в «Отложено» дедлайн автоматически сдвигается на +3 дня '
                    '(см. TaskUpdateSerializer.update).',
+    )
+    preferred_contact_channel = models.CharField(
+        'Приоритетный канал связи', max_length=20, choices=ContactChannel.choices, blank=True,
     )
     column = models.ForeignKey(KanbanColumn, on_delete=models.PROTECT, related_name='tasks')
     assignee = models.ForeignKey(

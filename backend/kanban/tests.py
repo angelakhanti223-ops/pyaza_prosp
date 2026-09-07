@@ -339,3 +339,38 @@ class TaskAttachmentTests(TestCase):
 
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(len(response.json()['attachments']), 1)
+
+
+class TaskPreferredContactChannelTests(TestCase):
+    """Приоритетный канал связи — ТЗ 07.09.2026."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(username='channelmanager', password='x', role=User.Role.MANAGER)
+        self.column = KanbanColumn.objects.get(name='Новая')
+        self.client.force_login(self.manager)
+
+    def test_set_on_create(self):
+        response = self.client.post('/api/crm/kanban/tasks/', {
+            'title': 'Позвонить клиенту', 'column': self.column.id, 'preferred_contact_channel': 'whatsapp',
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        data = response.json()
+        self.assertEqual(data['preferred_contact_channel'], 'whatsapp')
+        self.assertEqual(data['preferred_contact_channel_display'], 'Whatsapp')
+
+    def test_update_via_patch(self):
+        task = Task.objects.create(title='Задача', column=self.column)
+
+        response = self.client.patch(
+            f'/api/crm/kanban/tasks/{task.id}/', {'preferred_contact_channel': 'telegram'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        task.refresh_from_db()
+        self.assertEqual(task.preferred_contact_channel, 'telegram')
+
+    def test_blank_by_default(self):
+        task = Task.objects.create(title='Задача', column=self.column)
+        self.assertEqual(task.preferred_contact_channel, '')
