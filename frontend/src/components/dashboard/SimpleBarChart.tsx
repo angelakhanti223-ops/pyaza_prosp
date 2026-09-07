@@ -13,7 +13,12 @@ export default function SimpleBarChart({ data }: Props) {
     <div className="flex h-40 gap-1.5">
       {data.map((d) => (
         <div key={d.label} className="flex flex-1 flex-col items-center gap-1.5">
-          <div className="flex w-full flex-1 items-end">
+          <div className="flex w-full flex-1 flex-col justify-end">
+            <span
+              className={`mb-0.5 text-center text-[9px] ${d.value > 0 ? "font-semibold text-navy" : "text-foreground/30"}`}
+            >
+              {d.value}
+            </span>
             <div
               className="w-full rounded-t-md bg-blue"
               style={{ height: `${Math.max(4, (d.value / max) * 100)}%` }}

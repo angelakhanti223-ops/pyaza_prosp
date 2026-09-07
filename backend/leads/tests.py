@@ -668,6 +668,56 @@ class DashboardCommissionTests(TestCase):
         self.assertEqual(data['deals_count'], 1)
 
 
+class DailyDynamicsTests(TestCase):
+    """daily_dynamics — сплошной ряд по дням месяца (включая дни без заявок),
+    а не только дни, где что-то произошло — иначе график «прыгает» через
+    пропуски (решение заказчика, 07.09.2026)."""
+
+    def setUp(self):
+        self.direction = Direction.objects.create(name='Испания')
+
+    def test_fills_gap_days_with_zero(self):
+        from .dashboard import month_bounds
+
+        today = timezone.localdate()
+        date_from, date_to = month_bounds(today.year, today.month)
+        Lead.objects.create(name='А', direction=self.direction)
+        Lead.objects.filter(name='А').update(created_at=date_from)
+
+        data = _compute(Lead.objects.all(), date_from, date_to)
+
+        by_date = {row['date']: row['count'] for row in data['daily_dynamics']}
+        self.assertEqual(by_date[date_from.date().isoformat()], 1)
+        if today.day > 1:
+            second_day = (date_from + timedelta(days=1)).date().isoformat()
+            self.assertEqual(by_date.get(second_day), 0)
+
+    def test_current_month_stops_at_today_not_end_of_month(self):
+        from .dashboard import month_bounds
+
+        today = timezone.localdate()
+        date_from, date_to = month_bounds(today.year, today.month)
+
+        data = _compute(Lead.objects.all(), date_from, date_to)
+
+        dates = [row['date'] for row in data['daily_dynamics']]
+        self.assertEqual(dates[-1], today.isoformat())
+        self.assertEqual(dates[0], date_from.date().isoformat())
+
+    def test_past_month_covers_its_full_range(self):
+        from .dashboard import month_bounds
+
+        today = timezone.localdate()
+        last_year, last_month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+        date_from, date_to = month_bounds(last_year, last_month)
+
+        data = _compute(Lead.objects.all(), date_from, date_to)
+
+        dates = [row['date'] for row in data['daily_dynamics']]
+        self.assertEqual(dates[0], date_from.date().isoformat())
+        self.assertEqual(dates[-1], date_to.date().isoformat())
+
+
 class DashboardPeriodViewTests(TestCase):
     """Дашборд теперь выбирает ровно между двумя календарными месяцами —
     текущим и прошлым — вместо плавающего окна 7/30/90 дней (решение

@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import Avg, Count, Q, Sum
@@ -105,12 +105,23 @@ def _compute(base_qs, date_from, date_to):
         .order_by('-count')
     )
 
-    daily = (
-        period_leads.annotate(day=TruncDate('created_at'))
-        .values('day')
-        .annotate(count=Count('id'))
-        .order_by('day')
-    )
+    # Полный ряд по дням месяца, а не только дни, где есть заявки — иначе
+    # график «прыгает» через пропуски и выглядит как будто данных меньше,
+    # чем на самом деле (решение заказчика, 07.09.2026). Для ТЕКУЩЕГО месяца
+    # обрываем на сегодняшнем дне — дни впереди ещё не наступили, рисовать под
+    # них пустые столбцы нет смысла; для прошлого месяца date_to уже в
+    # прошлом, так что last_day остаётся его последним днём как есть.
+    daily_counts = {
+        row['day']: row['count']
+        for row in period_leads.annotate(day=TruncDate('created_at')).values('day').annotate(count=Count('id'))
+    }
+    first_day = date_from.date()
+    last_day = min(date_to.date(), timezone.localdate())
+    daily_dynamics = []
+    day = first_day
+    while day <= last_day:
+        daily_dynamics.append({'date': day.isoformat(), 'count': daily_counts.get(day, 0)})
+        day += timedelta(days=1)
 
     return {
         'new_leads_count': total,
@@ -124,7 +135,7 @@ def _compute(base_qs, date_from, date_to):
         'by_direction': [
             {'direction': row['direction__name'], 'count': row['count']} for row in by_direction
         ],
-        'daily_dynamics': [{'date': row['day'].isoformat(), 'count': row['count']} for row in daily],
+        'daily_dynamics': daily_dynamics,
     }
 
 
