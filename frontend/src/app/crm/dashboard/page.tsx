@@ -163,10 +163,16 @@ export default function CrmDashboardPage() {
                   />
                 </div>
                 <div className="mt-1 text-xs text-foreground/50">
-                  Уровень: <span className="font-medium text-navy">{row.tier_name ?? "ниже «Минимума»"}</span>
-                  {" "}({row.commission_percent}% от своей комиссии)
-                  {row.next_tier_name && (
-                    <> · до «{row.next_tier_name}» осталось {formatMoney(Math.max(row.target - row.actual, 0))}</>
+                  {row.tier_name ? (
+                    <>
+                      Уровень: <span className="font-medium text-navy">{row.tier_name}</span>
+                      {" "}({row.commission_percent}% от своей комиссии)
+                      {row.next_tier_name && (
+                        <> · до «{row.next_tier_name}» осталось {formatMoney(Math.max(row.target - row.actual, 0))}</>
+                      )}
+                    </>
+                  ) : (
+                    <>До Минимума осталось {formatMoney(Math.max(row.target - row.actual, 0))}</>
                   )}
                 </div>
                 <div className="mt-1 text-right text-xs font-semibold text-gold">
