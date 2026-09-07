@@ -14,6 +14,7 @@ import {
 } from "@/lib/dashboardApi";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
+import JourneyBanner from "@/components/dashboard/JourneyBanner";
 import SimpleBarChart from "@/components/dashboard/SimpleBarChart";
 import SimplePieChart from "@/components/dashboard/SimplePieChart";
 
@@ -98,46 +99,48 @@ export default function CrmDashboardPage() {
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-navy">
-            Дашборд {data?.scope === "department" ? "отдела" : "менеджера"}
-          </h1>
-          {data && (
-            <p className="mt-0.5 text-xs text-foreground/50">
-              {MONTH_LABELS[data.period.month]} {data.period.year}
-            </p>
-          )}
-        </div>
+      <JourneyBanner>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-navy">
+              Дашборд {data?.scope === "department" ? "отдела" : "менеджера"}
+            </h1>
+            {data && (
+              <p className="mt-0.5 text-xs text-foreground/50">
+                {MONTH_LABELS[data.period.month]} {data.period.year}
+              </p>
+            )}
+          </div>
 
-        <div className="flex gap-2">
-          {isHead && (
-            <select
-              value={managerId}
-              onChange={(e) => setManagerId(e.target.value)}
-              className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-            >
-              <option value="">Весь отдел</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.full_name}
-                </option>
-              ))}
-            </select>
-          )}
-          <div className="flex overflow-hidden rounded-xl border border-black/10 bg-white text-sm">
-            {PERIODS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setPeriod(p.value)}
-                className={`px-3.5 py-2 ${period === p.value ? "bg-navy text-white" : "text-navy/70 hover:bg-blue-light"}`}
+          <div className="flex gap-2">
+            {isHead && (
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value)}
+                className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
               >
-                {p.label}
-              </button>
-            ))}
+                <option value="">Весь отдел</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex overflow-hidden rounded-xl border border-black/10 bg-white text-sm">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriod(p.value)}
+                  className={`px-3.5 py-2 ${period === p.value ? "bg-navy text-white" : "text-navy/70 hover:bg-blue-light"}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </JourneyBanner>
 
       {plan && plan.rows.length > 0 && (
         <div className="mb-6 rounded-2xl border border-black/5 bg-white p-5">
