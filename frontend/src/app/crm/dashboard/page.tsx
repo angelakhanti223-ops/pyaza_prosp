@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   fetchDashboard,
   fetchPlan,
@@ -36,13 +36,19 @@ const MONTH_GENITIVE = [
   "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ];
 
-function formatScheduleRange(dateFrom: string, dateTo: string): string {
-  const from = new Date(`${dateFrom}T00:00:00`);
-  const to = new Date(`${dateTo}T00:00:00`);
-  const monthTo = MONTH_GENITIVE[to.getMonth() + 1];
-  if (dateFrom === dateTo) return `${from.getDate()} ${monthTo}`;
-  if (from.getMonth() === to.getMonth()) return `${from.getDate()}–${to.getDate()} ${monthTo}`;
-  return `${from.getDate()} ${MONTH_GENITIVE[from.getMonth() + 1]} – ${to.getDate()} ${monthTo}`;
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+}
+
+const MANAGER_COLORS = ["bg-navy", "bg-gold", "bg-blue", "bg-green-600", "bg-purple-600"];
+
+function isoDate(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
 export default function CrmDashboardPage() {
@@ -339,31 +345,90 @@ export default function CrmDashboardPage() {
             </div>
           )}
 
-          {schedule && schedule.rows.length > 0 && (
-            <div className="rounded-2xl border border-black/5 bg-white p-5">
-              <h2 className="mb-4 text-sm font-semibold text-navy">
-                Рабочий график — {MONTH_LABELS[schedule.month]} {schedule.year}
-              </h2>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-foreground/50">
-                  <tr>
-                    <th className="pb-2 font-medium">Даты</th>
-                    <th className="pb-2 font-medium">Кто работает</th>
-                    <th className="pb-2 text-right font-medium">Рабочих дней подряд</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.rows.map((row, i) => (
-                    <tr key={i} className="border-t border-black/5">
-                      <td className="py-2 text-navy">{formatScheduleRange(row.date_from, row.date_to)}</td>
-                      <td className="py-2 text-foreground/70">{row.manager_name}</td>
-                      <td className="py-2 text-right text-foreground/70">{row.days}</td>
-                    </tr>
+          {schedule && schedule.rows.length > 0 && (() => {
+            const today = todayIso();
+            const daysInMonth = new Date(schedule.year, schedule.month, 0).getDate();
+            const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+            const managers = Array.from(
+              new Map(schedule.rows.map((r) => [r.manager_id, r.manager_name])).entries(),
+            ).map(([manager_id, manager_name]) => ({ manager_id, manager_name }));
+
+            const workerByDate = new Map<string, number>();
+            for (const row of schedule.rows) {
+              const from = new Date(`${row.date_from}T00:00:00`);
+              const to = new Date(`${row.date_to}T00:00:00`);
+              for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+                workerByDate.set(isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate()), row.manager_id);
+              }
+            }
+
+            const todayManager = workerByDate.has(today)
+              ? managers.find((m) => m.manager_id === workerByDate.get(today))
+              : undefined;
+
+            return (
+              <div className="rounded-2xl border border-black/5 bg-white p-5">
+                <h2 className="mb-1 text-sm font-semibold text-navy">
+                  Рабочий график — {MONTH_LABELS[schedule.month]} {schedule.year}
+                </h2>
+                {todayManager && (
+                  <p className="mb-4 text-xs text-foreground/60">
+                    Сегодня работает: <span className="font-semibold text-navy">{todayManager.manager_name}</span>
+                  </p>
+                )}
+
+                <div className="overflow-x-auto">
+                  <div
+                    className="inline-grid items-center gap-y-1.5"
+                    style={{ gridTemplateColumns: `110px repeat(${daysInMonth}, minmax(26px, 1fr))` }}
+                  >
+                    <div />
+                    {days.map((d) => {
+                      const isToday = isoDate(schedule.year, schedule.month, d) === today;
+                      return (
+                        <div
+                          key={d}
+                          className={`text-center text-[11px] font-medium ${isToday ? "text-gold" : "text-foreground/40"}`}
+                        >
+                          {d}
+                        </div>
+                      );
+                    })}
+
+                    {managers.map((m, mi) => (
+                      <Fragment key={m.manager_id}>
+                        <div className="pr-2 text-xs font-medium text-navy">{m.manager_name}</div>
+                        {days.map((d) => {
+                          const dateStr = isoDate(schedule.year, schedule.month, d);
+                          const working = workerByDate.get(dateStr) === m.manager_id;
+                          const isToday = dateStr === today;
+                          return (
+                            <div
+                              key={d}
+                              title={`${d} ${MONTH_GENITIVE[schedule.month]}: ${working ? m.manager_name : "не работает"}`}
+                              className={`h-7 rounded ${working ? MANAGER_COLORS[mi % MANAGER_COLORS.length] : "bg-black/5"} ${
+                                isToday ? "ring-2 ring-offset-1 ring-red-500" : ""
+                              }`}
+                            />
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-foreground/60">
+                  {managers.map((m, mi) => (
+                    <div key={m.manager_id} className="flex items-center gap-1.5">
+                      <span className={`h-3 w-3 rounded ${MANAGER_COLORS[mi % MANAGER_COLORS.length]}`} />
+                      {m.manager_name}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
