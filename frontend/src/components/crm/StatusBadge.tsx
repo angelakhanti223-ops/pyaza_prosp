@@ -5,6 +5,7 @@ const COLORS: Record<LeadStatus, string> = {
   in_progress: "bg-amber-100 text-amber-700",
   options_proposed: "bg-purple-100 text-purple-700",
   booked: "bg-sky-100 text-sky-700",
+  prepaid: "bg-teal-100 text-teal-700",
   paid: "bg-emerald-100 text-emerald-700",
   closed_won: "bg-green-100 text-green-800",
   closed_lost: "bg-red-100 text-red-700",

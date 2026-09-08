@@ -287,6 +287,17 @@ class LeadStatusChangeNotificationTests(TestCase):
         mock_delay.assert_called_once_with(lead.id, Lead.Status.BOOKED)
 
     @patch('leads.views.notify_lead_status_change.delay')
+    def test_notifies_on_transition_to_prepaid(self, mock_delay):
+        # Добавлено 08.09.2026 — с предоплаты тоже причитается часть комиссии.
+        lead = Lead.objects.create(
+            name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.BOOKED,
+        )
+        self.client.patch(
+            f'/api/crm/leads/{lead.id}/', {'status': Lead.Status.PREPAID}, content_type='application/json',
+        )
+        mock_delay.assert_called_once_with(lead.id, Lead.Status.PREPAID)
+
+    @patch('leads.views.notify_lead_status_change.delay')
     def test_notifies_on_transition_to_paid(self, mock_delay):
         lead = Lead.objects.create(
             name='Клиент', direction=self.direction, assigned_manager=self.manager, status=Lead.Status.BOOKED,
@@ -558,34 +569,46 @@ class DashboardCommissionTests(TestCase):
     def _close_won(self, **kwargs):
         """Создаёт заявку сразу в CLOSED_WON + соответствующую запись
         LeadStatusHistory — с 02.09.2026 денежные показатели дашборда считаются
-        по дате смены статуса (см. _closed_won_qs), не по дате создания заявки,
-        так что без этой записи заявка не попала бы в комиссию за период."""
+        по дате смены статуса (см. _revenue_recognized_qs), не по дате создания
+        заявки, так что без этой записи заявка не попала бы в комиссию за период."""
         lead = Lead.objects.create(status=Lead.Status.CLOSED_WON, **kwargs)
         LeadStatusHistory.objects.create(lead=lead, old_status=Lead.Status.NEW, new_status=Lead.Status.CLOSED_WON)
         return lead
 
-    def test_compute_counts_closed_won_not_paid(self):
+    def test_compute_counts_all_revenue_statuses_not_still_active(self):
+        """С 08.09.2026 предоплата/оплата/закрыта-успехом — все три денежные
+        стадии сделки (часть комиссии причитается уже с предоплаты); заявка,
+        ещё не дошедшая ни до одной из них, в комиссию не входит."""
         self._close_won(
             name='Успех', direction=self.direction, assigned_manager=self.manager,
             commission=15000, deal_amount=100000,
         )
         Lead.objects.create(
-            name='Оплачено-но-не-закрыта', direction=self.direction, assigned_manager=self.manager,
-            status=Lead.Status.PAID, commission=99999, deal_amount=999999,
+            name='Оплачена', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.PAID, commission=20000, deal_amount=150000,
+        )
+        Lead.objects.create(
+            name='Внесена предоплата', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.PREPAID, commission=5000, deal_amount=50000,
+        )
+        Lead.objects.create(
+            name='Ещё в работе — денег пока нет', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.BOOKED, commission=99999, deal_amount=999999,
         )
 
         data = _compute(Lead.objects.all(), timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=1))
 
-        self.assertEqual(data['commission_total'], 15000)
-        self.assertEqual(data['deal_amount_total'], 100000)
+        self.assertEqual(data['commission_total'], 15000 + 20000 + 5000)
+        self.assertEqual(data['deal_amount_total'], 100000 + 150000 + 50000)
+        self.assertEqual(data['deals_count'], 3)
 
-    def test_commission_by_manager_endpoint_uses_closed_won(self):
+    def test_commission_by_manager_endpoint_includes_prepaid_and_paid(self):
         self._close_won(
             name='Успех', direction=self.direction, assigned_manager=self.manager, commission=15000,
         )
         Lead.objects.create(
-            name='Просто оплачена', direction=self.direction, assigned_manager=self.manager,
-            status=Lead.Status.PAID, commission=99999,
+            name='Оплачена', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.PAID, commission=20000,
         )
         self.client.force_login(self.head)
 
@@ -594,8 +617,38 @@ class DashboardCommissionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         by_manager = response.json()['commission_by_manager']
         self.assertEqual(len(by_manager), 1)
-        self.assertEqual(float(by_manager[0]['commission']), 15000)
-        self.assertEqual(by_manager[0]['deals'], 1)
+        self.assertEqual(float(by_manager[0]['commission']), 35000)
+        self.assertEqual(by_manager[0]['deals'], 2)
+
+    def test_progressing_through_all_revenue_statuses_counted_only_once(self):
+        """Сделка обычно проходит предоплата → оплата → закрытие подряд — если
+        считать каждый переход отдельно, один и тот же доход попал бы в
+        комиссию за несколько периодов; должен засчитаться только первый
+        денежный переход (решение заказчика, 08.09.2026)."""
+        lead = Lead.objects.create(
+            name='Прогресс', direction=self.direction, assigned_manager=self.manager,
+            status=Lead.Status.CLOSED_WON, commission=15000,
+        )
+        base = timezone.now() - timedelta(days=10)
+        LeadStatusHistory.objects.create(lead=lead, old_status=Lead.Status.BOOKED, new_status=Lead.Status.PREPAID)
+        LeadStatusHistory.objects.filter(lead=lead, new_status=Lead.Status.PREPAID).update(changed_at=base)
+        LeadStatusHistory.objects.create(lead=lead, old_status=Lead.Status.PREPAID, new_status=Lead.Status.PAID)
+        LeadStatusHistory.objects.filter(lead=lead, new_status=Lead.Status.PAID).update(changed_at=base + timedelta(days=3))
+        LeadStatusHistory.objects.create(lead=lead, old_status=Lead.Status.PAID, new_status=Lead.Status.CLOSED_WON)
+        LeadStatusHistory.objects.filter(lead=lead, new_status=Lead.Status.CLOSED_WON).update(changed_at=base + timedelta(days=6))
+
+        # Период, покрывающий только оплату и закрытие (не предоплату) — доход
+        # уже признан РАНЬШЕ (в момент предоплаты), сюда попадать не должен.
+        data_later = _compute(
+            Lead.objects.all(), base + timedelta(days=1), base + timedelta(days=7),
+        )
+        # Период, покрывающий именно момент предоплаты — доход признаётся здесь.
+        data_earlier = _compute(
+            Lead.objects.all(), base - timedelta(days=1), base + timedelta(days=1),
+        )
+
+        self.assertEqual(data_later['commission_total'], 0)
+        self.assertEqual(data_earlier['commission_total'], 15000)
 
     def test_deal_stats_and_direction_breakdown(self):
         turkey = Direction.objects.create(name='Турция')

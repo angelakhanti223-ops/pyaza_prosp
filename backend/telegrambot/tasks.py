@@ -207,6 +207,7 @@ def notify_lead_status_change(self, lead_id: int, new_status: str):
 
     icons = {
         Lead.Status.BOOKED: '🎫',
+        Lead.Status.PREPAID: '💵',
         Lead.Status.PAID: '💰',
         Lead.Status.CLOSED_WON: '🎉',
         Lead.Status.CLOSED_LOST: '❌',

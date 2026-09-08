@@ -20,9 +20,15 @@ FUNNEL_STAGES = [
     Lead.Status.IN_PROGRESS,
     Lead.Status.OPTIONS_PROPOSED,
     Lead.Status.BOOKED,
+    Lead.Status.PREPAID,
     Lead.Status.PAID,
     Lead.Status.CLOSED_WON,
 ]
+
+# «Денежные» статусы — начиная с предоплаты часть комиссии уже причитается
+# (решение заказчика, 08.09.2026), поэтому все три статуса засчитываются в
+# комиссию за период, а не только «Закрыта (успех)».
+REVENUE_STATUSES = [Lead.Status.PREPAID, Lead.Status.PAID, Lead.Status.CLOSED_WON]
 
 
 def month_bounds(year, month):
@@ -33,31 +39,47 @@ def month_bounds(year, month):
     return start, end
 
 
-def _closed_won_qs(base_qs, date_from, date_to):
-    """Заявки (в рамках base_qs), у которых переход в «Закрыта (успех)» пришёлся
-    на этот период — по дате смены статуса (LeadStatusHistory), а не по дате
+def _revenue_recognized_qs(base_qs, date_from, date_to):
+    """Заявки (в рамках base_qs), у которых комиссия ВПЕРВЫЕ признана в этом
+    периоде — по дате ПЕРВОГО перехода в один из денежных статусов
+    (REVENUE_STATUSES: предоплата / оплата / закрыта-успех), а не по дате
     создания заявки. Раньше денежные показатели дашборда (commission_total и
     т.д.) считались из period_leads (created_at внутри периода), из-за чего
     сделка, реально закрытая в этом месяце по заявке, заведённой раньше,
     выпадала из «Комиссии за период» — те же деньги План/факт (ниже,
     actual_commission_for_month) уже показывал корректно, теперь это одна
-    и та же логика (решение заказчика, 02.09.2026)."""
-    history_ids = set(
-        LeadStatusHistory.objects.filter(
-            new_status=Lead.Status.CLOSED_WON, changed_at__gte=date_from, changed_at__lte=date_to,
-        ).values_list('lead_id', flat=True)
-    )
+    и та же логика (решение заказчика, 02.09.2026).
+
+    Берём именно ПЕРВЫЙ денежный переход, а не любой: с 08.09.2026 сделка
+    обычно проходит все три денежных статуса подряд (предоплата → полная
+    оплата → закрытие), и если считать каждый переход отдельно, один и тот же
+    доход попал бы в комиссию за несколько месяцев подряд."""
+    candidate_ids = base_qs.filter(
+        Q(status__in=REVENUE_STATUSES) | Q(status_history__new_status__in=REVENUE_STATUSES),
+    ).values_list('id', flat=True).distinct()
+
+    first_recognized_at = {}
+    for lead_id, changed_at in (
+        LeadStatusHistory.objects.filter(lead_id__in=candidate_ids, new_status__in=REVENUE_STATUSES)
+        .order_by('lead_id', 'changed_at')
+        .values_list('lead_id', 'changed_at')
+    ):
+        first_recognized_at.setdefault(lead_id, changed_at)
+
     # LeadStatusHistory заполняется только в LeadViewSet.partial_update — заявка,
-    # закрытая в обход CRM (например, правкой статуса в Django admin или прямым
-    # апдейтом в БД), не оставит там записи и молча выпала бы из комиссии за
-    # месяц. Для заявок вообще без единой записи истории берём updated_at как
-    # разумную оценку момента закрытия — это подстраховка, а не основной путь.
-    fallback_ids = set(
-        base_qs.filter(status=Lead.Status.CLOSED_WON, updated_at__gte=date_from, updated_at__lte=date_to)
-        .exclude(status_history__new_status=Lead.Status.CLOSED_WON)
-        .values_list('id', flat=True)
-    )
-    return base_qs.filter(id__in=history_ids | fallback_ids)
+    # переведённая в обход CRM (например, правкой статуса в Django admin или
+    # прямым апдейтом в БД), не оставит там записи и молча выпала бы из
+    # комиссии за месяц. Для таких заявок берём updated_at как разумную оценку
+    # момента признания — это подстраховка, а не основной путь.
+    recognized_ids = set()
+    for lead_id, status, updated_at in base_qs.filter(id__in=candidate_ids).values_list('id', 'status', 'updated_at'):
+        recognized_at = first_recognized_at.get(lead_id)
+        if recognized_at is None and status in REVENUE_STATUSES:
+            recognized_at = updated_at
+        if recognized_at is not None and date_from <= recognized_at <= date_to:
+            recognized_ids.add(lead_id)
+
+    return base_qs.filter(id__in=recognized_ids)
 
 
 def _compute(base_qs, date_from, date_to):
@@ -86,12 +108,13 @@ def _compute(base_qs, date_from, date_to):
             'percent': round(reached / total * 100, 1) if total else 0,
         })
 
-    # «Закрыта (успех)» — реальный момент получения денег в этой команде;
-    # «Оплачено» в рабочем процессе почти не используется как отдельный шаг
-    # (решение заказчика, 26.08.2026). Считаем по дате закрытия (см.
-    # _closed_won_qs), не по дате создания заявки — иначе сделка, заведённая
-    # в прошлом периоде и закрытая в этом, не попадала бы в комиссию за период.
-    won_leads = _closed_won_qs(base_qs, date_from, date_to)
+    # Предоплата / оплата / закрытие успехом — все три «денежные» стадии сделки:
+    # часть комиссии причитается уже с предоплаты (решение заказчика,
+    # 08.09.2026). Считаем по дате ПЕРВОГО денежного перехода (см.
+    # _revenue_recognized_qs), не по дате создания заявки — иначе сделка,
+    # заведённая в прошлом периоде и оплаченная в этом, не попала бы в
+    # комиссию за период.
+    won_leads = _revenue_recognized_qs(base_qs, date_from, date_to)
     totals = won_leads.aggregate(
         commission_sum=Sum('commission'), deal_amount_sum=Sum('deal_amount'),
         avg_deal_amount=Avg('deal_amount'), avg_commission=Avg('commission'),
@@ -172,7 +195,7 @@ class DashboardView(APIView):
 
         if head and not manager_filter:
             by_manager = (
-                _closed_won_qs(Lead.objects.filter(assigned_manager__isnull=False), date_from, date_to)
+                _revenue_recognized_qs(Lead.objects.filter(assigned_manager__isnull=False), date_from, date_to)
                 .values('assigned_manager_id', 'assigned_manager__first_name', 'assigned_manager__last_name', 'assigned_manager__username')
                 .annotate(commission=Sum('commission'), deals=Count('id'))
                 .order_by('-commission')
@@ -194,20 +217,13 @@ class DashboardView(APIView):
 
 
 def actual_commission_for_month(manager, year, month):
-    """Комиссия менеджера, засчитанная в план месяца — по дате перехода заявки в
-    статус «Закрыта (успех)» (LeadStatusHistory), а не по дате создания заявки.
-    Это реальный момент получения денег в этой команде — «Оплачено» как
-    отдельный шаг почти не используется (решение заказчика, 26.08.2026)."""
+    """Комиссия менеджера, засчитанная в план месяца — по дате ПЕРВОГО денежного
+    перехода (предоплата / оплата / закрыта-успех, см. _revenue_recognized_qs
+    и REVENUE_STATUSES), а не по дате создания заявки. С предоплаты часть
+    комиссии причитается уже тогда (решение заказчика, 08.09.2026)."""
     start, end = month_bounds(year, month)
-    lead_ids = (
-        LeadStatusHistory.objects.filter(
-            new_status=Lead.Status.CLOSED_WON, changed_at__gte=start, changed_at__lte=end,
-            lead__assigned_manager=manager,
-        )
-        .values_list('lead_id', flat=True)
-        .distinct()
-    )
-    return Lead.objects.filter(id__in=lead_ids).aggregate(total=Sum('commission'))['total'] or 0
+    qs = _revenue_recognized_qs(Lead.objects.filter(assigned_manager=manager), start, end)
+    return qs.aggregate(total=Sum('commission'))['total'] or 0
 
 
 def _tier_lookup(actual, tiers):

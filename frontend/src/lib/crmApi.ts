@@ -16,6 +16,7 @@ export type LeadStatus =
   | "in_progress"
   | "options_proposed"
   | "booked"
+  | "prepaid"
   | "paid"
   | "closed_won"
   | "closed_lost";
@@ -25,6 +26,7 @@ export const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "in_progress", label: "В работе" },
   { value: "options_proposed", label: "Предложены варианты" },
   { value: "booked", label: "Бронь" },
+  { value: "prepaid", label: "Внесена предоплата" },
   { value: "paid", label: "Оплачено" },
   { value: "closed_won", label: "Закрыта (успех)" },
   { value: "closed_lost", label: "Закрыта (отказ)" },

@@ -29,6 +29,7 @@ class Lead(models.Model):
         IN_PROGRESS = 'in_progress', 'В работе'
         OPTIONS_PROPOSED = 'options_proposed', 'Предложены варианты'
         BOOKED = 'booked', 'Бронь'
+        PREPAID = 'prepaid', 'Внесена предоплата'
         PAID = 'paid', 'Оплачено'
         CLOSED_WON = 'closed_won', 'Закрыта (успех)'
         CLOSED_LOST = 'closed_lost', 'Закрыта (отказ)'
