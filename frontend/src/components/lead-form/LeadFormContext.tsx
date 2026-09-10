@@ -4,7 +4,8 @@ import { createContext, useContext, useMemo, useState } from "react";
 
 type LeadFormContextValue = {
   isOpen: boolean;
-  open: () => void;
+  prefillComment: string;
+  open: (comment?: string) => void;
   close: () => void;
 };
 
@@ -12,14 +13,19 @@ const LeadFormContext = createContext<LeadFormContextValue | null>(null);
 
 export function LeadFormProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [prefillComment, setPrefillComment] = useState("");
 
   const value = useMemo(
     () => ({
       isOpen,
-      open: () => setIsOpen(true),
+      prefillComment,
+      open: (comment?: string) => {
+        setPrefillComment(comment ?? "");
+        setIsOpen(true);
+      },
       close: () => setIsOpen(false),
     }),
-    [isOpen]
+    [isOpen, prefillComment]
   );
 
   return <LeadFormContext.Provider value={value}>{children}</LeadFormContext.Provider>;

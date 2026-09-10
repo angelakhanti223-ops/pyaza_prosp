@@ -5,12 +5,13 @@ import { useLeadForm } from "./LeadFormContext";
 type Props = {
   className?: string;
   children: React.ReactNode;
+  comment?: string;
 };
 
-export default function OpenLeadFormButton({ className, children }: Props) {
+export default function OpenLeadFormButton({ className, children, comment }: Props) {
   const { open } = useLeadForm();
   return (
-    <button type="button" onClick={open} className={className}>
+    <button type="button" onClick={() => open(comment)} className={className}>
       {children}
     </button>
   );

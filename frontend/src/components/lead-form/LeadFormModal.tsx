@@ -5,7 +5,7 @@ import { useLeadForm } from "./LeadFormContext";
 import LeadForm from "./LeadForm";
 
 export default function LeadFormModal() {
-  const { isOpen, close } = useLeadForm();
+  const { isOpen, close, prefillComment } = useLeadForm();
 
   if (!isOpen) return null;
 
@@ -29,7 +29,7 @@ export default function LeadFormModal() {
         <p className="mb-5 text-sm text-foreground/60">
           Оставьте заявку — перезвоним и подберём идеальный вариант
         </p>
-        <LeadForm onSuccess={() => setTimeout(close, 2500)} />
+        <LeadForm onSuccess={() => setTimeout(close, 2500)} initialComment={prefillComment} />
       </div>
     </div>
   );

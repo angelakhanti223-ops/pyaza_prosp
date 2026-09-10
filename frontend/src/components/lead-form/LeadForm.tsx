@@ -5,15 +5,16 @@ import { ApiError, createLead, fetchDirections, type Direction } from "@/lib/api
 
 type Props = {
   onSuccess?: () => void;
+  initialComment?: string;
 };
 
-export default function LeadForm({ onSuccess }: Props) {
+export default function LeadForm({ onSuccess, initialComment }: Props) {
   const [directions, setDirections] = useState<Direction[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [directionId, setDirectionId] = useState("");
-  const [comment, setComment] = useState("");
+  const [comment, setComment] = useState(initialComment ?? "");
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errors, setErrors] = useState<Record<string, string[]>>({});
