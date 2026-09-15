@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/', include('sitecontent.urls')),
     path('api/', include('integrations.urls')),
     path('api/', include('knowledgebase.urls')),
+    path('api/', include('mideast.urls')),
 ]
 
 if settings.DEBUG:

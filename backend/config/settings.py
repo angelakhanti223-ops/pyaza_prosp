@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'sitecontent',
     'telegrambot',
     'knowledgebase',
+    'mideast',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
