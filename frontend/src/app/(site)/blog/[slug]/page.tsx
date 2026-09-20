@@ -6,8 +6,37 @@ import { fetchArticle, mediaUrl } from "@/lib/articlesApi";
 import ArticleCard from "@/components/blog/ArticleCard";
 import ShareButtons from "@/components/blog/ShareButtons";
 import ImageCarousel from "@/components/blog/ImageCarousel";
+import ArticleHeroCarousel, { type ArticleHeroSlide } from "@/components/blog/ArticleHeroCarousel";
+import OctoberQuickGuide from "@/components/blog/OctoberQuickGuide";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/october/sea.svg",
+    alt: "Тёплое море и пляжный отдых в октябре",
+    title: "Продлить лето у моря",
+    description: "Пляжные направления подойдут тем, кто хочет солнце, купание и спокойный ритм без летней суеты.",
+  },
+  {
+    src: "/blog/october/family.svg",
+    alt: "Семейный отдых с детьми в октябре",
+    title: "Выбрать комфортный семейный формат",
+    description: "Для поездки с детьми важны короткая логистика, питание в отеле и понятная инфраструктура рядом.",
+  },
+  {
+    src: "/blog/october/excursions.svg",
+    alt: "Экскурсионная поездка и прогулки по городам осенью",
+    title: "Уехать в экскурсионный маршрут",
+    description: "Октябрь удобен для прогулок, древних городов и насыщенных программ без изнуряющей жары.",
+  },
+  {
+    src: "/blog/october/cruises.svg",
+    alt: "Круизный маршрут в октябре",
+    title: "Посмотреть несколько городов за одну поездку",
+    description: "Круиз подходит, когда хочется маршрута, но без постоянной смены отелей и лишней логистики.",
+  },
+];
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -37,6 +66,7 @@ export default async function ArticlePage({ params }: Props) {
 
   const url = `${SITE_URL}/blog/${article.slug}`;
   const image = mediaUrl(article.featured_image);
+  const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -89,11 +119,17 @@ export default async function ArticlePage({ params }: Props) {
         <ShareButtons url={url} title={article.title} />
       </div>
 
-      {image && (
-        <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
-          <Image src={image} alt={article.title} fill sizes="768px" className="object-cover" unoptimized priority />
-        </div>
+      {isOctoberArticle ? (
+        <ArticleHeroCarousel slides={OCTOBER_ARTICLE_SLIDES} />
+      ) : (
+        image && (
+          <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
+            <Image src={image} alt={article.title} fill sizes="768px" className="object-cover" unoptimized priority />
+          </div>
+        )
       )}
+
+      {isOctoberArticle && <OctoberQuickGuide />}
 
       <div
         className="prose prose-sm mt-8 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue"
