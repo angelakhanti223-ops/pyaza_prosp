@@ -9,6 +9,8 @@ class SiteImagesSerializer(serializers.ModelSerializer):
         fields = [
             'hero_background', 'why_us_solo', 'why_us_family', 'why_us_cruise',
             'why_us_excursion', 'why_us_support', 'office_photo',
+            'tours_hero', 'directions_hero', 'cruises_hero', 'promotions_hero',
+            'certificates_hero', 'contacts_hero', 'team_hero', 'about_hero',
         ]
 
 
