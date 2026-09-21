@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
@@ -21,6 +21,7 @@ import { fetchDirections, type Direction } from "@/lib/api";
 import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
+import { getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
 import TaskModal from "@/components/kanban/TaskModal";
 
 type UpdatePatch = Parameters<typeof updateLead>[1];
@@ -39,18 +40,17 @@ function dateTimeValue(value: string | null) {
   return local.toISOString().slice(0, 16);
 }
 
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU");
-}
-
 function isPast(value: string | null) {
   if (!value) return false;
   return new Date(value).getTime() < Date.now();
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="text-xs text-foreground/50">{children}</label>;
+}
+
+function inputClass(extra = "") {
+  return `mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue ${extra}`;
 }
 
 export default function CrmLeadDetailPage() {
@@ -106,7 +106,7 @@ export default function CrmLeadDetailPage() {
     }
   }
 
-  async function handleAddComment(e: React.FormEvent) {
+  async function handleAddComment(e: FormEvent) {
     e.preventDefault();
     if (!lead || !comment.trim()) return;
     await addLeadComment(lead.id, comment.trim());
@@ -150,6 +150,9 @@ export default function CrmLeadDetailPage() {
 
   const contactOverdue = isPast(lead.next_contact_at);
   const paymentOverdue = isPast(lead.full_payment_due_at);
+  const needsNextContact = ["follow_up", "selection", "options_proposed"].includes(lead.status) && !lead.next_contact_at;
+  const needsFailureReason = ["closed_lost", "failed", "not_target"].includes(lead.status) && !lead.failure_reason;
+  const needsPaymentControl = ["booked", "prepaid", "waiting_payment"].includes(lead.status) && !lead.full_payment_due_at;
 
   const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
@@ -179,22 +182,9 @@ export default function CrmLeadDetailPage() {
                   className="-mx-1 w-full rounded-lg border border-transparent px-1 text-xl font-bold text-navy outline-none hover:border-black/10 focus:border-blue"
                 />
                 <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-foreground/60">
-                  <input
-                    type="tel"
-                    defaultValue={lead.phone}
-                    onBlur={(e) => savePatch({ phone: e.target.value }, "phone")}
-                    disabled={savingField === "phone"}
-                    className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
-                  />
+                  <input type="tel" defaultValue={lead.phone} onBlur={(e) => savePatch({ phone: e.target.value }, "phone")} className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue" />
                   <span>·</span>
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    defaultValue={lead.email}
-                    onBlur={(e) => savePatch({ email: e.target.value }, "email")}
-                    disabled={savingField === "email"}
-                    className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
-                  />
+                  <input type="email" placeholder="Email" defaultValue={lead.email} onBlur={(e) => savePatch({ email: e.target.value }, "email")} className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue" />
                 </div>
                 <p className="mt-1 text-xs text-foreground/40">Источник: {lead.source_display}</p>
               </div>
@@ -206,44 +196,37 @@ export default function CrmLeadDetailPage() {
               <textarea
                 defaultValue={lead.initial_comment}
                 onBlur={(e) => savePatch({ initial_comment: e.target.value }, "initial_comment")}
-                disabled={savingField === "initial_comment"}
                 rows={2}
                 placeholder="Комментарий по заявке…"
                 className="mt-1 w-full resize-none rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70 outline-none focus:ring-1 focus:ring-blue"
               />
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <FieldLabel>Статус</FieldLabel>
                 <select
                   value={lead.status}
                   disabled={savingField === "status"}
                   onChange={(e) => savePatch({ status: e.target.value as LeadStatus }, "status")}
-                  className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
+                  className={inputClass()}
                 >
                   {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>{getLeadStatusLabel(s.value, s.label)}</option>
                   ))}
                 </select>
-                {lead.status === "selection" && !lead.next_contact_at && (
-                  <p className="mt-1 text-xs text-red-600">Для подборки нужна дата повторной связи.</p>
-                )}
+                <LeadStatusHint status={lead.status} />
+                {needsNextContact && <p className="mt-1 text-xs text-red-600">Для этого статуса нужна дата следующего контакта.</p>}
+                {needsPaymentControl && <p className="mt-1 text-xs text-red-600">Для этого статуса нужен дедлайн полной оплаты.</p>}
+                {needsFailureReason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
               </div>
 
               <div>
                 <FieldLabel>Ответственный</FieldLabel>
                 {isHead ? (
-                  <select
-                    value={lead.assigned_manager?.id ?? ""}
-                    disabled={savingField === "manager"}
-                    onChange={(e) => savePatch({ assigned_manager: Number(e.target.value) }, "manager")}
-                    className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
-                  >
+                  <select value={lead.assigned_manager?.id ?? ""} onChange={(e) => savePatch({ assigned_manager: Number(e.target.value) }, "manager")} className={inputClass()}>
                     <option value="" disabled>Не назначен</option>
-                    {managers.map((m) => (
-                      <option key={m.id} value={m.id}>{m.full_name}</option>
-                    ))}
+                    {managers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                   </select>
                 ) : (
                   <p className="mt-1.5 text-sm text-navy">{lead.assigned_manager?.full_name ?? "—"}</p>
@@ -252,16 +235,9 @@ export default function CrmLeadDetailPage() {
 
               <div>
                 <FieldLabel>Направление</FieldLabel>
-                <select
-                  value={lead.direction ?? ""}
-                  disabled={savingField === "direction"}
-                  onChange={(e) => savePatch({ direction: e.target.value ? Number(e.target.value) : null }, "direction")}
-                  className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
-                >
+                <select value={lead.direction ?? ""} onChange={(e) => savePatch({ direction: e.target.value ? Number(e.target.value) : null }, "direction")} className={inputClass()}>
                   <option value="">Не указано</option>
-                  {directions.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
+                  {directions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
             </div>
@@ -270,42 +246,15 @@ export default function CrmLeadDetailPage() {
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-navy">Параметры тура</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <FieldLabel>Город вылета</FieldLabel>
-                <input defaultValue={lead.departure_city} onBlur={(e) => savePatch({ departure_city: e.target.value }, "departure_city")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Дата вылета</FieldLabel>
-                <input type="date" defaultValue={dateValue(lead.departure_date)} onBlur={(e) => savePatch({ departure_date: e.target.value || null }, "departure_date")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Ночей</FieldLabel>
-                <input type="number" defaultValue={lead.nights ?? ""} onBlur={(e) => savePatch({ nights: e.target.value ? Number(e.target.value) : null }, "nights")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Взрослых</FieldLabel>
-                <input type="number" defaultValue={lead.adults ?? ""} onBlur={(e) => savePatch({ adults: e.target.value ? Number(e.target.value) : null }, "adults")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Детей</FieldLabel>
-                <input type="number" defaultValue={lead.children_count ?? ""} onBlur={(e) => savePatch({ children_count: e.target.value ? Number(e.target.value) : null }, "children_count")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Возраст детей</FieldLabel>
-                <input defaultValue={lead.children_ages} onBlur={(e) => savePatch({ children_ages: e.target.value }, "children_ages")} placeholder="например: 5 и 11" className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Бюджет от, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.budget_from ?? ""} onBlur={(e) => savePatch({ budget_from: e.target.value || null }, "budget_from")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Бюджет до, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.budget_to ?? ""} onBlur={(e) => savePatch({ budget_to: e.target.value || null }, "budget_to")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Питание</FieldLabel>
-                <input defaultValue={lead.meal_type} onBlur={(e) => savePatch({ meal_type: e.target.value }, "meal_type")} placeholder="AI, HB, BB" className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
+              <div><FieldLabel>Город вылета</FieldLabel><input defaultValue={lead.departure_city} onBlur={(e) => savePatch({ departure_city: e.target.value }, "departure_city")} className={inputClass()} /></div>
+              <div><FieldLabel>Дата вылета</FieldLabel><input type="date" defaultValue={dateValue(lead.departure_date)} onBlur={(e) => savePatch({ departure_date: e.target.value || null }, "departure_date")} className={inputClass()} /></div>
+              <div><FieldLabel>Ночей</FieldLabel><input type="number" defaultValue={lead.nights ?? ""} onBlur={(e) => savePatch({ nights: e.target.value ? Number(e.target.value) : null }, "nights")} className={inputClass()} /></div>
+              <div><FieldLabel>Взрослых</FieldLabel><input type="number" defaultValue={lead.adults ?? ""} onBlur={(e) => savePatch({ adults: e.target.value ? Number(e.target.value) : null }, "adults")} className={inputClass()} /></div>
+              <div><FieldLabel>Детей</FieldLabel><input type="number" defaultValue={lead.children_count ?? ""} onBlur={(e) => savePatch({ children_count: e.target.value ? Number(e.target.value) : null }, "children_count")} className={inputClass()} /></div>
+              <div><FieldLabel>Возраст детей</FieldLabel><input defaultValue={lead.children_ages} onBlur={(e) => savePatch({ children_ages: e.target.value }, "children_ages")} placeholder="например: 5 и 11" className={inputClass()} /></div>
+              <div><FieldLabel>Бюджет от, ₽</FieldLabel><input type="number" defaultValue={lead.budget_from ?? ""} onBlur={(e) => savePatch({ budget_from: e.target.value || null }, "budget_from")} className={inputClass()} /></div>
+              <div><FieldLabel>Бюджет до, ₽</FieldLabel><input type="number" defaultValue={lead.budget_to ?? ""} onBlur={(e) => savePatch({ budget_to: e.target.value || null }, "budget_to")} className={inputClass()} /></div>
+              <div><FieldLabel>Питание</FieldLabel><input defaultValue={lead.meal_type} onBlur={(e) => savePatch({ meal_type: e.target.value }, "meal_type")} placeholder="AI, HB, BB" className={inputClass()} /></div>
             </div>
             <div className="mt-4">
               <FieldLabel>Пожелания по отелю и отдыху</FieldLabel>
@@ -318,42 +267,21 @@ export default function CrmLeadDetailPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <FieldLabel>Следующий контакт</FieldLabel>
-                <input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-sm outline-none focus:border-blue ${contactOverdue ? "border-red-400" : "border-black/10"}`} />
+                <input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={inputClass(contactOverdue ? "border-red-400" : "")} />
                 {contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}
               </div>
-              <div>
-                <FieldLabel>Сумма сделки, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Комиссия, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.commission ?? ""} onBlur={(e) => savePatch({ commission: e.target.value || null }, "commission")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Предоплата, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.prepayment_amount ?? ""} onBlur={(e) => savePatch({ prepayment_amount: e.target.value || null }, "prepayment_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Оплачено туристом, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.paid_amount ?? ""} onBlur={(e) => savePatch({ paid_amount: e.target.value || null }, "paid_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Остаток, ₽</FieldLabel>
-                <input type="number" defaultValue={lead.balance_due ?? ""} onBlur={(e) => savePatch({ balance_due: e.target.value || null }, "balance_due")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
+              <div><FieldLabel>Сумма сделки, ₽</FieldLabel><input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className={inputClass()} /></div>
+              <div><FieldLabel>Комиссия, ₽</FieldLabel><input type="number" defaultValue={lead.commission ?? ""} onBlur={(e) => savePatch({ commission: e.target.value || null }, "commission")} className={inputClass()} /></div>
+              <div><FieldLabel>Предоплата, ₽</FieldLabel><input type="number" defaultValue={lead.prepayment_amount ?? ""} onBlur={(e) => savePatch({ prepayment_amount: e.target.value || null }, "prepayment_amount")} className={inputClass()} /></div>
+              <div><FieldLabel>Оплачено туристом, ₽</FieldLabel><input type="number" defaultValue={lead.paid_amount ?? ""} onBlur={(e) => savePatch({ paid_amount: e.target.value || null }, "paid_amount")} className={inputClass()} /></div>
+              <div><FieldLabel>Остаток, ₽</FieldLabel><input type="number" defaultValue={lead.balance_due ?? ""} onBlur={(e) => savePatch({ balance_due: e.target.value || null }, "balance_due")} className={inputClass()} /></div>
               <div>
                 <FieldLabel>Дедлайн полной оплаты</FieldLabel>
-                <input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-sm outline-none focus:border-blue ${paymentOverdue ? "border-red-400" : "border-black/10"}`} />
+                <input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={inputClass(paymentOverdue ? "border-red-400" : "")} />
                 {paymentOverdue && <p className="mt-1 text-xs text-red-600">Оплата просрочена</p>}
               </div>
-              <div>
-                <FieldLabel>Туроператор</FieldLabel>
-                <input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
-              <div>
-                <FieldLabel>Номер брони</FieldLabel>
-                <input defaultValue={lead.booking_number} onBlur={(e) => savePatch({ booking_number: e.target.value }, "booking_number")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
-              </div>
+              <div><FieldLabel>Туроператор</FieldLabel><input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className={inputClass()} /></div>
+              <div><FieldLabel>Номер брони</FieldLabel><input defaultValue={lead.booking_number} onBlur={(e) => savePatch({ booking_number: e.target.value }, "booking_number")} className={inputClass()} /></div>
             </div>
             {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && (
               <div className="mt-4">
@@ -373,15 +301,8 @@ export default function CrmLeadDetailPage() {
             <div className="flex flex-col gap-3">
               {timeline.map((item) => (
                 <div key={`${item.kind}-${item.data.id}`} className="rounded-xl bg-blue-light/30 p-3 text-sm">
-                  {item.kind === "comment" ? (
-                    <p className="text-foreground/80">{item.data.text}</p>
-                  ) : (
-                    <p className="text-foreground/80">Статус изменён: <span className="font-medium">{item.data.old_status_display || "—"} → {item.data.new_status_display}</span></p>
-                  )}
-                  <p className="mt-1 text-xs text-foreground/40">
-                    {"author" in item.data ? item.data.author?.full_name : item.data.changed_by?.full_name}
-                    {" · "}{new Date(item.date).toLocaleString("ru-RU")}
-                  </p>
+                  {item.kind === "comment" ? <p className="text-foreground/80">{item.data.text}</p> : <p className="text-foreground/80">Статус изменён: <span className="font-medium">{item.data.old_status_display || "—"} → {item.data.new_status_display}</span></p>}
+                  <p className="mt-1 text-xs text-foreground/40">{"author" in item.data ? item.data.author?.full_name : item.data.changed_by?.full_name}{" · "}{new Date(item.date).toLocaleString("ru-RU")}</p>
                 </div>
               ))}
               {timeline.length === 0 && <p className="text-sm text-foreground/40">Пока нет ни комментариев, ни изменений статуса.</p>}
@@ -399,11 +320,7 @@ export default function CrmLeadDetailPage() {
             </label>
             <ul className="mt-3 flex flex-col gap-2">
               {lead.attachments.map((a) => (
-                <li key={a.id}>
-                  <a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">
-                    {a.file.split("/").pop()}
-                  </a>
-                </li>
+                <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>
               ))}
               {lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}
             </ul>
@@ -451,15 +368,13 @@ export default function CrmLeadDetailPage() {
                     <div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div>
                   </dl>
                 )}
-                <Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">
-                  Открыть и редактировать в «Заявки U-ON»
-                </Link>
+                <Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">Открыть и редактировать в «Заявки U-ON»</Link>
               </>
             ) : (
               <>
-                <p className="text-sm text-foreground/50">Заявка в U-ON ещё не создана — переведите обращение в заявку, чтобы вести полноценную сделку.</p>
+                <p className="text-sm leading-6 text-foreground/50">Первичное обращение в U-ON создаётся автоматически. Эту кнопку нажимайте только когда клиент выбрал тур или готов перейти к бронированию.</p>
                 <button onClick={handleCreateUonRequest} disabled={convertingToRequest} className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50">
-                  {convertingToRequest ? "Создание…" : "Создать заявку в U-ON"}
+                  {convertingToRequest ? "Создание…" : "Перевести в заявку U-ON"}
                 </button>
                 {convertError && <p className="mt-2 text-xs text-red-600">{convertError}</p>}
               </>
