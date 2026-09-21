@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "О компании — туристическое агентство в Пензе | Слетать.ру",
@@ -15,12 +16,17 @@ const FACTS = [
   { value: "50+", label: "направлений по всему миру" },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const siteImages = await fetchSiteImages();
+  const heroImage = siteImageUrl(siteImages.about_hero ?? siteImages.office_photo);
+
   return (
     <div>
       <PageHero
         title="О компании Слетать.ру"
         text="Сеть туристических агентств в Пензе. Подбираем путешествия под бюджет и стиль отдыха каждого клиента вот уже больше 20 лет."
+        image={heroImage}
+        imageAlt="Туристическое агентство Слетать.ру в Пензе"
       />
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid grid-cols-3 gap-4 text-center">
