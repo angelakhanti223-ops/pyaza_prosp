@@ -8,7 +8,17 @@ import { useCrmAuth } from "./CrmAuthProvider";
 
 const SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: "phone_call", label: "Телефонный звонок" },
-  { value: "site_form", label: "Сайт (форма)" },
+  { value: "site_form", label: "Сайт / форма" },
+  { value: "sletat", label: "Слетать.ру" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+  { value: "vk", label: "ВК" },
+  { value: "max", label: "MAX" },
+  { value: "office", label: "Офис / личное обращение" },
+  { value: "referral", label: "Рекомендация" },
+  { value: "repeat", label: "Повторный клиент" },
+  { value: "instagram", label: "Instagram" },
+  { value: "uon", label: "U-ON" },
   { value: "chatbot", label: "Чат-бот" },
   { value: "other", label: "Другое" },
 ];
