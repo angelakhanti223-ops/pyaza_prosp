@@ -10,15 +10,17 @@ from rest_framework.throttling import ScopedRateThrottle
 from accounts.permissions import is_head
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
-from .models import Direction, Lead, LeadStatusHistory, TourOperator
+from .models import Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
 from .serializers import (
     DirectionSerializer,
     LeadAttachmentSerializer,
     LeadCommentSerializer,
+    LeadContactSerializer,
     LeadCreateSerializer,
     LeadCrmCreateSerializer,
     LeadDetailSerializer,
     LeadListSerializer,
+    LeadTagSerializer,
     LeadUpdateSerializer,
     TourOperatorSerializer,
 )
@@ -42,6 +44,15 @@ class TourOperatorListView(generics.ListAPIView):
     pagination_class = None
 
 
+class LeadTagListView(generics.ListAPIView):
+    """Справочник меток заявки для CRM."""
+
+    queryset = LeadTag.objects.filter(is_active=True).order_by('name')
+    serializer_class = LeadTagSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+
 class LeadCreateView(generics.CreateAPIView):
     """Приём заявки с публичного сайта (ТЗ 3.2): создаёт Lead со статусом «Новая»."""
 
@@ -59,7 +70,7 @@ class LeadViewSet(
     viewsets.GenericViewSet,
 ):
     """Мини-CRM (ТЗ 5): список/карточка заявки, создание вручную, смена статуса,
-    комментарии, файлы.
+    комментарии, файлы, контакты и метки.
 
     Менеджер видит и ведёт только свои заявки; руководитель/администратор — все
     заявки и может переназначать ответственного (ТЗ 5.3). Ручное создание (см.
@@ -79,8 +90,8 @@ class LeadViewSet(
         qs = (
             Lead.objects.select_related('assigned_manager', 'direction', 'tour_operator_ref')
             .prefetch_related(
-                'comments__author', 'status_history__changed_by', 'attachments__uploaded_by',
-                'tasks__column', 'uon_sync_logs',
+                'tags', 'contacts', 'comments__author', 'status_history__changed_by',
+                'attachments__uploaded_by', 'tasks__column', 'uon_sync_logs',
             )
         )
 
@@ -92,9 +103,18 @@ class LeadViewSet(
         if status_param:
             qs = qs.filter(status=status_param)
 
+        tag_param = self.request.query_params.get('tag')
+        if tag_param:
+            qs = qs.filter(tags__id=tag_param)
+
         search = self.request.query_params.get('search')
         if search:
-            qs = qs.filter(Q(name__icontains=search) | Q(phone__icontains=search) | Q(email__icontains=search))
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(email__icontains=search) |
+                Q(contacts__value__icontains=search)
+            ).distinct()
 
         return qs
 
@@ -107,6 +127,8 @@ class LeadViewSet(
             return LeadUpdateSerializer
         if self.action == 'add_comment':
             return LeadCommentSerializer
+        if self.action in ('add_contact', 'update_contact'):
+            return LeadContactSerializer
         if self.action == 'add_attachment':
             return LeadAttachmentSerializer
         return LeadDetailSerializer
@@ -115,7 +137,7 @@ class LeadViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
-        return Response(LeadDetailSerializer(lead).data, status=201)
+        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data, status=201)
 
     def partial_update(self, request, *args, **kwargs):
         lead = self.get_object()
@@ -152,7 +174,7 @@ class LeadViewSet(
         # get_object() ran against a queryset with prefetch_related, so the cached
         # related objects (status_history, comments, ...) are stale after the write above.
         lead.refresh_from_db()
-        return Response(LeadDetailSerializer(lead).data)
+        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=['post'], url_path='comments')
     def add_comment(self, request, pk=None):
@@ -161,6 +183,25 @@ class LeadViewSet(
         serializer.is_valid(raise_exception=True)
         serializer.save(lead=lead, author=request.user)
         return Response(serializer.data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='contacts')
+    def add_contact(self, request, pk=None):
+        lead = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(lead=lead)
+        lead.refresh_from_db()
+        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='contacts/(?P<contact_id>[^/.]+)')
+    def update_contact(self, request, pk=None, contact_id=None):
+        lead = self.get_object()
+        contact = lead.contacts.get(id=contact_id)
+        serializer = self.get_serializer(contact, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        lead.refresh_from_db()
+        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
     @action(
         detail=True, methods=['post'], url_path='attachments',
@@ -193,4 +234,4 @@ class LeadViewSet(
         lead.save(update_fields=['uon_request_id'])
         sync_uon_request(new_id)
 
-        return Response(LeadDetailSerializer(lead).data)
+        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
