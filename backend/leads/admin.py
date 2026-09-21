@@ -9,6 +9,7 @@ from .models import (
     LeadStatusHistory,
     MonthlyPlan,
     TourOperator,
+    TourOperatorExchangeRate,
     WorkShift,
 )
 
@@ -32,9 +33,15 @@ class LeadAttachmentInline(admin.TabularInline):
     readonly_fields = ('uploaded_at',)
 
 
+class TourOperatorExchangeRateInline(admin.TabularInline):
+    model = TourOperatorExchangeRate
+    extra = 1
+    fields = ('currency', 'rate', 'rate_date', 'source_note', 'source_url', 'is_active')
+
+
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'status', 'source', 'assigned_manager', 'tour_operator_ref', 'tour_currency', 'created_at')
+    list_display = ('name', 'phone', 'status', 'source', 'assigned_manager', 'tour_operator_ref', 'tour_currency', 'payment_exchange_rate', 'created_at')
     list_filter = ('status', 'source', 'direction', 'assigned_manager', 'tour_operator_ref', 'tour_currency')
     search_fields = ('name', 'phone', 'email', 'uon_ticket_id', 'booking_number', 'tour_operator')
     readonly_fields = ('created_at', 'updated_at')
@@ -53,12 +60,22 @@ class TourOperatorAdmin(admin.ModelAdmin):
     list_display = ('brand_name', 'legal_name', 'inn', 'registry_number', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('brand_name', 'legal_name', 'inn', 'ogrn', 'registry_number')
+    inlines = [TourOperatorExchangeRateInline]
     fieldsets = (
         ('Основное', {'fields': ('brand_name', 'legal_name', 'is_active')}),
         ('Реестр и реквизиты', {'fields': ('inn', 'ogrn', 'registry_number', 'activity_scope', 'payment_details')}),
         ('Контакты', {'fields': ('website', 'phone', 'email', 'address')}),
         ('Примечание', {'fields': ('note',)}),
     )
+
+
+@admin.register(TourOperatorExchangeRate)
+class TourOperatorExchangeRateAdmin(admin.ModelAdmin):
+    list_display = ('operator', 'currency', 'rate', 'rate_date', 'source_note', 'is_active', 'updated_at')
+    list_filter = ('operator', 'currency', 'rate_date', 'is_active')
+    search_fields = ('operator__brand_name', 'operator__legal_name', 'source_note')
+    date_hierarchy = 'rate_date'
+    ordering = ('operator__brand_name', 'currency', '-rate_date')
 
 
 @admin.register(CommissionTier)
