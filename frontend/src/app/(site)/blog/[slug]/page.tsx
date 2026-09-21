@@ -8,6 +8,7 @@ import ShareButtons from "@/components/blog/ShareButtons";
 import ImageCarousel from "@/components/blog/ImageCarousel";
 import ArticleHeroCarousel, { type ArticleHeroSlide } from "@/components/blog/ArticleHeroCarousel";
 import OctoberQuickGuide from "@/components/blog/OctoberQuickGuide";
+import NovemberQuickGuide from "@/components/blog/NovemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -36,6 +37,33 @@ const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
     alt: "Круизный маршрут в октябре",
     title: "Посмотреть несколько городов за одну поездку",
     description: "Круиз подходит, когда хочется маршрута, но без постоянной смены отелей и лишней логистики.",
+  },
+];
+
+const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/october/sea.svg",
+    alt: "Тёплое море и пляжный отдых в ноябре",
+    title: "Улететь из осени к тёплому морю",
+    description: "Ноябрь хорошо подходит для направлений, где уже комфортнее после летней жары и можно планировать пляжный отдых.",
+  },
+  {
+    src: "/blog/october/family.svg",
+    alt: "Семейный отдых с детьми в ноябре",
+    title: "Подобрать спокойный семейный отдых",
+    description: "Для поездки с детьми особенно важны перелёт, питание, пляж, тёплый бассейн и удобная территория отеля.",
+  },
+  {
+    src: "/blog/october/excursions.svg",
+    alt: "Экскурсионная поездка в ноябре",
+    title: "Сменить серую погоду на новые впечатления",
+    description: "В ноябре можно выбирать не только море, но и города, СПА, гастрономию, экскурсии и короткие перезагрузки.",
+  },
+  {
+    src: "/blog/october/cruises.svg",
+    alt: "Круизный маршрут в ноябре",
+    title: "Посмотреть несколько мест за одну поездку",
+    description: "Круизы и комбинированные маршруты подойдут тем, кто хочет больше впечатлений без постоянной смены отелей вручную.",
   },
 ];
 
@@ -68,6 +96,10 @@ export default async function ArticlePage({ params }: Props) {
   const url = `${SITE_URL}/blog/${article.slug}`;
   const image = mediaUrl(article.featured_image);
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
+  const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
+  const isSeasonalArticle = isOctoberArticle || isNovemberArticle;
+  const heroSlides = isNovemberArticle ? NOVEMBER_ARTICLE_SLIDES : OCTOBER_ARTICLE_SLIDES;
+  const leadComment = `Заявка из статьи: ${article.title}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -120,8 +152,8 @@ export default async function ArticlePage({ params }: Props) {
         <ShareButtons url={url} title={article.title} />
       </div>
 
-      {isOctoberArticle ? (
-        <ArticleHeroCarousel slides={OCTOBER_ARTICLE_SLIDES} />
+      {isSeasonalArticle ? (
+        <ArticleHeroCarousel slides={heroSlides} />
       ) : (
         image && (
           <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
@@ -131,9 +163,11 @@ export default async function ArticlePage({ params }: Props) {
       )}
 
       {isOctoberArticle && <OctoberQuickGuide />}
-      {isOctoberArticle && (
+      {isNovemberArticle && <NovemberQuickGuide />}
+      {isSeasonalArticle && (
         <ArticleLeadButtons
           compact
+          comment={leadComment}
           title="Хотите понять, куда поехать именно вам?"
           text="Опишите даты, состав туристов и бюджет — подберём направление и отели под ваш формат отдыха, а не просто покажем список туров."
         />
@@ -146,10 +180,11 @@ export default async function ArticlePage({ params }: Props) {
 
       <ImageCarousel images={article.gallery_images} />
 
-      {isOctoberArticle && (
+      {isSeasonalArticle && (
         <ArticleLeadButtons
+          comment={leadComment}
           title="Оставить заявку на подбор тура"
-          text="Сравним Египет, Турцию, ОАЭ, Таиланд, Вьетнам, Мальдивы, Россию и круизы под ваши даты. Можно написать в MAX, Telegram или заполнить заявку на сайте."
+          text="Сравним направления, отели, перелёты, питание и сезонность под ваши даты. Можно написать в MAX, Telegram или заполнить заявку на сайте."
         />
       )}
 
