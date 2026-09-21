@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Акции и горящие туры — Слетать.ру",
@@ -9,12 +10,17 @@ export const metadata: Metadata = {
     "Актуальные акции, горящие туры и сезонные скидки от туристического агентства Слетать.ру в Пензе. Оставьте заявку — пришлём подборку под ваши даты.",
 };
 
-export default function PromotionsPage() {
+export default async function PromotionsPage() {
+  const siteImages = await fetchSiteImages();
+  const heroImage = siteImageUrl(siteImages.promotions_hero);
+
   return (
     <div>
       <PageHero
         title="Акции и горящие туры"
         text="Собираем актуальные предложения от туроператоров — эта страница пополняется. Оставьте заявку, и мы пришлём вам подборку лучших вариантов на ваши даты."
+        image={heroImage}
+        imageAlt="Акции и горящие туры"
       />
       <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 lg:px-8">
         <p className="text-sm leading-relaxed text-foreground/70">
