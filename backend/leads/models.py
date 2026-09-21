@@ -26,13 +26,21 @@ class Lead(models.Model):
 
     class Status(models.TextChoices):
         NEW = 'new', 'Новая'
+        FOLLOW_UP = 'follow_up', 'Назначена повторная связь'
         IN_PROGRESS = 'in_progress', 'В работе'
+        SELECTION = 'selection', 'Подборка'
         OPTIONS_PROPOSED = 'options_proposed', 'Предложены варианты'
         BOOKED = 'booked', 'Бронь'
         PREPAID = 'prepaid', 'Внесена предоплата'
+        WAITING_PAYMENT = 'waiting_payment', 'Ожидаем полной оплаты'
         PAID = 'paid', 'Оплачено'
+        DEPARTURE = 'departure', 'Вылет'
+        CHECK_IN = 'check_in', 'Заселение'
+        RETURNED = 'returned', 'Прилет'
         CLOSED_WON = 'closed_won', 'Закрыта (успех)'
         CLOSED_LOST = 'closed_lost', 'Закрыта (отказ)'
+        FAILED = 'failed', 'Провалена'
+        NOT_TARGET = 'not_target', 'Нецелевой'
 
     name = models.CharField('Имя клиента', max_length=255)
     phone = models.CharField('Телефон', max_length=32)
@@ -45,8 +53,31 @@ class Lead(models.Model):
     assigned_manager = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads',
     )
+
+    # Туристические параметры заявки. Все поля nullable/blank, чтобы миграция не меняла
+    # и не перезаписывала уже существующие обращения и заявки.
+    departure_city = models.CharField('Город вылета', max_length=100, blank=True)
+    departure_date = models.DateField('Дата вылета', null=True, blank=True)
+    nights = models.PositiveSmallIntegerField('Количество ночей', null=True, blank=True)
+    adults = models.PositiveSmallIntegerField('Взрослых', null=True, blank=True)
+    children_count = models.PositiveSmallIntegerField('Детей', null=True, blank=True)
+    children_ages = models.CharField('Возраст детей', max_length=100, blank=True)
+    budget_from = models.DecimalField('Бюджет от', max_digits=10, decimal_places=2, null=True, blank=True)
+    budget_to = models.DecimalField('Бюджет до', max_digits=10, decimal_places=2, null=True, blank=True)
+    meal_type = models.CharField('Питание', max_length=100, blank=True)
+    hotel_wishes = models.TextField('Пожелания по отелю и отдыху', blank=True)
+    next_contact_at = models.DateTimeField('Следующий контакт', null=True, blank=True)
+
     deal_amount = models.DecimalField('Сумма сделки', max_digits=10, decimal_places=2, null=True, blank=True)
     commission = models.DecimalField('Комиссия', max_digits=10, decimal_places=2, null=True, blank=True)
+    prepayment_amount = models.DecimalField('Предоплата', max_digits=10, decimal_places=2, null=True, blank=True)
+    paid_amount = models.DecimalField('Оплачено туристом', max_digits=10, decimal_places=2, null=True, blank=True)
+    balance_due = models.DecimalField('Остаток к оплате', max_digits=10, decimal_places=2, null=True, blank=True)
+    full_payment_due_at = models.DateTimeField('Дедлайн полной оплаты', null=True, blank=True)
+    tour_operator = models.CharField('Туроператор', max_length=100, blank=True)
+    booking_number = models.CharField('Номер брони', max_length=100, blank=True)
+    failure_reason = models.CharField('Причина отказа / нецелевой заявки', max_length=255, blank=True)
+
     uon_ticket_id = models.CharField('ID обращения U-ON', max_length=64, blank=True)
     uon_request_id = models.CharField(
         'ID заявки U-ON', max_length=64, blank=True,
