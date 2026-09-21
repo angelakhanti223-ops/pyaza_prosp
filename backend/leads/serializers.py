@@ -47,34 +47,20 @@ def _decimal_string(value):
 
 
 def _latest_operator_rate(obj, context):
-    """Latest active operator-specific currency rate up to today.
-
-    Rates differ by tour operator, so this does not use CBR as fallback. If the
-    operator's own rate is not entered in the reference book, the response returns
-    nulls and the frontend shows that the TO rate is not set.
-    """
+    """Latest active operator-specific currency rate up to today."""
     if not obj.tour_operator_ref_id:
         return None
 
     currency = obj.tour_currency or Lead.Currency.RUB
     if currency == Lead.Currency.RUB:
-        return {
-            'rate': Decimal('1.0000'),
-            'rate_date': timezone.localdate(),
-            'source_note': 'RUB',
-        }
+        return {'rate': Decimal('1.0000'), 'rate_date': timezone.localdate(), 'source_note': 'RUB'}
 
     cache = context.setdefault('_operator_rate_cache', {})
     key = (obj.tour_operator_ref_id, currency)
     if key not in cache:
         cache[key] = (
             TourOperatorExchangeRate.objects
-            .filter(
-                operator_id=obj.tour_operator_ref_id,
-                currency=currency,
-                is_active=True,
-                rate_date__lte=timezone.localdate(),
-            )
+            .filter(operator_id=obj.tour_operator_ref_id, currency=currency, is_active=True, rate_date__lte=timezone.localdate())
             .order_by('-rate_date')
             .first()
         )
@@ -84,13 +70,7 @@ def _latest_operator_rate(obj, context):
 def _rate_payload(obj, context):
     rate_obj = _latest_operator_rate(obj, context)
     if rate_obj is None:
-        return {
-            'current_rate': None,
-            'rate_date': None,
-            'source_note': '',
-            'direction': 'missing',
-            'delta': None,
-        }
+        return {'current_rate': None, 'rate_date': None, 'source_note': '', 'direction': 'missing', 'delta': None}
 
     if isinstance(rate_obj, dict):
         current_rate = rate_obj['rate']
@@ -112,13 +92,7 @@ def _rate_payload(obj, context):
         }
 
     delta = current_rate - payment_rate
-    if delta > 0:
-        direction = 'higher'
-    elif delta < 0:
-        direction = 'lower'
-    else:
-        direction = 'same'
-
+    direction = 'higher' if delta > 0 else 'lower' if delta < 0 else 'same'
     return {
         'current_rate': _decimal_string(current_rate),
         'rate_date': rate_date.isoformat() if rate_date else None,
@@ -139,10 +113,7 @@ class TourOperatorExchangeRateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TourOperatorExchangeRate
-        fields = [
-            'id', 'operator', 'operator_name', 'currency', 'rate', 'rate_date',
-            'source_url', 'source_note', 'is_active', 'updated_at',
-        ]
+        fields = ['id', 'operator', 'operator_name', 'currency', 'rate', 'rate_date', 'source_url', 'source_note', 'is_active', 'updated_at']
 
 
 class TourOperatorSerializer(serializers.ModelSerializer):
@@ -172,13 +143,26 @@ class LeadContactSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+def _sync_primary_contacts_from_lead(lead: Lead):
+    if lead.phone:
+        LeadContact.objects.update_or_create(
+            lead=lead,
+            type=LeadContact.Type.PHONE,
+            value=lead.phone,
+            defaults={'label': 'Основной телефон из заявки', 'is_primary': True, 'allow_marketing': False},
+        )
+    if lead.email:
+        LeadContact.objects.update_or_create(
+            lead=lead,
+            type=LeadContact.Type.EMAIL,
+            value=lead.email,
+            defaults={'label': 'Email из заявки', 'is_primary': not bool(lead.phone), 'allow_marketing': True},
+        )
+
+
 class LeadCreateSerializer(serializers.ModelSerializer):
     consent = serializers.BooleanField(write_only=True)
-    # Only site_form (default) or chatbot are reachable from this public endpoint —
-    # phone_call/other are entered manually by staff, never by an anonymous request.
-    source = serializers.ChoiceField(
-        choices=[Lead.Source.SITE_FORM, Lead.Source.CHATBOT], required=False,
-    )
+    source = serializers.ChoiceField(choices=[Lead.Source.SITE_FORM, Lead.Source.CHATBOT], required=False)
 
     class Meta:
         model = Lead
@@ -187,17 +171,13 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
     def validate_consent(self, value):
         if not value:
-            raise serializers.ValidationError(
-                'Необходимо согласие на обработку персональных данных.'
-            )
+            raise serializers.ValidationError('Необходимо согласие на обработку персональных данных.')
         return value
 
     def create(self, validated_data):
         from django.conf import settings
-
         from emailing.tasks import send_lead_confirmation_task, send_lead_notification_task
         from integrations.tasks import sync_lead_to_uon
-
         from .tasks import create_new_lead_task
 
         validated_data.pop('consent')
@@ -211,41 +191,10 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         create_new_lead_task.delay(lead.id)
         if settings.SEND_LEAD_CONFIRMATION_EMAIL:
             send_lead_confirmation_task.delay(lead.id)
-
         return lead
 
 
-# --- Мини-CRM (внутренняя панель, ТЗ 5) ---
-
-
-def _sync_primary_contacts_from_lead(lead: Lead):
-    if lead.phone:
-        LeadContact.objects.update_or_create(
-            lead=lead,
-            type=LeadContact.Type.PHONE,
-            value=lead.phone,
-            defaults={
-                'label': 'Основной телефон из заявки',
-                'is_primary': True,
-                'allow_marketing': False,
-            },
-        )
-    if lead.email:
-        LeadContact.objects.update_or_create(
-            lead=lead,
-            type=LeadContact.Type.EMAIL,
-            value=lead.email,
-            defaults={
-                'label': 'Email из заявки',
-                'is_primary': not bool(lead.phone),
-                'allow_marketing': True,
-            },
-        )
-
-
 class LeadCrmCreateSerializer(serializers.ModelSerializer):
-    """Ручное создание обращения сотрудником в CRM (например, со звонка)."""
-
     consent = serializers.BooleanField(write_only=True)
 
     class Meta:
@@ -258,9 +207,7 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
 
     def validate_consent(self, value):
         if not value:
-            raise serializers.ValidationError(
-                'Подтвердите, что согласие клиента на обработку персональных данных получено.'
-            )
+            raise serializers.ValidationError('Подтвердите, что согласие клиента на обработку персональных данных получено.')
         return value
 
     def validate_assigned_manager(self, value):
@@ -272,7 +219,6 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from integrations.tasks import sync_lead_to_uon
         from telegrambot.tasks import notify_lead_assignment
-
         from .tasks import create_new_lead_task
 
         request = self.context['request']
@@ -287,7 +233,6 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
         create_new_lead_task.delay(lead.id)
         if lead.assigned_manager_id:
             notify_lead_assignment.delay(lead.id)
-
         return lead
 
 
@@ -307,10 +252,7 @@ class LeadStatusHistorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LeadStatusHistory
-        fields = [
-            'id', 'old_status', 'old_status_display', 'new_status', 'new_status_display',
-            'changed_by', 'changed_at',
-        ]
+        fields = ['id', 'old_status', 'old_status_display', 'new_status', 'new_status_display', 'changed_by', 'changed_at']
 
 
 class LeadAttachmentSerializer(serializers.ModelSerializer):
@@ -331,15 +273,13 @@ class LeadUonSyncLogSerializer(serializers.ModelSerializer):
 
 
 class LeadTaskSerializer(serializers.Serializer):
-    """Лёгкое read-only представление связанной канбан-задачи для карточки заявки (ТЗ 5.4)."""
-
     id = serializers.IntegerField()
     title = serializers.CharField()
     column = serializers.CharField(source='column.name')
     deadline = serializers.DateTimeField()
 
 
-class OperatorRateMixin:
+class OperatorRateMixin(serializers.Serializer):
     operator_current_rate = serializers.SerializerMethodField()
     operator_current_rate_date = serializers.SerializerMethodField()
     operator_rate_source_note = serializers.SerializerMethodField()
@@ -377,13 +317,12 @@ class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display',
-            'tags', 'status', 'status_display', 'source', 'source_display',
-            'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission',
-            'next_contact_at', 'departure_city', 'departure_date', 'nights', 'budget_from', 'budget_to',
-            'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
-            'tour_operator', 'tour_operator_ref', 'tour_operator_details', 'tour_currency', 'payment_exchange_rate',
-            *OPERATOR_RATE_FIELDS,
+            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display', 'tags',
+            'status', 'status_display', 'source', 'source_display', 'direction', 'direction_name',
+            'assigned_manager', 'deal_amount', 'commission', 'next_contact_at', 'departure_city',
+            'departure_date', 'nights', 'budget_from', 'budget_to', 'prepayment_amount', 'paid_amount',
+            'balance_due', 'full_payment_due_at', 'tour_operator', 'tour_operator_ref', 'tour_operator_details',
+            'tour_currency', 'payment_exchange_rate', *OPERATOR_RATE_FIELDS,
             'booking_number', 'failure_reason', 'created_at',
         ]
 
@@ -408,24 +347,21 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display',
-            'tags', 'contacts', 'source', 'source_display', 'direction', 'direction_name',
-            'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission',
-            *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tour_operator_details', *OPERATOR_RATE_FIELDS,
-            'uon_ticket_id', 'uon_request_id', 'initial_comment', 'consent_personal_data_at',
-            'created_at', 'updated_at', 'comments', 'status_history', 'attachments', 'tasks',
-            'uon_sync_logs', 'uon_lead', 'uon_request',
+            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display', 'tags', 'contacts',
+            'source', 'source_display', 'direction', 'direction_name', 'status', 'status_display',
+            'assigned_manager', 'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
+            'tour_operator_details', *OPERATOR_RATE_FIELDS, 'uon_ticket_id', 'uon_request_id',
+            'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at', 'comments',
+            'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead', 'uon_request',
         ]
 
     def get_uon_lead(self, obj):
-        """Данные обращения из U-ON-зеркала — если заявка уже синхронизирована."""
         if not obj.uon_ticket_id:
             return None
         record = UonLeadRecord.objects.filter(uon_id=obj.uon_ticket_id).first()
         return UonLeadRecordSerializer(record).data if record else None
 
     def get_uon_request(self, obj):
-        """Данные заявки из U-ON-зеркала — заполняется после перевода обращения в заявку."""
         if not obj.uon_request_id:
             return None
         record = UonRequestRecord.objects.filter(uon_id=obj.uon_request_id).first()
@@ -434,8 +370,7 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
 
 class LeadUpdateSerializer(serializers.ModelSerializer):
     tag_ids = serializers.PrimaryKeyRelatedField(
-        source='tags', queryset=LeadTag.objects.filter(is_active=True), many=True,
-        required=False, write_only=True,
+        source='tags', queryset=LeadTag.objects.filter(is_active=True), many=True, required=False, write_only=True,
     )
 
     class Meta:
