@@ -88,6 +88,21 @@ class TourOperatorExchangeRate(models.Model):
         return f'{self.operator} — {self.currency} {self.rate} на {self.rate_date}'
 
 
+class LeadTag(models.Model):
+    """Метка заявки для сегментации, контроля и будущих рассылок."""
+
+    name = models.CharField('Название метки', max_length=80, unique=True)
+    color = models.CharField('Цвет', max_length=20, blank=True, help_text='CSS-цвет или служебное имя цвета')
+    is_active = models.BooleanField('Активна', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Lead(models.Model):
     class Source(models.TextChoices):
         SITE_FORM = 'site_form', 'Сайт (форма)'
@@ -123,9 +138,21 @@ class Lead(models.Model):
         TRY = 'TRY', 'TRY — турецкая лира'
         OTHER = 'OTHER', 'Другая валюта'
 
+    class Messenger(models.TextChoices):
+        PHONE = 'phone', 'Телефон'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        TELEGRAM = 'telegram', 'Telegram'
+        MAX = 'max', 'MAX'
+        EMAIL = 'email', 'Email'
+        OTHER = 'other', 'Другое'
+
     name = models.CharField('Имя клиента', max_length=255)
     phone = models.CharField('Телефон', max_length=32)
     email = models.EmailField('Email', blank=True)
+    preferred_messenger = models.CharField(
+        'Приоритетный мессенджер / канал связи', max_length=20,
+        choices=Messenger.choices, default=Messenger.PHONE,
+    )
     source = models.CharField(max_length=20, choices=Source.choices, default=Source.SITE_FORM)
     direction = models.ForeignKey(
         Direction, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads',
@@ -134,6 +161,7 @@ class Lead(models.Model):
     assigned_manager = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads',
     )
+    tags = models.ManyToManyField(LeadTag, blank=True, related_name='leads', verbose_name='Метки заявки')
 
     # Туристические параметры заявки. Все поля nullable/blank, чтобы миграция не меняла
     # и не перезаписывала уже существующие обращения и заявки.
@@ -181,6 +209,42 @@ class Lead(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.phone})'
+
+
+class LeadContact(models.Model):
+    """Отдельный контакт клиента в заявке: телефоны, почта, мессенджеры.
+
+    Нужен для истории коммуникаций и будущих email/мессенджер-рассылок.
+    """
+
+    class Type(models.TextChoices):
+        PHONE = 'phone', 'Телефон'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        TELEGRAM = 'telegram', 'Telegram'
+        MAX = 'max', 'MAX'
+        EMAIL = 'email', 'Email'
+        OTHER = 'other', 'Другое'
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='contacts')
+    type = models.CharField('Тип контакта', max_length=20, choices=Type.choices)
+    value = models.CharField('Значение контакта', max_length=255)
+    label = models.CharField('Комментарий / кому принадлежит', max_length=100, blank=True)
+    is_primary = models.BooleanField('Основной контакт', default=False)
+    allow_marketing = models.BooleanField('Можно использовать для рассылок', default=True)
+    note = models.TextField('Примечание', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_primary', 'type', 'value']
+        unique_together = ('lead', 'type', 'value')
+        indexes = [
+            models.Index(fields=['type', 'value']),
+            models.Index(fields=['allow_marketing', 'type']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_type_display()}: {self.value}'
 
 
 class CommissionTier(models.Model):
