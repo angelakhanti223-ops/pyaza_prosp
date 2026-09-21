@@ -10,7 +10,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from accounts.permissions import is_head
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
-from .models import Direction, Lead, LeadStatusHistory
+from .models import Direction, Lead, LeadStatusHistory, TourOperator
 from .serializers import (
     DirectionSerializer,
     LeadAttachmentSerializer,
@@ -20,6 +20,7 @@ from .serializers import (
     LeadDetailSerializer,
     LeadListSerializer,
     LeadUpdateSerializer,
+    TourOperatorSerializer,
 )
 
 
@@ -29,6 +30,15 @@ class DirectionListView(generics.ListAPIView):
     queryset = Direction.objects.filter(is_active=True)
     serializer_class = DirectionSerializer
     permission_classes = [AllowAny]
+    pagination_class = None
+
+
+class TourOperatorListView(generics.ListAPIView):
+    """Справочник туроператоров для CRM: выбор в карточке заявки и просмотр реквизитов."""
+
+    queryset = TourOperator.objects.filter(is_active=True).order_by('brand_name')
+    serializer_class = TourOperatorSerializer
+    permission_classes = [IsAuthenticated]
     pagination_class = None
 
 
@@ -67,7 +77,7 @@ class LeadViewSet(
         # заявки теперь видны всем залогиненным сотрудникам — переназначать
         # ответственного по-прежнему может только руководитель (см. partial_update).
         qs = (
-            Lead.objects.select_related('assigned_manager', 'direction')
+            Lead.objects.select_related('assigned_manager', 'direction', 'tour_operator_ref')
             .prefetch_related(
                 'comments__author', 'status_history__changed_by', 'attachments__uploaded_by',
                 'tasks__column', 'uon_sync_logs',
