@@ -35,6 +35,11 @@ OPERATOR_ALIASES = [
     {'one touch', 'onetouch', 'ван тач'},
     {'russian express', 'русский экспресс'},
     {'tez tour', 'tez', 'тез тур'},
+    {'amigo', 'амиго'},
+    {'bon tour', 'bontour', 'бон тур', 'бонтур'},
+    {'art tour', 'арт тур'},
+    {'art travel', 'арт тревел'},
+    {'china travel', 'чайна тревел'},
 ]
 
 CURRENCIES = {
@@ -43,6 +48,11 @@ CURRENCIES = {
 }
 
 RATE_RE = re.compile(r'(?<!\d)(\d{2,3}(?:[,.]\d{1,4})?)(?!\d)')
+UI_TEXT_BLACKLIST = {
+    'название', 'курс usd', 'курс eur', 'курсы валют туроператоров', 'курсы туроператоров',
+    'сегодня', 'очистить', 'добавить', 'финансы', 'кассы', 'кассовая книга', 'фискальные чеки',
+    'обращения', 'заявки', 'туристы', 'партнеры', 'интеграции', 'настройки',
+}
 
 
 class _TableParser(HTMLParser):
@@ -118,13 +128,27 @@ def _rate_from_text(value: str) -> Decimal | None:
     return None
 
 
+def _all_rates_from_text(value: str) -> list[Decimal]:
+    rates: list[Decimal] = []
+    text = (value or '').replace('\xa0', ' ')
+    for match in RATE_RE.finditer(text):
+        raw = match.group(1).replace(',', '.')
+        try:
+            rate = Decimal(raw)
+        except InvalidOperation:
+            continue
+        if Decimal('10') <= rate <= Decimal('300'):
+            rates.append(rate.quantize(Decimal('0.0001')))
+    return rates
+
+
 def _parse_rows(html_text: str) -> list[list[str]]:
     parser = _TableParser()
     parser.feed(html_text)
     return parser.rows
 
 
-def _extract_rates(html_text: str) -> list[dict]:
+def _extract_rates_from_tables(html_text: str) -> list[dict]:
     rows = _parse_rows(html_text)
     parsed: list[dict] = []
     header_currency_columns: dict[int, str] = {}
@@ -167,6 +191,84 @@ def _extract_rates(html_text: str) -> list[dict]:
             parsed.append({'operator_name': operator_name, 'rates': rates, 'row_index': index})
 
     return parsed
+
+
+def _html_to_lines(html_text: str) -> list[str]:
+    text = re.sub(r'(?is)<script\b.*?</script>', '\n', html_text)
+    text = re.sub(r'(?is)<style\b.*?</style>', '\n', text)
+    text = re.sub(r'(?i)<\s*(tr|td|th|div|li|br|p|span|label|h\d)\b[^>]*>', '\n', text)
+    text = re.sub(r'(?i)</\s*(tr|td|th|div|li|p|span|label|h\d)\s*>', '\n', text)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = html.unescape(text)
+    lines = [_clean_cell(line) for line in text.splitlines()]
+    return [line for line in lines if line]
+
+
+def _looks_like_operator_name(value: str) -> bool:
+    text = _clean_cell(value)
+    norm = _norm(text)
+    if not norm or norm in UI_TEXT_BLACKLIST:
+        return False
+    if _rate_from_text(text) is not None:
+        return False
+    if len(text) < 3 or len(text) > 120:
+        return False
+    if re.search(r'\b(currency|cookie|script|function|return|window|document)\b', text, re.I):
+        return False
+    if '/' in text:
+        return True
+    compact = _compact(text)
+    return any(_compact(alias) and _compact(alias) in compact for group in OPERATOR_ALIASES for alias in group)
+
+
+def _extract_rates_from_text(html_text: str) -> list[dict]:
+    lines = _html_to_lines(html_text)
+    parsed: list[dict] = []
+
+    for idx, line in enumerate(lines):
+        if not _looks_like_operator_name(line):
+            continue
+
+        rates: dict[str, Decimal] = {}
+
+        # Same-line variant: "ANEX / Анекс Тур 89.67 100.12".
+        same_line_rates = _all_rates_from_text(line)
+        if same_line_rates:
+            rates['USD'] = same_line_rates[0]
+            if len(same_line_rates) > 1:
+                rates['EUR'] = same_line_rates[1]
+
+        # Common U-ON markup variant: operator name and numeric cells are split across elements.
+        if not rates:
+            numeric_after: list[Decimal] = []
+            for next_line in lines[idx + 1: idx + 6]:
+                if _looks_like_operator_name(next_line):
+                    break
+                for rate in _all_rates_from_text(next_line):
+                    numeric_after.append(rate)
+                if len(numeric_after) >= 2:
+                    break
+            if numeric_after:
+                rates['USD'] = numeric_after[0]
+                if len(numeric_after) > 1:
+                    rates['EUR'] = numeric_after[1]
+
+        if rates:
+            parsed.append({'operator_name': line, 'rates': rates, 'row_index': idx})
+
+    # Remove duplicate operator rows that may appear because fixed headers/hidden rows are duplicated.
+    unique: dict[str, dict] = {}
+    for item in parsed:
+        key = _compact(item['operator_name'])
+        unique[key] = item
+    return list(unique.values())
+
+
+def _extract_rates(html_text: str) -> list[dict]:
+    table_rates = _extract_rates_from_tables(html_text)
+    if table_rates:
+        return table_rates
+    return _extract_rates_from_text(html_text)
 
 
 def _operator_aliases(operator: TourOperator) -> set[str]:
@@ -231,8 +333,10 @@ def _rates_url() -> str:
 
 def _request_headers() -> dict[str, str]:
     headers = {
-        'User-Agent': 'Sletat-CRM/1.0 operator-rate-sync',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Referer': getattr(settings, 'UON_CABINET_URL', 'https://id62499.u-on.ru').rstrip('/') + '/',
     }
     cookie = os.getenv('UON_CABINET_COOKIE', '').strip()
     if cookie:
@@ -262,7 +366,14 @@ def sync_operator_exchange_rates_from_uon() -> dict:
 
     extracted = _extract_rates(html_text)
     if not extracted:
-        raise RuntimeError('На странице U-ON не удалось распознать таблицу курсов операторов.')
+        sample_path = '/tmp/uon_operator_rates_last_response.html'
+        try:
+            with open(sample_path, 'w', encoding='utf-8') as file:
+                file.write(html_text)
+        except OSError:
+            sample_path = ''
+        detail = f' Сохранён ответ: {sample_path}' if sample_path else ''
+        raise RuntimeError('На странице U-ON не удалось распознать таблицу курсов операторов.' + detail)
 
     operators = list(TourOperator.objects.filter(is_active=True))
     created = 0
