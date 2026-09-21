@@ -5,6 +5,7 @@ import { mediaUrl, type ArticleListItem } from "@/lib/articlesApi";
 const PREVIEW_BY_SLUG: Record<string, string> = {
   "gde-otdohnut-v-oktyabre": "/blog/october/sea.svg",
   "gde-otdohnut-v-noyabre": "/blog/october/family.svg",
+  "gde-otdohnut-v-dekabre": "/blog/october/cruises.svg",
   "gde-otdohnut-v-sentyabre": "/blog/october/excursions.svg",
 };
 
@@ -14,6 +15,7 @@ function fallbackPreview(article: ArticleListItem) {
 
   const title = article.title.toLowerCase();
   if (title.includes("мальдив")) return "/blog/october/sea.svg";
+  if (title.includes("декабр")) return "/blog/october/cruises.svg";
   if (title.includes("ноябр")) return "/blog/october/family.svg";
   if (title.includes("сентябр")) return "/blog/october/excursions.svg";
   if (title.includes("октябр")) return "/blog/october/sea.svg";
