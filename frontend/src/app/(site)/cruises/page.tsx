@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import CruiseWidget from "@/components/cruises/CruiseWidget";
@@ -32,6 +33,15 @@ export default function CruisesPage() {
         text="Морские и речные круизы по самым красивым маршрутам — от коротких речных путешествий до многодневных морских лайнеров."
       />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        <SiteCtaBlock
+          className="mb-10"
+          eyebrow="Подбор круиза"
+          title="Поможем выбрать маршрут, лайнер и каюту"
+          text="Укажите даты, длительность, желаемое направление и бюджет — подберём круиз и объясним разницу между вариантами."
+          primaryLabel="Подобрать круиз"
+          comment="Заявка со страницы круизов"
+        />
+
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {CRUISE_TYPES.map((c) => (
             <div key={c.title} className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">
