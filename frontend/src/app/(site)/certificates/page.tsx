@@ -4,6 +4,7 @@ import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import { fetchCertificates } from "@/lib/api";
 import { mediaUrl } from "@/lib/articlesApi";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Сертификаты и квалификация — Слетать.ру в Пензе",
@@ -12,13 +13,16 @@ export const metadata: Metadata = {
 };
 
 export default async function CertificatesPage() {
-  const certificates = await fetchCertificates();
+  const [certificates, siteImages] = await Promise.all([fetchCertificates(), fetchSiteImages()]);
+  const heroImage = siteImageUrl(siteImages.certificates_hero);
 
   return (
     <div>
       <PageHero
         title="Сертификаты и квалификация"
         text="Наши специалисты регулярно проходят обучение и аттестацию — вот подтверждения."
+        image={heroImage}
+        imageAlt="Сертификаты и квалификация специалистов Слетать.ру"
       />
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
         {certificates.length > 0 ? (
