@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Туры и путёвки в Пензе — купить тур онлайн | Слетать.ру",
@@ -18,12 +19,17 @@ const TOUR_TYPES = [
   { title: "Круизы", text: "Морские и речные круизы с подбором каюты под ваш бюджет." },
 ];
 
-export default function ToursPage() {
+export default async function ToursPage() {
+  const siteImages = await fetchSiteImages();
+  const heroImage = siteImageUrl(siteImages.tours_hero);
+
   return (
     <div>
       <PageHero
         title="Туры и путёвки в Пензе"
         text="Подбираем туры под ваш бюджет, даты и стиль отдыха: пляжный отдых, горящие туры, экскурсии, семейные поездки и круизы."
+        image={heroImage}
+        imageAlt="Подбор тура и путёвки в туристическом агентстве Слетать.ру"
       />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed text-foreground/70">
