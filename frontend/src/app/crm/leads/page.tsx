@@ -30,6 +30,13 @@ function isPast(value: string | null) {
   return new Date(value).getTime() < Date.now();
 }
 
+function getReasonLabel(status: LeadStatus) {
+  if (status === "failed") return "Причина провала";
+  if (status === "closed_lost") return "Причина неуспешной заявки";
+  if (status === "not_target") return "Причина нецелевого обращения";
+  return "Причина закрытия";
+}
+
 export default function CrmLeadsPage() {
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,8 +157,12 @@ export default function CrmLeadsPage() {
                     {lead.budget_to && <p className="text-xs text-foreground/45">Бюджет до {formatMoney(lead.budget_to)}</p>}
                   </td>
                   <td className="px-4 py-3 align-top">
-                    <StatusBadge status={lead.status} label={lead.status_display} />
-                    {lead.failure_reason && <p className="mt-1 text-xs text-red-600">{lead.failure_reason}</p>}
+                    <StatusBadge status={lead.status} label={getLeadStatusLabel(lead.status, lead.status_display)} />
+                    {lead.failure_reason && (
+                      <p className="mt-1 text-xs text-red-600">
+                        {getReasonLabel(lead.status)}: {lead.failure_reason}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 align-top">
                     <span className={contactOverdue ? "font-semibold text-red-600" : "text-foreground/70"}>
