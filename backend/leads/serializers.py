@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -6,7 +8,15 @@ from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonRequestRecord, UonSyncLog
 from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSerializer
 
-from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, TourOperator
+from .models import (
+    Direction,
+    Lead,
+    LeadAttachment,
+    LeadComment,
+    LeadStatusHistory,
+    TourOperator,
+    TourOperatorExchangeRate,
+)
 
 
 TRAVEL_FIELDS = [
@@ -20,11 +30,115 @@ PAYMENT_FIELDS = [
     'booking_number', 'failure_reason',
 ]
 
+OPERATOR_RATE_FIELDS = [
+    'operator_current_rate', 'operator_current_rate_date', 'operator_rate_source_note',
+    'operator_rate_direction', 'operator_rate_delta',
+]
+
+
+def _decimal_string(value):
+    if value is None:
+        return None
+    return format(value, '.4f')
+
+
+def _latest_operator_rate(obj, context):
+    """Latest active operator-specific currency rate up to today.
+
+    Rates differ by tour operator, so this does not use CBR as fallback. If the
+    operator's own rate is not entered in the reference book, the response returns
+    nulls and the frontend shows that the TO rate is not set.
+    """
+    if not obj.tour_operator_ref_id:
+        return None
+
+    currency = obj.tour_currency or Lead.Currency.RUB
+    if currency == Lead.Currency.RUB:
+        return {
+            'rate': Decimal('1.0000'),
+            'rate_date': timezone.localdate(),
+            'source_note': 'RUB',
+        }
+
+    cache = context.setdefault('_operator_rate_cache', {})
+    key = (obj.tour_operator_ref_id, currency)
+    if key not in cache:
+        cache[key] = (
+            TourOperatorExchangeRate.objects
+            .filter(
+                operator_id=obj.tour_operator_ref_id,
+                currency=currency,
+                is_active=True,
+                rate_date__lte=timezone.localdate(),
+            )
+            .order_by('-rate_date')
+            .first()
+        )
+    return cache[key]
+
+
+def _rate_payload(obj, context):
+    rate_obj = _latest_operator_rate(obj, context)
+    if rate_obj is None:
+        return {
+            'current_rate': None,
+            'rate_date': None,
+            'source_note': '',
+            'direction': 'missing',
+            'delta': None,
+        }
+
+    if isinstance(rate_obj, dict):
+        current_rate = rate_obj['rate']
+        rate_date = rate_obj['rate_date']
+        source_note = rate_obj.get('source_note', '')
+    else:
+        current_rate = rate_obj.rate
+        rate_date = rate_obj.rate_date
+        source_note = rate_obj.source_note
+
+    payment_rate = obj.payment_exchange_rate
+    if current_rate is None or payment_rate is None:
+        return {
+            'current_rate': _decimal_string(current_rate),
+            'rate_date': rate_date.isoformat() if rate_date else None,
+            'source_note': source_note,
+            'direction': 'missing',
+            'delta': None,
+        }
+
+    delta = current_rate - payment_rate
+    if delta > 0:
+        direction = 'higher'
+    elif delta < 0:
+        direction = 'lower'
+    else:
+        direction = 'same'
+
+    return {
+        'current_rate': _decimal_string(current_rate),
+        'rate_date': rate_date.isoformat() if rate_date else None,
+        'source_note': source_note,
+        'direction': direction,
+        'delta': _decimal_string(delta),
+    }
+
 
 class DirectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Direction
         fields = ['id', 'name']
+
+
+class TourOperatorExchangeRateSerializer(serializers.ModelSerializer):
+    operator_name = serializers.CharField(source='operator.brand_name', read_only=True)
+
+    class Meta:
+        model = TourOperatorExchangeRate
+        fields = [
+            'id', 'operator', 'operator_name', 'currency', 'rate', 'rate_date',
+            'source_url', 'source_note', 'is_active', 'updated_at',
+        ]
 
 
 class TourOperatorSerializer(serializers.ModelSerializer):
@@ -183,7 +297,33 @@ class LeadTaskSerializer(serializers.Serializer):
     deadline = serializers.DateTimeField()
 
 
-class LeadListSerializer(serializers.ModelSerializer):
+class OperatorRateMixin:
+    operator_current_rate = serializers.SerializerMethodField()
+    operator_current_rate_date = serializers.SerializerMethodField()
+    operator_rate_source_note = serializers.SerializerMethodField()
+    operator_rate_direction = serializers.SerializerMethodField()
+    operator_rate_delta = serializers.SerializerMethodField()
+
+    def _payload(self, obj):
+        return _rate_payload(obj, self.context)
+
+    def get_operator_current_rate(self, obj):
+        return self._payload(obj)['current_rate']
+
+    def get_operator_current_rate_date(self, obj):
+        return self._payload(obj)['rate_date']
+
+    def get_operator_rate_source_note(self, obj):
+        return self._payload(obj)['source_note']
+
+    def get_operator_rate_direction(self, obj):
+        return self._payload(obj)['direction']
+
+    def get_operator_rate_delta(self, obj):
+        return self._payload(obj)['delta']
+
+
+class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
@@ -198,11 +338,12 @@ class LeadListSerializer(serializers.ModelSerializer):
             'next_contact_at', 'departure_city', 'departure_date', 'nights', 'budget_from', 'budget_to',
             'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
             'tour_operator', 'tour_operator_ref', 'tour_operator_details', 'tour_currency', 'payment_exchange_rate',
+            *OPERATOR_RATE_FIELDS,
             'booking_number', 'failure_reason', 'created_at',
         ]
 
 
-class LeadDetailSerializer(serializers.ModelSerializer):
+class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
@@ -221,7 +362,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission',
-            *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tour_operator_details',
+            *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tour_operator_details', *OPERATOR_RATE_FIELDS,
             'uon_ticket_id', 'uon_request_id', 'initial_comment', 'consent_personal_data_at',
             'created_at', 'updated_at', 'comments', 'status_history', 'attachments', 'tasks',
             'uon_sync_logs', 'uon_lead', 'uon_request',
