@@ -298,12 +298,6 @@ class LeadTaskSerializer(serializers.Serializer):
 
 
 class OperatorRateMixin:
-    operator_current_rate = serializers.SerializerMethodField()
-    operator_current_rate_date = serializers.SerializerMethodField()
-    operator_rate_source_note = serializers.SerializerMethodField()
-    operator_rate_direction = serializers.SerializerMethodField()
-    operator_rate_delta = serializers.SerializerMethodField()
-
     def _payload(self, obj):
         return _rate_payload(obj, self.context)
 
@@ -329,6 +323,11 @@ class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
     tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
+    operator_current_rate = serializers.SerializerMethodField()
+    operator_current_rate_date = serializers.SerializerMethodField()
+    operator_rate_source_note = serializers.SerializerMethodField()
+    operator_rate_direction = serializers.SerializerMethodField()
+    operator_rate_delta = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -356,6 +355,11 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     uon_lead = serializers.SerializerMethodField()
     uon_request = serializers.SerializerMethodField()
     tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
+    operator_current_rate = serializers.SerializerMethodField()
+    operator_current_rate_date = serializers.SerializerMethodField()
+    operator_rate_source_note = serializers.SerializerMethodField()
+    operator_rate_direction = serializers.SerializerMethodField()
+    operator_rate_delta = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
