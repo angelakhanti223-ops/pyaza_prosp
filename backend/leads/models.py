@@ -37,8 +37,8 @@ class Lead(models.Model):
         DEPARTURE = 'departure', 'Вылет'
         CHECK_IN = 'check_in', 'Заселение'
         RETURNED = 'returned', 'Прилет'
-        CLOSED_WON = 'closed_won', 'Закрыта (успех)'
-        CLOSED_LOST = 'closed_lost', 'Закрыта (отказ)'
+        CLOSED_WON = 'closed_won', 'Успешная'
+        CLOSED_LOST = 'closed_lost', 'Неуспешная'
         FAILED = 'failed', 'Провалена'
         NOT_TARGET = 'not_target', 'Нецелевой'
 
