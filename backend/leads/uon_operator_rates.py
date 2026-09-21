@@ -15,18 +15,18 @@ from .models import TourOperator, TourOperatorExchangeRate
 
 logger = logging.getLogger('leads')
 
-PUBLIC_RATES_URL = 'https://tour-kassa.ru/курсы-валют-туроператоров'
-PUBLIC_RATE_SOURCE_NOTE = 'Tour-Kassa: Курсы валют туроператоров'
+PUBLIC_RATES_URL = 'https://tour-kurs.ru/'
+PUBLIC_RATE_SOURCE_NOTE = 'ТурКурс: курсы валют туроператоров'
 UON_RATE_SOURCE_NOTE = 'U-ON: Финансы → Курсы валют → Курсы валют ТО'
 DEFAULT_RATES_PATH = '/currency_rates_operators.php'
 
 OPERATOR_ALIASES = [
-    {'anex', 'anex tour', 'анекс', 'анекс тур'},
-    {'biblio globus', 'biblioglobus', 'библио глобус', 'библиоглобус'},
+    {'anex', 'anex tour', 'anextour', 'анекс', 'анекс тур'},
+    {'biblio globus', 'biblioglobus', 'bgoperator', 'библио глобус', 'библиоглобус'},
     {'coral', 'coral travel', 'корал', 'корал тревел'},
     {'sunmar', 'санмар'},
     {'fun sun', 'fun&sun', 'fun and sun', 'фан сан', 'фан энд сан'},
-    {'pegas', 'pegas touristic', 'пегас', 'пегас туристик'},
+    {'pegas', 'pegas touristic', 'pegast', 'пегас', 'пегас туристик'},
     {'intourist', 'интурист'},
     {'pac', 'paks', 'пак', 'пакс'},
     {'space travel', 'space', 'спейс', 'спейс тревел'},
@@ -47,7 +47,6 @@ OPERATOR_ALIASES = [
     {'loti', 'лоти'},
     {'europort', 'европорт'},
     {'kazunion', 'казюнион'},
-    {'tour kassa', 'тур касса'},
 ]
 
 CURRENCIES = {
@@ -55,13 +54,19 @@ CURRENCIES = {
     'EUR': ('eur', '€', 'евро'),
 }
 
-RATE_RE = re.compile(r'(?<!\d)(\d{2,3}(?:[,.]\d{1,4})?)(?!\d)')
+# Только десятичные значения. Так мы не берём служебные числа/номера со страницы
+# как курс. Ошибка 47.0000 возникла именно из-за слишком свободного regex,
+# который принимал любое 2-3 значное число.
+RATE_RE = re.compile(r'(?<!\d)(\d{2,3}[,.]\d{1,4})(?!\d)')
+
 UI_TEXT_BLACKLIST = {
     'название', 'курс usd', 'курс eur', 'курсы валют туроператоров', 'курсы туроператоров',
     'сегодня', 'очистить', 'добавить', 'финансы', 'кассы', 'кассовая книга', 'фискальные чеки',
     'обращения', 'заявки', 'туристы', 'партнеры', 'интеграции', 'настройки', 'личный кабинет туриста',
     'главная', 'о нас', 'новости', 'поиск туров', 'горящие', 'календарь туров', 'страны',
     'билеты', 'страховки', 'топ направлений', 'принять все', 'политика обработки персональных данных',
+    'сравнение курсов', 'архив', 'калькулятор', 'частые вопросы', 'отображение валют', 'только доллар',
+    'только евро', 'изменение', 'разница с цб',
 }
 
 
@@ -125,17 +130,14 @@ def _currency_from_text(value: str) -> str | None:
     return None
 
 
-def _rate_from_text(value: str) -> Decimal | None:
-    text = (value or '').replace('\xa0', ' ')
-    for match in RATE_RE.finditer(text):
-        raw = match.group(1).replace(',', '.')
-        try:
-            rate = Decimal(raw)
-        except InvalidOperation:
-            continue
-        if Decimal('10') <= rate <= Decimal('300'):
-            return rate.quantize(Decimal('0.0001'))
-    return None
+def _valid_rate(currency: str, rate: Decimal) -> bool:
+    # Защитный диапазон для курса ТО к рублю. Значения ниже 60 для USD/EUR сейчас
+    # почти наверняка не курс туроператора, а служебное число из HTML.
+    if currency == 'USD':
+        return Decimal('60') <= rate <= Decimal('160')
+    if currency == 'EUR':
+        return Decimal('60') <= rate <= Decimal('180')
+    return Decimal('1') <= rate <= Decimal('300')
 
 
 def _all_rates_from_text(value: str) -> list[Decimal]:
@@ -144,12 +146,21 @@ def _all_rates_from_text(value: str) -> list[Decimal]:
     for match in RATE_RE.finditer(text):
         raw = match.group(1).replace(',', '.')
         try:
-            rate = Decimal(raw)
+            rate = Decimal(raw).quantize(Decimal('0.0001'))
         except InvalidOperation:
             continue
-        if Decimal('10') <= rate <= Decimal('300'):
-            rates.append(rate.quantize(Decimal('0.0001')))
+        rates.append(rate)
     return rates
+
+
+def _rate_from_text(value: str, currency: str | None = None) -> Decimal | None:
+    for rate in _all_rates_from_text(value):
+        if currency is None:
+            if _valid_rate('USD', rate) or _valid_rate('EUR', rate):
+                return rate
+        elif _valid_rate(currency, rate):
+            return rate
+    return None
 
 
 def _parse_rows(html_text: str) -> list[list[str]]:
@@ -158,44 +169,67 @@ def _parse_rows(html_text: str) -> list[list[str]]:
     return parser.rows
 
 
+def _rates_from_cells(cells: list[str]) -> dict[str, Decimal]:
+    rates: dict[str, Decimal] = {}
+
+    for cell in cells:
+        currency = _currency_from_text(cell)
+        if currency:
+            rate = _rate_from_text(cell, currency)
+            if rate is not None:
+                rates[currency] = rate
+
+    if rates:
+        return rates
+
+    numeric_rates: list[Decimal] = []
+    for cell in cells:
+        # Берём только явные денежные значения, чтобы не схватить даты, номера,
+        # изменения к ЦБ или другие служебные цифры.
+        lowered = cell.lower()
+        if not any(marker in lowered for marker in ('₽', 'руб', 'р.')) and not re.search(r'\d+[,.]\d+', cell):
+            continue
+        numeric_rates.extend(_all_rates_from_text(cell))
+        if len(numeric_rates) >= 2:
+            break
+
+    if numeric_rates and _valid_rate('USD', numeric_rates[0]):
+        rates['USD'] = numeric_rates[0]
+    if len(numeric_rates) > 1 and _valid_rate('EUR', numeric_rates[1]):
+        rates['EUR'] = numeric_rates[1]
+    return rates
+
+
 def _extract_rates_from_tables(html_text: str) -> list[dict]:
     rows = _parse_rows(html_text)
     parsed: list[dict] = []
     header_currency_columns: dict[int, str] = {}
 
     for index, row in enumerate(rows):
-        row_currencies = {idx: code for idx, cell in enumerate(row) if (code := _currency_from_text(cell))}
-        if row_currencies:
-            header_currency_columns = row_currencies
-            continue
-
         if not row:
             continue
 
-        operator_name = row[0]
-        rates: dict[str, Decimal] = {}
+        row_currencies = {idx: code for idx, cell in enumerate(row) if (code := _currency_from_text(cell))}
+        if row_currencies and not _looks_like_operator_name(row[0]):
+            header_currency_columns = row_currencies
+            continue
 
+        operator_name = row[0]
+        if not _looks_like_operator_name(operator_name):
+            continue
+
+        rates: dict[str, Decimal] = {}
         if header_currency_columns:
             for col_idx, currency in header_currency_columns.items():
                 if col_idx < len(row):
-                    rate = _rate_from_text(row[col_idx])
+                    rate = _rate_from_text(row[col_idx], currency)
                     if rate is not None:
                         rates[currency] = rate
 
-        for cell in row[1:]:
-            currency = _currency_from_text(cell)
-            rate = _rate_from_text(cell)
-            if currency and rate is not None:
-                rates[currency] = rate
+        if not rates:
+            rates = _rates_from_cells(row[1:])
 
-        if not rates and len(row) >= 3:
-            numeric_rates = [_rate_from_text(cell) for cell in row[1:3]]
-            if numeric_rates[0] is not None:
-                rates['USD'] = numeric_rates[0]
-            if numeric_rates[1] is not None:
-                rates['EUR'] = numeric_rates[1]
-
-        if operator_name and rates:
+        if rates:
             parsed.append({'operator_name': operator_name, 'rates': rates, 'row_index': index})
 
     return parsed
@@ -217,6 +251,8 @@ def _looks_like_operator_name(value: str) -> bool:
     norm = _norm(text)
     if not norm or norm in UI_TEXT_BLACKLIST:
         return False
+    if '@' in text:
+        return False
     if _rate_from_text(text) is not None:
         return False
     if len(text) < 3 or len(text) > 120:
@@ -237,27 +273,14 @@ def _extract_rates_from_text(html_text: str) -> list[dict]:
         if not _looks_like_operator_name(line):
             continue
 
-        rates: dict[str, Decimal] = {}
-        same_line_rates = _all_rates_from_text(line)
-        if same_line_rates:
-            rates['USD'] = same_line_rates[0]
-            if len(same_line_rates) > 1:
-                rates['EUR'] = same_line_rates[1]
+        # Tour-kurs может отдавать название, домен, доллар, евро разными div-ами.
+        next_lines: list[str] = []
+        for next_line in lines[idx + 1: idx + 10]:
+            if _looks_like_operator_name(next_line):
+                break
+            next_lines.append(next_line)
 
-        if not rates:
-            numeric_after: list[Decimal] = []
-            for next_line in lines[idx + 1: idx + 8]:
-                if _looks_like_operator_name(next_line):
-                    break
-                for rate in _all_rates_from_text(next_line):
-                    numeric_after.append(rate)
-                if len(numeric_after) >= 2:
-                    break
-            if numeric_after:
-                rates['USD'] = numeric_after[0]
-                if len(numeric_after) > 1:
-                    rates['EUR'] = numeric_after[1]
-
+        rates = _rates_from_cells(next_lines)
         if rates:
             parsed.append({'operator_name': line, 'rates': rates, 'row_index': idx})
 
@@ -268,38 +291,11 @@ def _extract_rates_from_text(html_text: str) -> list[dict]:
     return list(unique.values())
 
 
-def _extract_rates_from_json_like_text(html_text: str) -> list[dict]:
-    """Fallback for pages where the rates are embedded in inline JS/JSON.
-
-    It scans text windows around known operator aliases and extracts the first two
-    plausible numeric values as USD/EUR. This is deliberately conservative and is
-    only used after table/text extraction failed.
-    """
-    parsed: list[dict] = []
-    compact_html = re.sub(r'\s+', ' ', html.unescape(html_text))
-    for group in OPERATOR_ALIASES:
-        pattern = '|'.join(re.escape(alias) for alias in sorted(group, key=len, reverse=True) if len(alias) >= 3)
-        if not pattern:
-            continue
-        for match in re.finditer(pattern, compact_html, flags=re.I):
-            window = compact_html[match.start(): match.start() + 500]
-            rates = _all_rates_from_text(window)
-            if rates:
-                parsed.append({
-                    'operator_name': match.group(0),
-                    'rates': {'USD': rates[0], **({'EUR': rates[1]} if len(rates) > 1 else {})},
-                    'row_index': match.start(),
-                })
-                break
-    unique: dict[str, dict] = {}
-    for item in parsed:
-        key = _compact(item['operator_name'])
-        unique[key] = item
-    return list(unique.values())
-
-
 def _extract_rates(html_text: str) -> list[dict]:
-    for extractor in (_extract_rates_from_tables, _extract_rates_from_text, _extract_rates_from_json_like_text):
+    # Преднамеренно не используем сканирование произвольного JS/JSON вокруг алиасов:
+    # оно может принять служебные цифры за курс. Берём только табличную или явно
+    # текстовую структуру страницы.
+    for extractor in (_extract_rates_from_tables, _extract_rates_from_text):
         rates = extractor(html_text)
         if rates:
             return rates
@@ -388,7 +384,7 @@ def _request_headers(url: str | None = None) -> dict[str, str]:
         if cookie:
             headers['Cookie'] = cookie
     else:
-        headers['Referer'] = 'https://tour-kassa.ru/'
+        headers['Referer'] = 'https://tour-kurs.ru/'
 
     return headers
 
@@ -414,7 +410,7 @@ def sync_operator_exchange_rates_from_uon() -> dict:
     html_text = response.text
     if _login_page_detected(url, html_text):
         raise RuntimeError(
-            'U-ON вернул страницу авторизации. Для публичной загрузки укажите TOUR_OPERATOR_RATES_URL=https://tour-kassa.ru/курсы-валют-туроператоров.'
+            'U-ON вернул страницу авторизации. Для публичной загрузки укажите TOUR_OPERATOR_RATES_URL=https://tour-kurs.ru/.'
         )
 
     extracted = _extract_rates(html_text)
@@ -440,6 +436,9 @@ def sync_operator_exchange_rates_from_uon() -> dict:
             skipped.append(item['operator_name'])
             continue
         for currency, rate in item['rates'].items():
+            if not _valid_rate(currency, rate):
+                skipped.append(f"{item['operator_name']} {currency}={rate}")
+                continue
             obj, was_created = TourOperatorExchangeRate.objects.update_or_create(
                 operator=operator,
                 currency=currency,
