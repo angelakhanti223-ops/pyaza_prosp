@@ -13,26 +13,66 @@ export type CrmUser = {
 
 export type LeadStatus =
   | "new"
+  | "follow_up"
   | "in_progress"
+  | "selection"
   | "options_proposed"
   | "booked"
   | "prepaid"
+  | "waiting_payment"
   | "paid"
+  | "departure"
+  | "check_in"
+  | "returned"
   | "closed_won"
-  | "closed_lost";
+  | "closed_lost"
+  | "failed"
+  | "not_target";
 
 export const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "new", label: "Новая" },
+  { value: "follow_up", label: "Назначена повторная связь" },
   { value: "in_progress", label: "В работе" },
+  { value: "selection", label: "Подборка" },
   { value: "options_proposed", label: "Предложены варианты" },
   { value: "booked", label: "Бронь" },
   { value: "prepaid", label: "Внесена предоплата" },
+  { value: "waiting_payment", label: "Ожидаем полной оплаты" },
   { value: "paid", label: "Оплачено" },
+  { value: "departure", label: "Вылет" },
+  { value: "check_in", label: "Заселение" },
+  { value: "returned", label: "Прилет" },
   { value: "closed_won", label: "Закрыта (успех)" },
   { value: "closed_lost", label: "Закрыта (отказ)" },
+  { value: "failed", label: "Провалена" },
+  { value: "not_target", label: "Нецелевой" },
 ];
 
-export type LeadListItem = {
+export type LeadTravelFields = {
+  departure_city: string;
+  departure_date: string | null;
+  nights: number | null;
+  adults: number | null;
+  children_count: number | null;
+  children_ages: string;
+  budget_from: string | null;
+  budget_to: string | null;
+  meal_type: string;
+  hotel_wishes: string;
+  next_contact_at: string | null;
+};
+
+export type LeadPaymentFields = {
+  prepayment_amount: string | null;
+  paid_amount: string | null;
+  balance_due: string | null;
+  full_payment_due_at: string | null;
+  tour_operator: string;
+  booking_number: string;
+  failure_reason: string;
+};
+
+export type LeadListItem = LeadTravelFields & LeadPaymentFields & {
   id: number;
   name: string;
   phone: string;
@@ -186,6 +226,27 @@ export async function getLead(id: number): Promise<LeadDetail> {
   return apiJson<LeadDetail>(`/api/crm/leads/${id}/`);
 }
 
+type LeadInputExtras = Partial<{
+  departure_city: string;
+  departure_date: string | null;
+  nights: number | null;
+  adults: number | null;
+  children_count: number | null;
+  children_ages: string;
+  budget_from: string | null;
+  budget_to: string | null;
+  meal_type: string;
+  hotel_wishes: string;
+  next_contact_at: string | null;
+  prepayment_amount: string | null;
+  paid_amount: string | null;
+  balance_due: string | null;
+  full_payment_due_at: string | null;
+  tour_operator: string;
+  booking_number: string;
+  failure_reason: string;
+}>;
+
 export async function createLead(data: {
   name: string;
   phone: string;
@@ -195,7 +256,7 @@ export async function createLead(data: {
   source?: string;
   assigned_manager?: number | null;
   consent: boolean;
-}): Promise<LeadDetail> {
+} & LeadInputExtras): Promise<LeadDetail> {
   return apiJson<LeadDetail>("/api/crm/leads/", {
     method: "POST",
     body: JSON.stringify(data),
@@ -212,9 +273,9 @@ export async function updateLead(
     initial_comment: string;
     status: LeadStatus;
     assigned_manager: number;
-    deal_amount: string;
-    commission: string;
-  }>
+    deal_amount: string | null;
+    commission: string | null;
+  }> & LeadInputExtras
 ): Promise<LeadDetail> {
   return apiJson<LeadDetail>(`/api/crm/leads/${id}/`, {
     method: "PATCH",
