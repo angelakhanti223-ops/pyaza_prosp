@@ -3,6 +3,7 @@ import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import CruiseWidget from "@/components/cruises/CruiseWidget";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Круизы — морские и речные туры | Слетать.ру",
@@ -25,12 +26,17 @@ const CRUISE_TYPES = [
   },
 ];
 
-export default function CruisesPage() {
+export default async function CruisesPage() {
+  const siteImages = await fetchSiteImages();
+  const heroImage = siteImageUrl(siteImages.cruises_hero);
+
   return (
     <div>
       <PageHero
         title="Круизы: морские и речные маршруты"
         text="Морские и речные круизы по самым красивым маршрутам — от коротких речных путешествий до многодневных морских лайнеров."
+        image={heroImage}
+        imageAlt="Морские и речные круизы"
       />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <SiteCtaBlock
