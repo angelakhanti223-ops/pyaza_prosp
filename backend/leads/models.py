@@ -147,9 +147,19 @@ class LeadTag(models.Model):
 
 class Lead(models.Model):
     class Source(models.TextChoices):
-        SITE_FORM = 'site_form', 'Сайт (форма)'
+        SITE_FORM = 'site_form', 'Сайт / форма'
+        SLETAT = 'sletat', 'Слетать.ру'
         CHATBOT = 'chatbot', 'Чат-бот'
         PHONE_CALL = 'phone_call', 'Телефонный звонок'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        TELEGRAM = 'telegram', 'Telegram'
+        VK = 'vk', 'ВК'
+        MAX = 'max', 'MAX'
+        OFFICE = 'office', 'Офис / личное обращение'
+        REFERRAL = 'referral', 'Рекомендация'
+        REPEAT = 'repeat', 'Повторный клиент'
+        INSTAGRAM = 'instagram', 'Instagram'
+        UON = 'uon', 'U-ON'
         OTHER = 'other', 'Другое'
 
     class Status(models.TextChoices):
