@@ -45,17 +45,17 @@ class TourOperatorExchangeRateInline(admin.TabularInline):
 class ContactAdmin(admin.ModelAdmin):
     list_display = (
         'full_name', 'phone_primary', 'phone_secondary', 'email_primary',
-        'email_secondary', 'preferred_contact_method', 'allow_email_marketing', 'updated_at',
+        'email_secondary', 'vk_profile', 'preferred_contact_method', 'allow_email_marketing', 'updated_at',
     )
     list_filter = ('preferred_contact_method', 'allow_email_marketing', 'allow_messenger_marketing')
     search_fields = (
         'last_name', 'first_name', 'middle_name', 'phone_primary', 'phone_secondary',
-        'email_primary', 'email_secondary',
+        'email_primary', 'email_secondary', 'vk_profile',
     )
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('ФИО и данные клиента', {'fields': ('last_name', 'first_name', 'middle_name', 'birth_date')}),
-        ('Контакты', {'fields': ('phone_primary', 'phone_secondary', 'email_primary', 'email_secondary', 'preferred_contact_method')}),
+        ('Контакты', {'fields': ('phone_primary', 'phone_secondary', 'email_primary', 'email_secondary', 'vk_profile', 'preferred_contact_method')}),
         ('Рассылки', {'fields': ('allow_email_marketing', 'allow_messenger_marketing')}),
         ('Примечание', {'fields': ('note',)}),
         ('Служебное', {'fields': ('created_at', 'updated_at')}),
@@ -72,7 +72,8 @@ class LeadAdmin(admin.ModelAdmin):
     search_fields = (
         'name', 'phone', 'email', 'uon_ticket_id', 'booking_number', 'tour_operator',
         'contact__last_name', 'contact__first_name', 'contact__middle_name',
-        'contact__phone_primary', 'contact__phone_secondary', 'contact__email_primary', 'contact__email_secondary',
+        'contact__phone_primary', 'contact__phone_secondary', 'contact__email_primary',
+        'contact__email_secondary', 'contact__vk_profile',
     )
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('tags',)
