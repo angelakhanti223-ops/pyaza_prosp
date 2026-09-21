@@ -9,6 +9,7 @@ import ImageCarousel from "@/components/blog/ImageCarousel";
 import ArticleHeroCarousel, { type ArticleHeroSlide } from "@/components/blog/ArticleHeroCarousel";
 import OctoberQuickGuide from "@/components/blog/OctoberQuickGuide";
 import NovemberQuickGuide from "@/components/blog/NovemberQuickGuide";
+import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -67,6 +68,33 @@ const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/october/sea.svg",
+    alt: "Тёплое море и пляжный отдых в декабре",
+    title: "Улететь к солнцу перед Новым годом",
+    description: "Декабрь подходит для Египта, ОАЭ, Таиланда, Мальдив и других направлений, где можно сменить зиму на море.",
+  },
+  {
+    src: "/blog/october/family.svg",
+    alt: "Семейный отдых с детьми в декабре",
+    title: "Выбрать отдых для семьи",
+    description: "Для поездки с детьми важны перелёт, питание, тёплый бассейн, пляж, трансфер и спокойная логистика.",
+  },
+  {
+    src: "/blog/october/excursions.svg",
+    alt: "Новогодняя поездка и экскурсии в декабре",
+    title: "Поймать новогоднюю атмосферу",
+    description: "Стамбул, Россия, горы, СПА и городские поездки подойдут тем, кто хочет не только пляж.",
+  },
+  {
+    src: "/blog/october/cruises.svg",
+    alt: "Круизный маршрут и зимний отдых в декабре",
+    title: "Собрать маршрут с впечатлениями",
+    description: "Круизы и комбинированные поездки хороши, когда хочется праздника, смены мест и удобной логистики.",
+  },
+];
+
 type Props = {
   params: Promise<{ slug: string }>;
 };
@@ -97,8 +125,13 @@ export default async function ArticlePage({ params }: Props) {
   const image = mediaUrl(article.featured_image);
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
   const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
-  const isSeasonalArticle = isOctoberArticle || isNovemberArticle;
-  const heroSlides = isNovemberArticle ? NOVEMBER_ARTICLE_SLIDES : OCTOBER_ARTICLE_SLIDES;
+  const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
+  const isSeasonalArticle = isOctoberArticle || isNovemberArticle || isDecemberArticle;
+  const heroSlides = isDecemberArticle
+    ? DECEMBER_ARTICLE_SLIDES
+    : isNovemberArticle
+      ? NOVEMBER_ARTICLE_SLIDES
+      : OCTOBER_ARTICLE_SLIDES;
   const leadComment = `Заявка из статьи: ${article.title}`;
 
   const jsonLd = {
@@ -164,6 +197,7 @@ export default async function ArticlePage({ params }: Props) {
 
       {isOctoberArticle && <OctoberQuickGuide />}
       {isNovemberArticle && <NovemberQuickGuide />}
+      {isDecemberArticle && <DecemberQuickGuide />}
       {isSeasonalArticle && (
         <ArticleLeadButtons
           compact
