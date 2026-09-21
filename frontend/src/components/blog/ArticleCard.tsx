@@ -2,9 +2,28 @@ import Image from "next/image";
 import Link from "next/link";
 import { mediaUrl, type ArticleListItem } from "@/lib/articlesApi";
 
+const PREVIEW_BY_SLUG: Record<string, string> = {
+  "gde-otdohnut-v-oktyabre": "/blog/october/sea.svg",
+  "gde-otdohnut-v-noyabre": "/blog/october/family.svg",
+  "gde-otdohnut-v-sentyabre": "/blog/october/excursions.svg",
+};
+
+function fallbackPreview(article: ArticleListItem) {
+  const bySlug = PREVIEW_BY_SLUG[article.slug];
+  if (bySlug) return bySlug;
+
+  const title = article.title.toLowerCase();
+  if (title.includes("мальдив")) return "/blog/october/sea.svg";
+  if (title.includes("ноябр")) return "/blog/october/family.svg";
+  if (title.includes("сентябр")) return "/blog/october/excursions.svg";
+  if (title.includes("октябр")) return "/blog/october/sea.svg";
+
+  return null;
+}
+
 export default function ArticleCard({ article }: { article: ArticleListItem }) {
   const backendImage = mediaUrl(article.featured_image);
-  const image = backendImage ?? "/placeholders/article.svg";
+  const image = backendImage ?? fallbackPreview(article) ?? "/placeholders/article.svg";
 
   return (
     <Link
