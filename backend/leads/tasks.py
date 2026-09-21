@@ -55,15 +55,20 @@ def create_new_lead_task(lead_id: int):
 def check_stale_leads():
     """Раз в день (см. CELERY_BEAT_SCHEDULE) — открытые лиды, не обновлявшиеся
     STALE_LEAD_THRESHOLD_DAYS дней, получают задачу-напоминание «тронуть» лид.
-    Идемпотентно: если такая задача уже стоит и ещё не закрыта, повторно не
-    создаём (проверка по фиксированному префиксу заголовка — тот же приём, что
-    уже используется для меток U-ON, см. integrations.tasks._titled)."""
+
+    Этим же ежедневным проходом пересчитываются автоматические метки заявок:
+    контроль оплаты, выдача документов, ближайший вылет и просроченные действия.
+    """
     from kanban.models import Task
     from kanban.services import next_order_in_column
     from telegrambot.services import get_first_column, get_last_column
     from telegrambot.tasks import notify_task_created
 
+    from .auto_tags import sync_automatic_tags_for_all_leads
     from .models import Lead
+
+    auto_tags_result = sync_automatic_tags_for_all_leads()
+    logger.info('Автоматические метки заявок: %s', auto_tags_result)
 
     cutoff = timezone.now() - timedelta(days=STALE_LEAD_THRESHOLD_DAYS)
     stale_leads = Lead.objects.exclude(
