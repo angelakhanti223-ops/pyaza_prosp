@@ -107,7 +107,7 @@ def sync_automatic_tags_for_all_leads() -> dict[str, int]:
     ensure_auto_tags()
     checked = 0
     changed = 0
-    for lead in Lead.objects.prefetch_related('tags').all().iterator():
+    for lead in Lead.objects.all().iterator():
         before = set(lead.tags.filter(name__in=AUTO_TAG_NAMES).values_list('name', flat=True))
         after = sync_automatic_lead_tags(lead)
         checked += 1
