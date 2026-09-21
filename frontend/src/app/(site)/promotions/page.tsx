@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 
@@ -20,6 +21,16 @@ export default function PromotionsPage() {
           Горящие туры и сезонные скидки меняются каждый день — чтобы не пропустить выгодное
           предложение под ваши даты, оставьте заявку и укажите желаемое направление.
         </p>
+
+        <SiteCtaBlock
+          className="mt-10 text-left"
+          eyebrow="Горящие предложения"
+          title="Прислать подборку актуальных акций?"
+          text="Укажите направление, даты, состав туристов и бюджет — проверим предложения туроператоров и отправим подходящие варианты."
+          primaryLabel="Получить акции"
+          comment="Заявка со страницы акций"
+        />
+
         <div className="mt-8">
           <OpenLeadFormButton className="rounded-full bg-navy px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue">
             Узнать об акциях
