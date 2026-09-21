@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Paperclip } from "lucide-react";
+import { ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
 import {
   addLeadComment,
   createUonRequest,
@@ -19,12 +19,31 @@ import {
 } from "@/lib/crmApi";
 import { fetchDirections, type Direction } from "@/lib/api";
 import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
+import { listTourOperators, type TourOperator } from "@/lib/tourOperatorsApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
-import { getLeadReasonLabel, getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
+import { getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
 import TaskModal from "@/components/kanban/TaskModal";
 
+type LeadExtra = LeadDetail & {
+  tour_currency?: string;
+  payment_exchange_rate?: string | null;
+  tour_operator_ref?: number | null;
+  tour_operator_details?: TourOperator | null;
+};
+
 type UpdatePatch = Parameters<typeof updateLead>[1];
+
+const CURRENCY_OPTIONS = [
+  { value: "RUB", label: "RUB — рубль" },
+  { value: "USD", label: "USD — доллар" },
+  { value: "EUR", label: "EUR — евро" },
+  { value: "CNY", label: "CNY — юань" },
+  { value: "AED", label: "AED — дирхам" },
+  { value: "THB", label: "THB — бат" },
+  { value: "TRY", label: "TRY — лира" },
+  { value: "OTHER", label: "Другая валюта" },
+];
 
 function dateValue(value: string | null) {
   if (!value) return "";
@@ -53,6 +72,16 @@ function inputClass(extra = "") {
   return `mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue ${extra}`;
 }
 
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex justify-between gap-3 text-xs">
+      <dt className="text-foreground/45">{label}</dt>
+      <dd className="text-right font-medium text-navy">{value}</dd>
+    </div>
+  );
+}
+
 export default function CrmLeadDetailPage() {
   const params = useParams<{ id: string }>();
   const leadId = Number(params.id);
@@ -64,6 +93,7 @@ export default function CrmLeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [directions, setDirections] = useState<Direction[]>([]);
+  const [tourOperators, setTourOperators] = useState<TourOperator[]>([]);
   const [comment, setComment] = useState("");
   const [savingField, setSavingField] = useState<string | null>(null);
   const [convertingToRequest, setConvertingToRequest] = useState(false);
@@ -93,6 +123,7 @@ export default function CrmLeadDetailPage() {
   useEffect(() => {
     fetchDirections().then(setDirections);
     listColumns().then(setColumns);
+    listTourOperators().then(setTourOperators).catch(() => setTourOperators([]));
   }, []);
 
   async function savePatch(data: UpdatePatch, field: string) {
@@ -148,12 +179,25 @@ export default function CrmLeadDetailPage() {
     );
   }
 
+  const leadExtra = lead as LeadExtra;
+  const selectedTourOperator = useMemo(() => {
+    return leadExtra.tour_operator_details ?? tourOperators.find((item) => item.id === leadExtra.tour_operator_ref) ?? null;
+  }, [leadExtra.tour_operator_details, leadExtra.tour_operator_ref, tourOperators]);
+
   const contactOverdue = isPast(lead.next_contact_at);
   const paymentOverdue = isPast(lead.full_payment_due_at);
   const needsNextContact = ["follow_up", "selection", "options_proposed"].includes(lead.status) && !lead.next_contact_at;
   const needsFailureReason = ["closed_lost", "failed", "not_target"].includes(lead.status) && !lead.failure_reason;
   const needsPaymentControl = ["booked", "prepaid", "waiting_payment"].includes(lead.status) && !lead.full_payment_due_at;
-  const failureReasonLabel = getLeadReasonLabel(lead.status);
+
+  const reasonLabel =
+    lead.status === "failed"
+      ? "Причина провала"
+      : lead.status === "closed_lost"
+        ? "Причина неуспешной заявки"
+        : lead.status === "not_target"
+          ? "Причина нецелевого обращения"
+          : "Причина";
 
   const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
@@ -189,7 +233,7 @@ export default function CrmLeadDetailPage() {
                 </div>
                 <p className="mt-1 text-xs text-foreground/40">Источник: {lead.source_display}</p>
               </div>
-              <StatusBadge status={lead.status} label={getLeadStatusLabel(lead.status, lead.status_display)} />
+              <StatusBadge status={lead.status} label={lead.status_display} />
             </div>
 
             <div className="mt-4">
@@ -271,7 +315,17 @@ export default function CrmLeadDetailPage() {
                 <input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={inputClass(contactOverdue ? "border-red-400" : "")} />
                 {contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}
               </div>
-              <div><FieldLabel>Сумма сделки, ₽</FieldLabel><input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className={inputClass()} /></div>
+              <div><FieldLabel>Сумма сделки</FieldLabel><input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className={inputClass()} /></div>
+              <div>
+                <FieldLabel>Валюта тура</FieldLabel>
+                <select value={leadExtra.tour_currency ?? "RUB"} onChange={(e) => savePatch({ tour_currency: e.target.value } as UpdatePatch, "tour_currency")} className={inputClass()}>
+                  {CURRENCY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Курс на момент оплаты</FieldLabel>
+                <input type="number" step="0.0001" placeholder="например: 92.5000" defaultValue={leadExtra.payment_exchange_rate ?? ""} onBlur={(e) => savePatch({ payment_exchange_rate: e.target.value || null } as UpdatePatch, "payment_exchange_rate")} className={inputClass()} />
+              </div>
               <div><FieldLabel>Комиссия, ₽</FieldLabel><input type="number" defaultValue={lead.commission ?? ""} onBlur={(e) => savePatch({ commission: e.target.value || null }, "commission")} className={inputClass()} /></div>
               <div><FieldLabel>Предоплата, ₽</FieldLabel><input type="number" defaultValue={lead.prepayment_amount ?? ""} onBlur={(e) => savePatch({ prepayment_amount: e.target.value || null }, "prepayment_amount")} className={inputClass()} /></div>
               <div><FieldLabel>Оплачено туристом, ₽</FieldLabel><input type="number" defaultValue={lead.paid_amount ?? ""} onBlur={(e) => savePatch({ paid_amount: e.target.value || null }, "paid_amount")} className={inputClass()} /></div>
@@ -281,14 +335,44 @@ export default function CrmLeadDetailPage() {
                 <input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={inputClass(paymentOverdue ? "border-red-400" : "")} />
                 {paymentOverdue && <p className="mt-1 text-xs text-red-600">Оплата просрочена</p>}
               </div>
-              <div><FieldLabel>Туроператор</FieldLabel><input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className={inputClass()} /></div>
+              <div>
+                <FieldLabel>Туроператор из справочника</FieldLabel>
+                <select value={leadExtra.tour_operator_ref ?? ""} onChange={(e) => savePatch({ tour_operator_ref: e.target.value ? Number(e.target.value) : null } as UpdatePatch, "tour_operator_ref")} className={inputClass()}>
+                  <option value="">Не выбран</option>
+                  {tourOperators.map((operator) => <option key={operator.id} value={operator.id}>{operator.brand_name}</option>)}
+                </select>
+              </div>
+              <div><FieldLabel>Туроператор текстом</FieldLabel><input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className={inputClass()} /></div>
               <div><FieldLabel>Номер брони</FieldLabel><input defaultValue={lead.booking_number} onBlur={(e) => savePatch({ booking_number: e.target.value }, "booking_number")} className={inputClass()} /></div>
             </div>
+
+            {selectedTourOperator && (
+              <div className="mt-4 rounded-2xl bg-blue-light/35 p-4">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-navy">{selectedTourOperator.brand_name}</p>
+                    {selectedTourOperator.legal_name && <p className="mt-1 text-xs text-foreground/60">{selectedTourOperator.legal_name}</p>}
+                  </div>
+                  {selectedTourOperator.website && <a href={selectedTourOperator.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue hover:underline">сайт <ExternalLink size={12} /></a>}
+                </div>
+                <dl className="grid gap-1 sm:grid-cols-2">
+                  <InfoRow label="ИНН" value={selectedTourOperator.inn} />
+                  <InfoRow label="ОГРН" value={selectedTourOperator.ogrn} />
+                  <InfoRow label="Реестр" value={selectedTourOperator.registry_number} />
+                  <InfoRow label="Сфера" value={selectedTourOperator.activity_scope} />
+                  <InfoRow label="Телефон" value={selectedTourOperator.phone} />
+                  <InfoRow label="Email" value={selectedTourOperator.email} />
+                </dl>
+                {selectedTourOperator.payment_details && <p className="mt-3 whitespace-pre-line text-xs text-foreground/65">{selectedTourOperator.payment_details}</p>}
+                {selectedTourOperator.note && <p className="mt-3 text-xs text-foreground/45">{selectedTourOperator.note}</p>}
+              </div>
+            )}
+
             {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && (
               <div className="mt-4">
-                <FieldLabel>{failureReasonLabel}</FieldLabel>
-                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} placeholder={failureReasonLabel} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
-                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Заполните поле «{failureReasonLabel.toLowerCase()}».</p>}
+                <FieldLabel>{reasonLabel}</FieldLabel>
+                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
+                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
               </div>
             )}
           </div>
@@ -320,9 +404,7 @@ export default function CrmLeadDetailPage() {
               <input type="file" className="hidden" onChange={handleFileUpload} />
             </label>
             <ul className="mt-3 flex flex-col gap-2">
-              {lead.attachments.map((a) => (
-                <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>
-              ))}
+              {lead.attachments.map((a) => <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>)}
               {lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}
             </ul>
           </div>
@@ -362,13 +444,7 @@ export default function CrmLeadDetailPage() {
             {lead.uon_request_id ? (
               <>
                 <p className="text-sm text-navy">ID заявки: {lead.uon_request_id}</p>
-                {lead.uon_request && (
-                  <dl className="mt-2 flex flex-col gap-2 text-sm">
-                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd></div>
-                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd></div>
-                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div>
-                  </dl>
-                )}
+                {lead.uon_request && <dl className="mt-2 flex flex-col gap-2 text-sm"><div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div></dl>}
                 <Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">Открыть и редактировать в «Заявки U-ON»</Link>
               </>
             ) : (
@@ -385,32 +461,14 @@ export default function CrmLeadDetailPage() {
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2>
             <ul className="flex flex-col gap-2">
-              {lead.uon_sync_logs.map((log) => (
-                <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm">
-                  <p className="font-medium text-navy">Попытка {log.attempt_number} — {log.status_display}</p>
-                  {log.error_message && <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>}
-                  <p className="mt-1 text-xs text-foreground/40">{new Date(log.created_at).toLocaleString("ru-RU")}</p>
-                </li>
-              ))}
+              {lead.uon_sync_logs.map((log) => <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm"><p className="font-medium text-navy">Попытка {log.attempt_number} — {log.status_display}</p>{log.error_message && <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>}<p className="mt-1 text-xs text-foreground/40">{new Date(log.created_at).toLocaleString("ru-RU")}</p></li>)}
               {lead.uon_sync_logs.length === 0 && <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>}
             </ul>
           </div>
         </div>
       </div>
 
-      {showTaskModal && (
-        <TaskModal
-          columns={columns}
-          defaultColumnId={columns[0]?.id ?? null}
-          task={null}
-          presetLead={{ id: lead.id, name: lead.name }}
-          onClose={() => setShowTaskModal(false)}
-          onSaved={() => {
-            setShowTaskModal(false);
-            load();
-          }}
-        />
-      )}
+      {showTaskModal && <TaskModal columns={columns} defaultColumnId={columns[0]?.id ?? null} task={null} presetLead={{ id: lead.id, name: lead.name }} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); load(); }} />}
     </div>
   );
 }
