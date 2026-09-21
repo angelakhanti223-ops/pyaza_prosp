@@ -1,4 +1,4 @@
-import { apiJson } from "./crmApi";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export type TourOperator = {
   id: number;
@@ -18,6 +18,11 @@ export type TourOperator = {
 };
 
 export async function listTourOperators(): Promise<TourOperator[]> {
-  const data = await apiJson<TourOperator[] | { results: TourOperator[] }>("/api/crm/tour-operators/");
+  const res = await fetch(`${API_BASE_URL}/api/crm/tour-operators/`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Не удалось загрузить справочник туроператоров");
+  const data = (await res.json()) as TourOperator[] | { results: TourOperator[] };
   return Array.isArray(data) ? data : data.results;
 }
