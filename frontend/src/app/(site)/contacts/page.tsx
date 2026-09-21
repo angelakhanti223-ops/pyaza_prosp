@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Mail, MapPin, Phone } from "lucide-react";
 import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Контакты турагентства в Пензе — адрес, телефон | Слетать.ру",
@@ -12,12 +13,17 @@ export const metadata: Metadata = {
 const OFFICE_MAP_SRC =
   "https://www.google.com/maps?q=%D0%9F%D0%B5%D0%BD%D0%B7%D0%B0,%20%D0%9F%D1%80%D0%BE%D1%81%D0%BF%D0%B5%D0%BA%D1%82%20%D0%A1%D1%82%D1%80%D0%BE%D0%B8%D1%82%D0%B5%D0%BB%D0%B5%D0%B9%2049%D0%90&output=embed";
 
-export default function ContactsPage() {
+export default async function ContactsPage() {
+  const siteImages = await fetchSiteImages();
+  const heroImage = siteImageUrl(siteImages.contacts_hero ?? siteImages.office_photo);
+
   return (
     <div>
       <PageHero
         title="Контакты"
         text="Всегда на связи — звоните, пишите или приходите в офис в Пензе."
+        image={heroImage}
+        imageAlt="Офис турагентства Слетать.ру в Пензе"
       />
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8">
         <div className="flex flex-col gap-6">
