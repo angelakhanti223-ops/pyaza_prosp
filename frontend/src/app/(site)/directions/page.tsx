@@ -3,6 +3,7 @@ import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import { fetchDirections } from "@/lib/api";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Направления для отдыха — куда поехать | Слетать.ру",
@@ -11,13 +12,16 @@ export const metadata: Metadata = {
 };
 
 export default async function DirectionsPage() {
-  const directions = await fetchDirections();
+  const [directions, siteImages] = await Promise.all([fetchDirections(), fetchSiteImages()]);
+  const heroImage = siteImageUrl(siteImages.directions_hero);
 
   return (
     <div>
       <PageHero
         title="Куда поехать: направления для отдыха"
         text="Собрали направления, которые чаще всего выбирают наши клиенты — от пляжного отдыха до экскурсионных туров. Не нашли своё? Расскажите, куда хотите, и мы подберём вариант."
+        image={heroImage}
+        imageAlt="Популярные направления для отдыха и путешествий"
       />
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <p className="mx-auto mb-10 max-w-2xl text-center text-sm leading-relaxed text-foreground/70">
