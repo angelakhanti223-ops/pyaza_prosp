@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
@@ -25,12 +25,58 @@ import StatusBadge from "@/components/crm/StatusBadge";
 import { getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
 import TaskModal from "@/components/kanban/TaskModal";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+type ContactPreferredMethod = "phone" | "whatsapp" | "telegram" | "max" | "vk" | "email" | "other";
+
+type ClientContact = {
+  id: number;
+  last_name: string;
+  first_name: string;
+  middle_name: string;
+  full_name: string;
+  birth_date: string | null;
+  email_primary: string;
+  email_secondary: string;
+  phone_primary: string;
+  phone_secondary: string;
+  vk_profile: string;
+  preferred_contact_method: ContactPreferredMethod;
+  preferred_contact_method_display: string;
+  allow_email_marketing: boolean;
+  allow_messenger_marketing: boolean;
+  note: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type LeadExtra = LeadDetail & {
+  contact?: number | null;
+  contact_details?: ClientContact | null;
+  preferred_messenger?: ContactPreferredMethod;
+  preferred_messenger_display?: string;
   tour_currency?: string;
   payment_exchange_rate?: string | null;
   tour_operator_ref?: number | null;
   tour_operator_details?: TourOperator | null;
 };
+
+type ContactPayload = Partial<Pick<
+  ClientContact,
+  | "last_name"
+  | "first_name"
+  | "middle_name"
+  | "birth_date"
+  | "email_primary"
+  | "email_secondary"
+  | "phone_primary"
+  | "phone_secondary"
+  | "vk_profile"
+  | "preferred_contact_method"
+  | "allow_email_marketing"
+  | "allow_messenger_marketing"
+  | "note"
+>>;
 
 type UpdatePatch = Parameters<typeof updateLead>[1];
 
@@ -44,6 +90,58 @@ const CURRENCY_OPTIONS = [
   { value: "TRY", label: "TRY — лира" },
   { value: "OTHER", label: "Другая валюта" },
 ];
+
+const CONTACT_METHOD_OPTIONS: { value: ContactPreferredMethod; label: string }[] = [
+  { value: "phone", label: "Телефон" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+  { value: "max", label: "MAX" },
+  { value: "vk", label: "ВК" },
+  { value: "email", label: "Email" },
+  { value: "other", label: "Другое" },
+];
+
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function ensureCsrfCookie() {
+  await fetch(`${API_BASE_URL}/api/auth/csrf/`, { credentials: "include" });
+}
+
+async function crmApiJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let csrfToken = getCookie("csrftoken");
+  if (!csrfToken) {
+    await ensureCsrfCookie();
+    csrfToken = getCookie("csrftoken");
+  }
+
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  if (csrfToken) headers.set("X-CSRFToken", csrfToken);
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const fieldErrors = Object.values(data).flat().filter((v): v is string => typeof v === "string");
+    throw new Error(data.detail || fieldErrors.join(" ") || "Ошибка запроса");
+  }
+
+  return res.json();
+}
+
+async function upsertLeadContact(leadId: number, data: ContactPayload): Promise<LeadDetail> {
+  return crmApiJson<LeadDetail>(`/api/crm/leads/${leadId}/contact/`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
 
 function dateValue(value: string | null) {
   return value ? value.slice(0, 10) : "";
@@ -93,6 +191,8 @@ export default function CrmLeadDetailPage() {
   const [tourOperators, setTourOperators] = useState<TourOperator[]>([]);
   const [comment, setComment] = useState("");
   const [savingField, setSavingField] = useState<string | null>(null);
+  const [savingContactField, setSavingContactField] = useState<string | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
   const [convertingToRequest, setConvertingToRequest] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
@@ -132,6 +232,41 @@ export default function CrmLeadDetailPage() {
     }
   }
 
+  function contactPayload(data: ContactPayload): ContactPayload {
+    if (!lead) return data;
+    const leadExtra = lead as LeadExtra;
+    const current = leadExtra.contact_details;
+    return {
+      last_name: current?.last_name ?? "",
+      first_name: current?.first_name ?? lead.name,
+      middle_name: current?.middle_name ?? "",
+      birth_date: current?.birth_date ?? null,
+      email_primary: current?.email_primary ?? lead.email,
+      email_secondary: current?.email_secondary ?? "",
+      phone_primary: current?.phone_primary ?? lead.phone,
+      phone_secondary: current?.phone_secondary ?? "",
+      vk_profile: current?.vk_profile ?? "",
+      preferred_contact_method: current?.preferred_contact_method ?? leadExtra.preferred_messenger ?? "phone",
+      allow_email_marketing: current?.allow_email_marketing ?? true,
+      allow_messenger_marketing: current?.allow_messenger_marketing ?? true,
+      note: current?.note ?? "",
+      ...data,
+    };
+  }
+
+  async function saveContactPatch(data: ContactPayload, field: string) {
+    if (!lead) return;
+    setSavingContactField(field);
+    setContactError(null);
+    try {
+      setLead(await upsertLeadContact(lead.id, contactPayload(data)));
+    } catch (err) {
+      setContactError(err instanceof Error ? err.message : "Не удалось сохранить клиента");
+    } finally {
+      setSavingContactField(null);
+    }
+  }
+
   async function handleAddComment(e: FormEvent) {
     e.preventDefault();
     if (!lead || !comment.trim()) return;
@@ -140,7 +275,7 @@ export default function CrmLeadDetailPage() {
     load();
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(e: ChangeEvent<HTMLInputElement>) {
     if (!lead || !e.target.files?.length) return;
     await uploadLeadAttachment(lead.id, e.target.files[0]);
     e.target.value = "";
@@ -174,6 +309,22 @@ export default function CrmLeadDetailPage() {
   }
 
   const leadExtra = lead as LeadExtra;
+  const client = leadExtra.contact_details;
+  const clientDefaults = {
+    last_name: client?.last_name ?? "",
+    first_name: client?.first_name ?? lead.name,
+    middle_name: client?.middle_name ?? "",
+    birth_date: client?.birth_date ?? null,
+    phone_primary: client?.phone_primary ?? lead.phone,
+    phone_secondary: client?.phone_secondary ?? "",
+    email_primary: client?.email_primary ?? lead.email,
+    email_secondary: client?.email_secondary ?? "",
+    vk_profile: client?.vk_profile ?? "",
+    preferred_contact_method: client?.preferred_contact_method ?? leadExtra.preferred_messenger ?? "phone",
+    allow_email_marketing: client?.allow_email_marketing ?? true,
+    allow_messenger_marketing: client?.allow_messenger_marketing ?? true,
+    note: client?.note ?? "",
+  };
   const selectedTourOperator = leadExtra.tour_operator_details ?? tourOperators.find((item) => item.id === leadExtra.tour_operator_ref) ?? null;
   const contactOverdue = isPast(lead.next_contact_at);
   const paymentOverdue = isPast(lead.full_payment_due_at);
@@ -244,6 +395,32 @@ export default function CrmLeadDetailPage() {
                 </select>
               </div>
             </div>
+          </section>
+
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-navy">Клиент</h2>
+                <p className="mt-1 text-xs text-foreground/45">Отдельная карточка клиента для контактов и будущих рассылок.</p>
+              </div>
+              {savingContactField && <span className="text-xs text-foreground/40">Сохранение…</span>}
+            </div>
+            {contactError && <p className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{contactError}</p>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div><FieldLabel>Фамилия</FieldLabel><input defaultValue={clientDefaults.last_name} onBlur={(e) => saveContactPatch({ last_name: e.target.value }, "last_name")} className={inputClass()} /></div>
+              <div><FieldLabel>Имя</FieldLabel><input defaultValue={clientDefaults.first_name} onBlur={(e) => saveContactPatch({ first_name: e.target.value }, "first_name")} className={inputClass()} /></div>
+              <div><FieldLabel>Отчество</FieldLabel><input defaultValue={clientDefaults.middle_name} onBlur={(e) => saveContactPatch({ middle_name: e.target.value }, "middle_name")} className={inputClass()} /></div>
+              <div><FieldLabel>Дата рождения</FieldLabel><input type="date" defaultValue={dateValue(clientDefaults.birth_date)} onBlur={(e) => saveContactPatch({ birth_date: e.target.value || null }, "birth_date")} className={inputClass()} /></div>
+              <div><FieldLabel>Телефон основной</FieldLabel><input type="tel" defaultValue={clientDefaults.phone_primary} onBlur={(e) => saveContactPatch({ phone_primary: e.target.value }, "phone_primary")} className={inputClass()} /></div>
+              <div><FieldLabel>Телефон дополнительный</FieldLabel><input type="tel" defaultValue={clientDefaults.phone_secondary} onBlur={(e) => saveContactPatch({ phone_secondary: e.target.value }, "phone_secondary")} className={inputClass()} /></div>
+              <div><FieldLabel>Email основной</FieldLabel><input type="email" defaultValue={clientDefaults.email_primary} onBlur={(e) => saveContactPatch({ email_primary: e.target.value }, "email_primary")} className={inputClass()} /></div>
+              <div><FieldLabel>Email дополнительный</FieldLabel><input type="email" defaultValue={clientDefaults.email_secondary} onBlur={(e) => saveContactPatch({ email_secondary: e.target.value }, "email_secondary")} className={inputClass()} /></div>
+              <div><FieldLabel>ВК</FieldLabel><input defaultValue={clientDefaults.vk_profile} placeholder="ссылка или id" onBlur={(e) => saveContactPatch({ vk_profile: e.target.value }, "vk_profile")} className={inputClass()} /></div>
+              <div><FieldLabel>Предпочтительный тип связи</FieldLabel><select defaultValue={clientDefaults.preferred_contact_method} onChange={(e) => saveContactPatch({ preferred_contact_method: e.target.value as ContactPreferredMethod }, "preferred_contact_method")} className={inputClass()}>{CONTACT_METHOD_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
+              <label className="mt-5 flex items-center gap-2 text-sm text-foreground/70"><input type="checkbox" defaultChecked={clientDefaults.allow_email_marketing} onChange={(e) => saveContactPatch({ allow_email_marketing: e.target.checked }, "allow_email_marketing")} /> Email-рассылки разрешены</label>
+              <label className="mt-5 flex items-center gap-2 text-sm text-foreground/70"><input type="checkbox" defaultChecked={clientDefaults.allow_messenger_marketing} onChange={(e) => saveContactPatch({ allow_messenger_marketing: e.target.checked }, "allow_messenger_marketing")} /> Мессенджер-рассылки разрешены</label>
+            </div>
+            <div className="mt-4"><FieldLabel>Примечание по клиенту</FieldLabel><textarea defaultValue={clientDefaults.note} onBlur={(e) => saveContactPatch({ note: e.target.value }, "note")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" /></div>
           </section>
 
           <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
