@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from .models import CommissionTier, Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, MonthlyPlan, WorkShift
+from .models import (
+    CommissionTier,
+    Direction,
+    Lead,
+    LeadAttachment,
+    LeadComment,
+    LeadStatusHistory,
+    MonthlyPlan,
+    TourOperator,
+    WorkShift,
+)
 
 
 class LeadCommentInline(admin.TabularInline):
@@ -24,9 +34,9 @@ class LeadAttachmentInline(admin.TabularInline):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'status', 'source', 'assigned_manager', 'created_at')
-    list_filter = ('status', 'source', 'direction', 'assigned_manager')
-    search_fields = ('name', 'phone', 'email', 'uon_ticket_id')
+    list_display = ('name', 'phone', 'status', 'source', 'assigned_manager', 'tour_operator_ref', 'tour_currency', 'created_at')
+    list_filter = ('status', 'source', 'direction', 'assigned_manager', 'tour_operator_ref', 'tour_currency')
+    search_fields = ('name', 'phone', 'email', 'uon_ticket_id', 'booking_number', 'tour_operator')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
 
@@ -36,6 +46,19 @@ class DirectionAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name',)
+
+
+@admin.register(TourOperator)
+class TourOperatorAdmin(admin.ModelAdmin):
+    list_display = ('brand_name', 'legal_name', 'inn', 'registry_number', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('brand_name', 'legal_name', 'inn', 'ogrn', 'registry_number')
+    fieldsets = (
+        ('Основное', {'fields': ('brand_name', 'legal_name', 'is_active')}),
+        ('Реестр и реквизиты', {'fields': ('inn', 'ogrn', 'registry_number', 'activity_scope', 'payment_details')}),
+        ('Контакты', {'fields': ('website', 'phone', 'email', 'address')}),
+        ('Примечание', {'fields': ('note',)}),
+    )
 
 
 @admin.register(CommissionTier)
