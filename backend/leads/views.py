@@ -10,12 +10,12 @@ from rest_framework.throttling import ScopedRateThrottle
 from accounts.permissions import is_head
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
-from .models import Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
+from .models import Contact, Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
 from .serializers import (
+    ContactSerializer,
     DirectionSerializer,
     LeadAttachmentSerializer,
     LeadCommentSerializer,
-    LeadContactSerializer,
     LeadCreateSerializer,
     LeadCrmCreateSerializer,
     LeadDetailSerializer,
@@ -27,7 +27,7 @@ from .serializers import (
 
 
 class DirectionListView(generics.ListAPIView):
-    """Публичный список направлений для выпадающего списка в форме заявки (ТЗ 3.2)."""
+    """Публичный список направлений для выпадающего списка в форме заявки."""
 
     queryset = Direction.objects.filter(is_active=True)
     serializer_class = DirectionSerializer
@@ -36,7 +36,7 @@ class DirectionListView(generics.ListAPIView):
 
 
 class TourOperatorListView(generics.ListAPIView):
-    """Справочник туроператоров для CRM: выбор в карточке заявки и просмотр реквизитов."""
+    """Справочник туроператоров для CRM."""
 
     queryset = TourOperator.objects.filter(is_active=True).order_by('brand_name')
     serializer_class = TourOperatorSerializer
@@ -53,8 +53,33 @@ class LeadTagListView(generics.ListAPIView):
     pagination_class = None
 
 
+class ContactListView(generics.ListAPIView):
+    """Клиенты / контакты для CRM и будущих рассылок."""
+
+    serializer_class = ContactSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Contact.objects.all()
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(last_name__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(middle_name__icontains=search) |
+                Q(phone_primary__icontains=search) |
+                Q(phone_secondary__icontains=search) |
+                Q(email_primary__icontains=search) |
+                Q(email_secondary__icontains=search)
+            )
+        if self.request.query_params.get('email_marketing'):
+            qs = qs.exclude(email_primary='').filter(allow_email_marketing=True)
+        return qs.order_by('last_name', 'first_name', 'phone_primary')
+
+
 class LeadCreateView(generics.CreateAPIView):
-    """Приём заявки с публичного сайта (ТЗ 3.2): создаёт Lead со статусом «Новая»."""
+    """Приём заявки с публичного сайта: создаёт Lead со статусом «Новая»."""
 
     serializer_class = LeadCreateSerializer
     permission_classes = [AllowAny]
@@ -69,28 +94,16 @@ class LeadViewSet(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Мини-CRM (ТЗ 5): список/карточка заявки, создание вручную, смена статуса,
-    комментарии, файлы, контакты и метки.
-
-    Менеджер видит и ведёт только свои заявки; руководитель/администратор — все
-    заявки и может переназначать ответственного (ТЗ 5.3). Ручное создание (см.
-    LeadCrmCreateSerializer) — второй путь появления Lead в системе, наравне с
-    публичной формой сайта (LeadCreateView); оба одинаково пушат обращение в
-    U-ON через sync_lead_to_uon.
-    """
+    """Мини-CRM: список/карточка заявки, создание вручную, смена статуса, комментарии, файлы."""
 
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'post', 'head', 'options']
 
     def get_queryset(self):
-        # Раньше менеджер видел только свои заявки (assigned_manager=user), заявки
-        # других — только руководитель. По решению заказчика (04.09.2026) все
-        # заявки теперь видны всем залогиненным сотрудникам — переназначать
-        # ответственного по-прежнему может только руководитель (см. partial_update).
         qs = (
-            Lead.objects.select_related('assigned_manager', 'direction', 'tour_operator_ref')
+            Lead.objects.select_related('assigned_manager', 'direction', 'tour_operator_ref', 'contact')
             .prefetch_related(
-                'tags', 'contacts', 'comments__author', 'status_history__changed_by',
+                'tags', 'comments__author', 'status_history__changed_by',
                 'attachments__uploaded_by', 'tasks__column', 'uon_sync_logs',
             )
         )
@@ -113,7 +126,13 @@ class LeadViewSet(
                 Q(name__icontains=search) |
                 Q(phone__icontains=search) |
                 Q(email__icontains=search) |
-                Q(contacts__value__icontains=search)
+                Q(contact__last_name__icontains=search) |
+                Q(contact__first_name__icontains=search) |
+                Q(contact__middle_name__icontains=search) |
+                Q(contact__phone_primary__icontains=search) |
+                Q(contact__phone_secondary__icontains=search) |
+                Q(contact__email_primary__icontains=search) |
+                Q(contact__email_secondary__icontains=search)
             ).distinct()
 
         return qs
@@ -127,8 +146,8 @@ class LeadViewSet(
             return LeadUpdateSerializer
         if self.action == 'add_comment':
             return LeadCommentSerializer
-        if self.action in ('add_contact', 'update_contact'):
-            return LeadContactSerializer
+        if self.action == 'upsert_contact':
+            return ContactSerializer
         if self.action == 'add_attachment':
             return LeadAttachmentSerializer
         return LeadDetailSerializer
@@ -157,11 +176,6 @@ class LeadViewSet(
             LeadStatusHistory.objects.create(
                 lead=lead, old_status=old_status, new_status=new_status, changed_by=request.user,
             )
-            # Только ключевые для денег переходы — не на каждую смену статуса,
-            # иначе уведомления превращаются в шум (решение заказчика, 19.08.2026).
-            # CLOSED_WON добавлен 26.08.2026 — выяснилось, что именно этот статус,
-            # а не PAID, означает реальное получение денег в рабочем процессе команды.
-            # PREPAID добавлен 08.09.2026 — с предоплаты тоже причитается часть комиссии.
             if new_status in (
                 Lead.Status.BOOKED, Lead.Status.PREPAID, Lead.Status.PAID,
                 Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST,
@@ -171,8 +185,6 @@ class LeadViewSet(
         if lead.assigned_manager_id and lead.assigned_manager_id != old_assigned_manager_id:
             notify_lead_assignment.delay(lead.id)
 
-        # get_object() ran against a queryset with prefetch_related, so the cached
-        # related objects (status_history, comments, ...) are stale after the write above.
         lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
@@ -184,22 +196,18 @@ class LeadViewSet(
         serializer.save(lead=lead, author=request.user)
         return Response(serializer.data, status=201)
 
-    @action(detail=True, methods=['post'], url_path='contacts')
-    def add_contact(self, request, pk=None):
+    @action(detail=True, methods=['post'], url_path='contact')
+    def upsert_contact(self, request, pk=None):
         lead = self.get_object()
-        serializer = self.get_serializer(data=request.data)
+        if lead.contact_id:
+            serializer = self.get_serializer(lead.contact, data=request.data, partial=True)
+        else:
+            serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(lead=lead)
-        lead.refresh_from_db()
-        return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data, status=201)
-
-    @action(detail=True, methods=['post'], url_path='contacts/(?P<contact_id>[^/.]+)')
-    def update_contact(self, request, pk=None, contact_id=None):
-        lead = self.get_object()
-        contact = lead.contacts.get(id=contact_id)
-        serializer = self.get_serializer(contact, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        contact = serializer.save()
+        if lead.contact_id != contact.id:
+            lead.contact = contact
+            lead.save(update_fields=['contact'])
         lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
