@@ -21,7 +21,7 @@ import { fetchDirections, type Direction } from "@/lib/api";
 import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
-import { getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
+import { getLeadReasonLabel, getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
 import TaskModal from "@/components/kanban/TaskModal";
 
 type UpdatePatch = Parameters<typeof updateLead>[1];
@@ -153,6 +153,7 @@ export default function CrmLeadDetailPage() {
   const needsNextContact = ["follow_up", "selection", "options_proposed"].includes(lead.status) && !lead.next_contact_at;
   const needsFailureReason = ["closed_lost", "failed", "not_target"].includes(lead.status) && !lead.failure_reason;
   const needsPaymentControl = ["booked", "prepaid", "waiting_payment"].includes(lead.status) && !lead.full_payment_due_at;
+  const failureReasonLabel = getLeadReasonLabel(lead.status);
 
   const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
@@ -188,7 +189,7 @@ export default function CrmLeadDetailPage() {
                 </div>
                 <p className="mt-1 text-xs text-foreground/40">Источник: {lead.source_display}</p>
               </div>
-              <StatusBadge status={lead.status} label={lead.status_display} />
+              <StatusBadge status={lead.status} label={getLeadStatusLabel(lead.status, lead.status_display)} />
             </div>
 
             <div className="mt-4">
@@ -285,9 +286,9 @@ export default function CrmLeadDetailPage() {
             </div>
             {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && (
               <div className="mt-4">
-                <FieldLabel>Причина отказа / нецелевой заявки</FieldLabel>
-                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
-                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
+                <FieldLabel>{failureReasonLabel}</FieldLabel>
+                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} placeholder={failureReasonLabel} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
+                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Заполните поле «{failureReasonLabel.toLowerCase()}».</p>}
               </div>
             )}
           </div>
