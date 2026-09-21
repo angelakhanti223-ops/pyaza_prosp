@@ -1,6 +1,5 @@
 import Image from "next/image";
-import { ArrowRight, Phone } from "lucide-react";
-import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import ContactCtaButtons from "@/components/lead-form/ContactCtaButtons";
 import { siteImageUrl } from "@/lib/siteImagesApi";
 
 type Props = {
@@ -28,19 +27,7 @@ export default function Hero({ image }: Props) {
             до, во время и после поездки.
           </p>
 
-          <div className="mt-7 flex flex-wrap gap-3">
-            <OpenLeadFormButton className="flex items-center gap-2 rounded-full bg-navy px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue">
-              Подобрать тур
-              <ArrowRight size={17} />
-            </OpenLeadFormButton>
-            <a
-              href="tel:+79502302555"
-              className="flex items-center gap-2 rounded-full border border-navy/20 px-6 py-3.5 text-sm font-semibold text-navy transition-colors hover:bg-navy/5"
-            >
-              <Phone size={17} />
-              Связаться с нами
-            </a>
-          </div>
+          <ContactCtaButtons className="mt-7" comment="Заявка с главного экрана сайта" />
 
           <div className="mt-8 flex items-center gap-3">
             <div className="flex -space-x-3">
