@@ -5,6 +5,7 @@ import re
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Iterable
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
@@ -14,7 +15,9 @@ from .models import TourOperator, TourOperatorExchangeRate
 
 logger = logging.getLogger('leads')
 
-RATE_SOURCE_NOTE = 'U-ON: Финансы → Курсы валют → Курсы валют ТО'
+PUBLIC_RATES_URL = 'https://tour-kassa.ru/курсы-валют-туроператоров'
+PUBLIC_RATE_SOURCE_NOTE = 'Tour-Kassa: Курсы валют туроператоров'
+UON_RATE_SOURCE_NOTE = 'U-ON: Финансы → Курсы валют → Курсы валют ТО'
 DEFAULT_RATES_PATH = '/currency_rates_operators.php'
 
 OPERATOR_ALIASES = [
@@ -40,6 +43,11 @@ OPERATOR_ALIASES = [
     {'art tour', 'арт тур'},
     {'art travel', 'арт тревел'},
     {'china travel', 'чайна тревел'},
+    {'ics', 'ics travel', 'икс', 'икс тревел'},
+    {'loti', 'лоти'},
+    {'europort', 'европорт'},
+    {'kazunion', 'казюнион'},
+    {'tour kassa', 'тур касса'},
 ]
 
 CURRENCIES = {
@@ -51,7 +59,9 @@ RATE_RE = re.compile(r'(?<!\d)(\d{2,3}(?:[,.]\d{1,4})?)(?!\d)')
 UI_TEXT_BLACKLIST = {
     'название', 'курс usd', 'курс eur', 'курсы валют туроператоров', 'курсы туроператоров',
     'сегодня', 'очистить', 'добавить', 'финансы', 'кассы', 'кассовая книга', 'фискальные чеки',
-    'обращения', 'заявки', 'туристы', 'партнеры', 'интеграции', 'настройки',
+    'обращения', 'заявки', 'туристы', 'партнеры', 'интеграции', 'настройки', 'личный кабинет туриста',
+    'главная', 'о нас', 'новости', 'поиск туров', 'горящие', 'календарь туров', 'страны',
+    'билеты', 'страховки', 'топ направлений', 'принять все', 'политика обработки персональных данных',
 }
 
 
@@ -172,14 +182,12 @@ def _extract_rates_from_tables(html_text: str) -> list[dict]:
                     if rate is not None:
                         rates[currency] = rate
 
-        # Fallback for rows like: ["ANEX", "USD 89.50", "EUR 102.95"].
         for cell in row[1:]:
             currency = _currency_from_text(cell)
             rate = _rate_from_text(cell)
             if currency and rate is not None:
                 rates[currency] = rate
 
-        # Fallback for rows without header, but with two numeric cells after operator.
         if not rates and len(row) >= 3:
             numeric_rates = [_rate_from_text(cell) for cell in row[1:3]]
             if numeric_rates[0] is not None:
@@ -196,8 +204,8 @@ def _extract_rates_from_tables(html_text: str) -> list[dict]:
 def _html_to_lines(html_text: str) -> list[str]:
     text = re.sub(r'(?is)<script\b.*?</script>', '\n', html_text)
     text = re.sub(r'(?is)<style\b.*?</style>', '\n', text)
-    text = re.sub(r'(?i)<\s*(tr|td|th|div|li|br|p|span|label|h\d)\b[^>]*>', '\n', text)
-    text = re.sub(r'(?i)</\s*(tr|td|th|div|li|p|span|label|h\d)\s*>', '\n', text)
+    text = re.sub(r'(?i)<\s*(tr|td|th|div|li|br|p|span|label|h\d|strong|b|section|article)\b[^>]*>', '\n', text)
+    text = re.sub(r'(?i)</\s*(tr|td|th|div|li|p|span|label|h\d|strong|b|section|article)\s*>', '\n', text)
     text = re.sub(r'<[^>]+>', ' ', text)
     text = html.unescape(text)
     lines = [_clean_cell(line) for line in text.splitlines()]
@@ -213,7 +221,7 @@ def _looks_like_operator_name(value: str) -> bool:
         return False
     if len(text) < 3 or len(text) > 120:
         return False
-    if re.search(r'\b(currency|cookie|script|function|return|window|document)\b', text, re.I):
+    if re.search(r'\b(currency|cookie|script|function|return|window|document|copyright|utm|telegram)\b', text, re.I):
         return False
     if '/' in text:
         return True
@@ -230,18 +238,15 @@ def _extract_rates_from_text(html_text: str) -> list[dict]:
             continue
 
         rates: dict[str, Decimal] = {}
-
-        # Same-line variant: "ANEX / Анекс Тур 89.67 100.12".
         same_line_rates = _all_rates_from_text(line)
         if same_line_rates:
             rates['USD'] = same_line_rates[0]
             if len(same_line_rates) > 1:
                 rates['EUR'] = same_line_rates[1]
 
-        # Common U-ON markup variant: operator name and numeric cells are split across elements.
         if not rates:
             numeric_after: list[Decimal] = []
-            for next_line in lines[idx + 1: idx + 6]:
+            for next_line in lines[idx + 1: idx + 8]:
                 if _looks_like_operator_name(next_line):
                     break
                 for rate in _all_rates_from_text(next_line):
@@ -256,7 +261,36 @@ def _extract_rates_from_text(html_text: str) -> list[dict]:
         if rates:
             parsed.append({'operator_name': line, 'rates': rates, 'row_index': idx})
 
-    # Remove duplicate operator rows that may appear because fixed headers/hidden rows are duplicated.
+    unique: dict[str, dict] = {}
+    for item in parsed:
+        key = _compact(item['operator_name'])
+        unique[key] = item
+    return list(unique.values())
+
+
+def _extract_rates_from_json_like_text(html_text: str) -> list[dict]:
+    """Fallback for pages where the rates are embedded in inline JS/JSON.
+
+    It scans text windows around known operator aliases and extracts the first two
+    plausible numeric values as USD/EUR. This is deliberately conservative and is
+    only used after table/text extraction failed.
+    """
+    parsed: list[dict] = []
+    compact_html = re.sub(r'\s+', ' ', html.unescape(html_text))
+    for group in OPERATOR_ALIASES:
+        pattern = '|'.join(re.escape(alias) for alias in sorted(group, key=len, reverse=True) if len(alias) >= 3)
+        if not pattern:
+            continue
+        for match in re.finditer(pattern, compact_html, flags=re.I):
+            window = compact_html[match.start(): match.start() + 500]
+            rates = _all_rates_from_text(window)
+            if rates:
+                parsed.append({
+                    'operator_name': match.group(0),
+                    'rates': {'USD': rates[0], **({'EUR': rates[1]} if len(rates) > 1 else {})},
+                    'row_index': match.start(),
+                })
+                break
     unique: dict[str, dict] = {}
     for item in parsed:
         key = _compact(item['operator_name'])
@@ -265,10 +299,11 @@ def _extract_rates_from_text(html_text: str) -> list[dict]:
 
 
 def _extract_rates(html_text: str) -> list[dict]:
-    table_rates = _extract_rates_from_tables(html_text)
-    if table_rates:
-        return table_rates
-    return _extract_rates_from_text(html_text)
+    for extractor in (_extract_rates_from_tables, _extract_rates_from_text, _extract_rates_from_json_like_text):
+        rates = extractor(html_text)
+        if rates:
+            return rates
+    return []
 
 
 def _operator_aliases(operator: TourOperator) -> set[str]:
@@ -317,31 +352,49 @@ def _match_operator(source_name: str, operators: Iterable[TourOperator]) -> Tour
     return best[1] if best and best[0] >= 60 else None
 
 
-def _login_page_detected(html_text: str) -> bool:
+def _login_page_detected(url: str, html_text: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    if 'u-on.ru' not in host:
+        return False
     text = _norm(html_text[:5000])
     markers = ('войти', 'логин', 'пароль', 'login', 'password', 'authorization')
     return any(marker in text for marker in markers)
 
 
 def _rates_url() -> str:
+    public_url = os.getenv('TOUR_OPERATOR_RATES_URL', '').strip()
+    if public_url:
+        return public_url
+
     configured = os.getenv('UON_OPERATOR_RATES_URL', '').strip()
-    if configured:
+    if configured and 'u-on.ru' not in urlparse(configured).netloc.lower():
         return configured
-    cabinet_url = getattr(settings, 'UON_CABINET_URL', 'https://id62499.u-on.ru').rstrip('/')
-    return f'{cabinet_url}{DEFAULT_RATES_PATH}'
+
+    return PUBLIC_RATES_URL
 
 
-def _request_headers() -> dict[str, str]:
+def _request_headers(url: str | None = None) -> dict[str, str]:
+    url = url or _rates_url()
+    host = urlparse(url).netloc.lower()
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                       '(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Referer': getattr(settings, 'UON_CABINET_URL', 'https://id62499.u-on.ru').rstrip('/') + '/',
     }
-    cookie = os.getenv('UON_CABINET_COOKIE', '').strip()
-    if cookie:
-        headers['Cookie'] = cookie
+
+    if 'u-on.ru' in host:
+        headers['Referer'] = getattr(settings, 'UON_CABINET_URL', 'https://id62499.u-on.ru').rstrip('/') + '/'
+        cookie = os.getenv('UON_CABINET_COOKIE', '').strip()
+        if cookie:
+            headers['Cookie'] = cookie
+    else:
+        headers['Referer'] = 'https://tour-kassa.ru/'
+
     return headers
+
+
+def _source_note_for_url(url: str) -> str:
+    return UON_RATE_SOURCE_NOTE if 'u-on.ru' in urlparse(url).netloc.lower() else PUBLIC_RATE_SOURCE_NOTE
 
 
 def sync_operator_exchange_rates_from_uon() -> dict:
@@ -353,32 +406,33 @@ def sync_operator_exchange_rates_from_uon() -> dict:
         return {'status': 'skipped', 'reason': 'disabled'}
 
     try:
-        response = requests.get(url, headers=_request_headers(), timeout=30)
+        response = requests.get(url, headers=_request_headers(url), timeout=30)
         response.raise_for_status()
     except requests.RequestException as exc:
-        raise RuntimeError(f'Не удалось получить страницу курсов U-ON: {exc}') from exc
+        raise RuntimeError(f'Не удалось получить страницу курсов туроператоров: {exc}') from exc
 
     html_text = response.text
-    if _login_page_detected(html_text):
+    if _login_page_detected(url, html_text):
         raise RuntimeError(
-            'U-ON вернул страницу авторизации. Нужна актуальная cookie-сессия в UON_CABINET_COOKIE.'
+            'U-ON вернул страницу авторизации. Для публичной загрузки укажите TOUR_OPERATOR_RATES_URL=https://tour-kassa.ru/курсы-валют-туроператоров.'
         )
 
     extracted = _extract_rates(html_text)
     if not extracted:
-        sample_path = '/tmp/uon_operator_rates_last_response.html'
+        sample_path = '/tmp/operator_rates_last_response.html'
         try:
             with open(sample_path, 'w', encoding='utf-8') as file:
                 file.write(html_text)
         except OSError:
             sample_path = ''
         detail = f' Сохранён ответ: {sample_path}' if sample_path else ''
-        raise RuntimeError('На странице U-ON не удалось распознать таблицу курсов операторов.' + detail)
+        raise RuntimeError('На странице не удалось распознать таблицу курсов операторов.' + detail)
 
     operators = list(TourOperator.objects.filter(is_active=True))
     created = 0
     updated = 0
     skipped = []
+    source_note = _source_note_for_url(url)
 
     for item in extracted:
         operator = _match_operator(item['operator_name'], operators)
@@ -393,7 +447,7 @@ def sync_operator_exchange_rates_from_uon() -> dict:
                 defaults={
                     'rate': rate,
                     'source_url': url,
-                    'source_note': RATE_SOURCE_NOTE,
+                    'source_note': source_note,
                     'is_active': True,
                 },
             )
@@ -404,6 +458,7 @@ def sync_operator_exchange_rates_from_uon() -> dict:
 
     return {
         'status': 'ok',
+        'source': source_note,
         'date': today.isoformat(),
         'created': created,
         'updated': updated,
