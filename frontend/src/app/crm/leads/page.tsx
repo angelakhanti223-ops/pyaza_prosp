@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { listLeads, STATUS_OPTIONS, type LeadListItem } from "@/lib/crmApi";
+import { listLeads, STATUS_OPTIONS, type LeadListItem, type LeadStatus } from "@/lib/crmApi";
 import StatusBadge from "@/components/crm/StatusBadge";
 import NewLeadModal from "@/components/crm/NewLeadModal";
+import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStatusInfo";
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -54,6 +55,7 @@ export default function CrmLeadsPage() {
 
   const overdueContacts = useMemo(() => leads.filter((lead) => isPast(lead.next_contact_at)).length, [leads]);
   const overduePayments = useMemo(() => leads.filter((lead) => isPast(lead.full_payment_due_at)).length, [leads]);
+  const selectedStatusHint = status ? getLeadStatusHint(status as LeadStatus) : "Выберите статус, чтобы увидеть подсказку по этапу работы с заявкой.";
 
   return (
     <div>
@@ -101,10 +103,14 @@ export default function CrmLeadsPage() {
           <option value="">Все статусы</option>
           {STATUS_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>
-              {s.label}
+              {getLeadStatusLabel(s.value, s.label)}
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="mb-4 rounded-2xl border border-blue-light bg-blue-light/35 px-4 py-3 text-xs leading-relaxed text-foreground/70">
+        {selectedStatusHint}
       </div>
 
       <div className="overflow-auto rounded-2xl border border-black/5 bg-white">
