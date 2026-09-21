@@ -1,4 +1,5 @@
 import type { LeadStatus } from "@/lib/crmApi";
+import { getLeadStatusLabel } from "./LeadStatusInfo";
 
 const COLORS: Record<LeadStatus, string> = {
   new: "bg-blue-light text-blue",
@@ -26,7 +27,7 @@ export default function StatusBadge({ status, label }: { status: LeadStatus; lab
         COLORS[status] ?? "bg-black/5 text-foreground/70"
       }`}
     >
-      {label}
+      {getLeadStatusLabel(status, label)}
     </span>
   );
 }
