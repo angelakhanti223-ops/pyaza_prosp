@@ -48,6 +48,46 @@ class TourOperator(models.Model):
         return self.brand_name
 
 
+class TourOperatorExchangeRate(models.Model):
+    """Курс валюты конкретного туроператора на дату.
+
+    У разных туроператоров внутренний курс может отличаться от ЦБ и друг от друга,
+    поэтому курс хранится отдельно по каждому ТО, валюте и дате.
+    """
+
+    class Currency(models.TextChoices):
+        RUB = 'RUB', 'RUB — рубль'
+        USD = 'USD', 'USD — доллар США'
+        EUR = 'EUR', 'EUR — евро'
+        CNY = 'CNY', 'CNY — юань'
+        AED = 'AED', 'AED — дирхам ОАЭ'
+        THB = 'THB', 'THB — бат'
+        TRY = 'TRY', 'TRY — турецкая лира'
+        OTHER = 'OTHER', 'Другая валюта'
+
+    operator = models.ForeignKey(
+        TourOperator, on_delete=models.CASCADE, related_name='exchange_rates', verbose_name='Туроператор',
+    )
+    currency = models.CharField('Валюта', max_length=10, choices=Currency.choices)
+    rate = models.DecimalField('Курс туроператора', max_digits=12, decimal_places=4)
+    rate_date = models.DateField('Дата курса')
+    source_url = models.URLField('Ссылка на источник курса', blank=True)
+    source_note = models.CharField('Комментарий / источник курса', max_length=255, blank=True)
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['operator__brand_name', 'currency', '-rate_date']
+        unique_together = ('operator', 'currency', 'rate_date')
+        indexes = [
+            models.Index(fields=['operator', 'currency', 'rate_date']),
+        ]
+
+    def __str__(self):
+        return f'{self.operator} — {self.currency} {self.rate} на {self.rate_date}'
+
+
 class Lead(models.Model):
     class Source(models.TextChoices):
         SITE_FORM = 'site_form', 'Сайт (форма)'
