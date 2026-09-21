@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Paperclip } from "lucide-react";
@@ -22,6 +22,36 @@ import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
 import TaskModal from "@/components/kanban/TaskModal";
+
+type UpdatePatch = Parameters<typeof updateLead>[1];
+
+function dateValue(value: string | null) {
+  if (!value) return "";
+  return value.slice(0, 10);
+}
+
+function dateTimeValue(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("ru-RU");
+}
+
+function isPast(value: string | null) {
+  if (!value) return false;
+  return new Date(value).getTime() < Date.now();
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-xs text-foreground/50">{children}</label>;
+}
 
 export default function CrmLeadDetailPage() {
   const params = useParams<{ id: string }>();
@@ -53,21 +83,8 @@ export default function CrmLeadDetailPage() {
   }, [leadId]);
 
   useEffect(() => {
-    let active = true;
-    getLead(leadId)
-      .then((data) => {
-        if (active) setLead(data);
-      })
-      .catch(() => {
-        if (active) setLead(null);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [leadId]);
+    load();
+  }, [load]);
 
   useEffect(() => {
     if (isHead) listManagers().then(setManagers);
@@ -75,78 +92,17 @@ export default function CrmLeadDetailPage() {
 
   useEffect(() => {
     fetchDirections().then(setDirections);
-  }, []);
-
-  useEffect(() => {
     listColumns().then(setColumns);
   }, []);
 
-  async function handleStatusChange(status: LeadStatus) {
-    if (!lead) return;
-    setSavingField("status");
-    try {
-      const updated = await updateLead(lead.id, { status });
-      setLead(updated);
-    } finally {
-      setSavingField(null);
-    }
-  }
-
-  async function handleManagerChange(managerId: string) {
-    if (!lead) return;
-    setSavingField("manager");
-    try {
-      const updated = await updateLead(lead.id, { assigned_manager: Number(managerId) });
-      setLead(updated);
-    } finally {
-      setSavingField(null);
-    }
-  }
-
-  async function handleDealFieldSave(field: "deal_amount" | "commission", value: string) {
+  async function savePatch(data: UpdatePatch, field: string) {
     if (!lead) return;
     setSavingField(field);
     try {
-      const updated = await updateLead(lead.id, { [field]: value || undefined });
+      const updated = await updateLead(lead.id, data);
       setLead(updated);
     } finally {
       setSavingField(null);
-    }
-  }
-
-  async function handleTextFieldSave(field: "name" | "phone" | "email" | "initial_comment", value: string) {
-    if (!lead || value === lead[field]) return;
-    setSavingField(field);
-    try {
-      const updated = await updateLead(lead.id, { [field]: value });
-      setLead(updated);
-    } finally {
-      setSavingField(null);
-    }
-  }
-
-  async function handleDirectionChange(directionId: string) {
-    if (!lead) return;
-    setSavingField("direction");
-    try {
-      const updated = await updateLead(lead.id, { direction: directionId ? Number(directionId) : null });
-      setLead(updated);
-    } finally {
-      setSavingField(null);
-    }
-  }
-
-  async function handleCreateUonRequest() {
-    if (!lead) return;
-    setConvertingToRequest(true);
-    setConvertError(null);
-    try {
-      const updated = await createUonRequest(lead.id);
-      setLead(updated);
-    } catch (err) {
-      setConvertError(err instanceof Error ? err.message : "Не удалось создать заявку в U-ON");
-    } finally {
-      setConvertingToRequest(false);
     }
   }
 
@@ -165,9 +121,21 @@ export default function CrmLeadDetailPage() {
     load();
   }
 
-  if (loading) {
-    return <p className="text-sm text-foreground/50">Загрузка…</p>;
+  async function handleCreateUonRequest() {
+    if (!lead) return;
+    setConvertingToRequest(true);
+    setConvertError(null);
+    try {
+      const updated = await createUonRequest(lead.id);
+      setLead(updated);
+    } catch (err) {
+      setConvertError(err instanceof Error ? err.message : "Не удалось создать заявку в U-ON");
+    } finally {
+      setConvertingToRequest(false);
+    }
   }
+
+  if (loading) return <p className="text-sm text-foreground/50">Загрузка…</p>;
 
   if (!lead) {
     return (
@@ -180,11 +148,10 @@ export default function CrmLeadDetailPage() {
     );
   }
 
-  type TimelineItem =
-    | { kind: "comment"; date: string; data: LeadDetail["comments"][number] }
-    | { kind: "status"; date: string; data: LeadDetail["status_history"][number] };
+  const contactOverdue = isPast(lead.next_contact_at);
+  const paymentOverdue = isPast(lead.full_payment_due_at);
 
-  const timeline: TimelineItem[] = [
+  const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
     ...lead.status_history.map((h) => ({ kind: "status" as const, date: h.changed_at, data: h })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -207,7 +174,7 @@ export default function CrmLeadDetailPage() {
                 <input
                   type="text"
                   defaultValue={lead.name}
-                  onBlur={(e) => handleTextFieldSave("name", e.target.value)}
+                  onBlur={(e) => savePatch({ name: e.target.value }, "name")}
                   disabled={savingField === "name"}
                   className="-mx-1 w-full rounded-lg border border-transparent px-1 text-xl font-bold text-navy outline-none hover:border-black/10 focus:border-blue"
                 />
@@ -215,7 +182,7 @@ export default function CrmLeadDetailPage() {
                   <input
                     type="tel"
                     defaultValue={lead.phone}
-                    onBlur={(e) => handleTextFieldSave("phone", e.target.value)}
+                    onBlur={(e) => savePatch({ phone: e.target.value }, "phone")}
                     disabled={savingField === "phone"}
                     className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
                   />
@@ -224,7 +191,7 @@ export default function CrmLeadDetailPage() {
                     type="email"
                     placeholder="Email"
                     defaultValue={lead.email}
-                    onBlur={(e) => handleTextFieldSave("email", e.target.value)}
+                    onBlur={(e) => savePatch({ email: e.target.value }, "email")}
                     disabled={savingField === "email"}
                     className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue"
                   />
@@ -235,10 +202,10 @@ export default function CrmLeadDetailPage() {
             </div>
 
             <div className="mt-4">
-              <label className="text-xs text-foreground/50">Комментарий</label>
+              <FieldLabel>Комментарий</FieldLabel>
               <textarea
                 defaultValue={lead.initial_comment}
-                onBlur={(e) => handleTextFieldSave("initial_comment", e.target.value)}
+                onBlur={(e) => savePatch({ initial_comment: e.target.value }, "initial_comment")}
                 disabled={savingField === "initial_comment"}
                 rows={2}
                 placeholder="Комментарий по заявке…"
@@ -248,37 +215,34 @@ export default function CrmLeadDetailPage() {
 
             <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div>
-                <label className="text-xs text-foreground/50">Статус</label>
+                <FieldLabel>Статус</FieldLabel>
                 <select
                   value={lead.status}
                   disabled={savingField === "status"}
-                  onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
+                  onChange={(e) => savePatch({ status: e.target.value as LeadStatus }, "status")}
                   className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
                 >
                   {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
+                    <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
+                {lead.status === "selection" && !lead.next_contact_at && (
+                  <p className="mt-1 text-xs text-red-600">Для подборки нужна дата повторной связи.</p>
+                )}
               </div>
 
               <div>
-                <label className="text-xs text-foreground/50">Ответственный</label>
+                <FieldLabel>Ответственный</FieldLabel>
                 {isHead ? (
                   <select
                     value={lead.assigned_manager?.id ?? ""}
                     disabled={savingField === "manager"}
-                    onChange={(e) => handleManagerChange(e.target.value)}
+                    onChange={(e) => savePatch({ assigned_manager: Number(e.target.value) }, "manager")}
                     className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
                   >
-                    <option value="" disabled>
-                      Не назначен
-                    </option>
+                    <option value="" disabled>Не назначен</option>
                     {managers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.full_name}
-                      </option>
+                      <option key={m.id} value={m.id}>{m.full_name}</option>
                     ))}
                   </select>
                 ) : (
@@ -287,90 +251,140 @@ export default function CrmLeadDetailPage() {
               </div>
 
               <div>
-                <label className="text-xs text-foreground/50">Сумма сделки, ₽</label>
-                <input
-                  type="number"
-                  defaultValue={lead.deal_amount ?? ""}
-                  onBlur={(e) => handleDealFieldSave("deal_amount", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-foreground/50">Комиссия, ₽</label>
-                <input
-                  type="number"
-                  defaultValue={lead.commission ?? ""}
-                  onBlur={(e) => handleDealFieldSave("commission", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-foreground/50">Направление</label>
+                <FieldLabel>Направление</FieldLabel>
                 <select
                   value={lead.direction ?? ""}
                   disabled={savingField === "direction"}
-                  onChange={(e) => handleDirectionChange(e.target.value)}
+                  onChange={(e) => savePatch({ direction: e.target.value ? Number(e.target.value) : null }, "direction")}
                   className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue"
                 >
                   <option value="">Не указано</option>
                   {directions.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="text-xs text-foreground/50">ID обращения U-ON</label>
-                <p className="mt-1.5 text-sm text-navy">{lead.uon_ticket_id || "не синхронизировано"}</p>
               </div>
             </div>
           </div>
 
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Параметры тура</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <FieldLabel>Город вылета</FieldLabel>
+                <input defaultValue={lead.departure_city} onBlur={(e) => savePatch({ departure_city: e.target.value }, "departure_city")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Дата вылета</FieldLabel>
+                <input type="date" defaultValue={dateValue(lead.departure_date)} onBlur={(e) => savePatch({ departure_date: e.target.value || null }, "departure_date")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Ночей</FieldLabel>
+                <input type="number" defaultValue={lead.nights ?? ""} onBlur={(e) => savePatch({ nights: e.target.value ? Number(e.target.value) : null }, "nights")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Взрослых</FieldLabel>
+                <input type="number" defaultValue={lead.adults ?? ""} onBlur={(e) => savePatch({ adults: e.target.value ? Number(e.target.value) : null }, "adults")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Детей</FieldLabel>
+                <input type="number" defaultValue={lead.children_count ?? ""} onBlur={(e) => savePatch({ children_count: e.target.value ? Number(e.target.value) : null }, "children_count")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Возраст детей</FieldLabel>
+                <input defaultValue={lead.children_ages} onBlur={(e) => savePatch({ children_ages: e.target.value }, "children_ages")} placeholder="например: 5 и 11" className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Бюджет от, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.budget_from ?? ""} onBlur={(e) => savePatch({ budget_from: e.target.value || null }, "budget_from")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Бюджет до, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.budget_to ?? ""} onBlur={(e) => savePatch({ budget_to: e.target.value || null }, "budget_to")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Питание</FieldLabel>
+                <input defaultValue={lead.meal_type} onBlur={(e) => savePatch({ meal_type: e.target.value }, "meal_type")} placeholder="AI, HB, BB" className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <FieldLabel>Пожелания по отелю и отдыху</FieldLabel>
+              <textarea defaultValue={lead.hotel_wishes} onBlur={(e) => savePatch({ hotel_wishes: e.target.value }, "hotel_wishes")} rows={3} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+            <h2 className="mb-4 text-sm font-semibold text-navy">Контроль продаж и оплаты</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <FieldLabel>Следующий контакт</FieldLabel>
+                <input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-sm outline-none focus:border-blue ${contactOverdue ? "border-red-400" : "border-black/10"}`} />
+                {contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}
+              </div>
+              <div>
+                <FieldLabel>Сумма сделки, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Комиссия, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.commission ?? ""} onBlur={(e) => savePatch({ commission: e.target.value || null }, "commission")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Предоплата, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.prepayment_amount ?? ""} onBlur={(e) => savePatch({ prepayment_amount: e.target.value || null }, "prepayment_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Оплачено туристом, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.paid_amount ?? ""} onBlur={(e) => savePatch({ paid_amount: e.target.value || null }, "paid_amount")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Остаток, ₽</FieldLabel>
+                <input type="number" defaultValue={lead.balance_due ?? ""} onBlur={(e) => savePatch({ balance_due: e.target.value || null }, "balance_due")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Дедлайн полной оплаты</FieldLabel>
+                <input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-sm outline-none focus:border-blue ${paymentOverdue ? "border-red-400" : "border-black/10"}`} />
+                {paymentOverdue && <p className="mt-1 text-xs text-red-600">Оплата просрочена</p>}
+              </div>
+              <div>
+                <FieldLabel>Туроператор</FieldLabel>
+                <input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+              <div>
+                <FieldLabel>Номер брони</FieldLabel>
+                <input defaultValue={lead.booking_number} onBlur={(e) => savePatch({ booking_number: e.target.value }, "booking_number")} className="mt-1 w-full rounded-lg border border-black/10 px-2 py-1.5 text-sm outline-none focus:border-blue" />
+              </div>
+            </div>
+            {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && (
+              <div className="mt-4">
+                <FieldLabel>Причина отказа / нецелевой заявки</FieldLabel>
+                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
+                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-3 text-sm font-semibold text-navy">История</h2>
             <form onSubmit={handleAddComment} className="mb-4 flex gap-2">
-              <input
-                type="text"
-                placeholder="Добавить комментарий…"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue"
-              >
-                Добавить
-              </button>
+              <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Добавить комментарий…" className="flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue" />
+              <button type="submit" className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue">Добавить</button>
             </form>
-
             <div className="flex flex-col gap-3">
               {timeline.map((item) => (
                 <div key={`${item.kind}-${item.data.id}`} className="rounded-xl bg-blue-light/30 p-3 text-sm">
                   {item.kind === "comment" ? (
                     <p className="text-foreground/80">{item.data.text}</p>
                   ) : (
-                    <p className="text-foreground/80">
-                      Статус изменён:{" "}
-                      <span className="font-medium">
-                        {item.data.old_status_display || "—"} → {item.data.new_status_display}
-                      </span>
-                    </p>
+                    <p className="text-foreground/80">Статус изменён: <span className="font-medium">{item.data.old_status_display || "—"} → {item.data.new_status_display}</span></p>
                   )}
                   <p className="mt-1 text-xs text-foreground/40">
                     {"author" in item.data ? item.data.author?.full_name : item.data.changed_by?.full_name}
-                    {" · "}
-                    {new Date(item.date).toLocaleString("ru-RU")}
+                    {" · "}{new Date(item.date).toLocaleString("ru-RU")}
                   </p>
                 </div>
               ))}
-              {timeline.length === 0 && (
-                <p className="text-sm text-foreground/40">Пока нет ни комментариев, ни изменений статуса.</p>
-              )}
+              {timeline.length === 0 && <p className="text-sm text-foreground/40">Пока нет ни комментариев, ни изменений статуса.</p>}
             </div>
           </div>
         </div>
@@ -386,50 +400,30 @@ export default function CrmLeadDetailPage() {
             <ul className="mt-3 flex flex-col gap-2">
               {lead.attachments.map((a) => (
                 <li key={a.id}>
-                  <a
-                    href={mediaUrl(a.file)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue underline underline-offset-2 hover:text-navy"
-                  >
+                  <a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">
                     {a.file.split("/").pop()}
                   </a>
                 </li>
               ))}
-              {lead.attachments.length === 0 && (
-                <p className="text-xs text-foreground/40">Файлов пока нет</p>
-              )}
+              {lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}
             </ul>
           </div>
 
           <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-navy">Связанные задачи</h2>
-              <button
-                onClick={() => setShowTaskModal(true)}
-                className="text-xs font-semibold text-blue hover:underline"
-              >
-                + Создать задачу
-              </button>
+              <button onClick={() => setShowTaskModal(true)} className="text-xs font-semibold text-blue hover:underline">+ Создать задачу</button>
             </div>
             <ul className="flex flex-col gap-2">
               {lead.tasks.map((t) => (
                 <li key={t.id}>
-                  <Link
-                    href={`/crm/kanban?task=${t.id}`}
-                    className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light"
-                  >
+                  <Link href={`/crm/kanban?task=${t.id}`} className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light">
                     <p className="font-medium text-navy">{t.title}</p>
-                    <p className="text-xs text-foreground/50">
-                      {t.column}
-                      {t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}
-                    </p>
+                    <p className="text-xs text-foreground/50">{t.column}{t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}</p>
                   </Link>
                 </li>
               ))}
-              {lead.tasks.length === 0 && (
-                <p className="text-xs text-foreground/40">Задач на канбан-доске пока нет</p>
-              )}
+              {lead.tasks.length === 0 && <p className="text-xs text-foreground/40">Задач на канбан-доске пока нет</p>}
             </ul>
           </div>
 
@@ -437,26 +431,11 @@ export default function CrmLeadDetailPage() {
             <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
               <h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2>
               <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-foreground/50">Статус в U-ON</dt>
-                  <dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-foreground/50">Менеджер в U-ON</dt>
-                  <dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-foreground/50">Источник</dt>
-                  <dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-foreground/50">В архиве</dt>
-                  <dd className="text-navy">{lead.uon_lead.is_archive ? "Да" : "Нет"}</dd>
-                </div>
+                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Источник</dt><dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd></div>
               </dl>
-              <p className="mt-3 text-xs text-foreground/40">
-                Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}
-              </p>
+              <p className="mt-3 text-xs text-foreground/40">Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}</p>
             </div>
           )}
 
@@ -467,38 +446,19 @@ export default function CrmLeadDetailPage() {
                 <p className="text-sm text-navy">ID заявки: {lead.uon_request_id}</p>
                 {lead.uon_request && (
                   <dl className="mt-2 flex flex-col gap-2 text-sm">
-                    <div className="flex justify-between gap-2">
-                      <dt className="text-foreground/50">Статус в U-ON</dt>
-                      <dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt className="text-foreground/50">Менеджер в U-ON</dt>
-                      <dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <dt className="text-foreground/50">Номер брони</dt>
-                      <dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd>
-                    </div>
+                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd></div>
+                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd></div>
+                    <div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div>
                   </dl>
                 )}
-                <Link
-                  href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`}
-                  className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy"
-                >
+                <Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">
                   Открыть и редактировать в «Заявки U-ON»
                 </Link>
               </>
             ) : (
               <>
-                <p className="text-sm text-foreground/50">
-                  Заявка в U-ON ещё не создана — переведите обращение в заявку, чтобы вести полноценную сделку
-                  (статус, бронирование) в U-ON.
-                </p>
-                <button
-                  onClick={handleCreateUonRequest}
-                  disabled={convertingToRequest}
-                  className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50"
-                >
+                <p className="text-sm text-foreground/50">Заявка в U-ON ещё не создана — переведите обращение в заявку, чтобы вести полноценную сделку.</p>
+                <button onClick={handleCreateUonRequest} disabled={convertingToRequest} className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50">
                   {convertingToRequest ? "Создание…" : "Создать заявку в U-ON"}
                 </button>
                 {convertError && <p className="mt-2 text-xs text-red-600">{convertError}</p>}
@@ -511,20 +471,12 @@ export default function CrmLeadDetailPage() {
             <ul className="flex flex-col gap-2">
               {lead.uon_sync_logs.map((log) => (
                 <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm">
-                  <p className="font-medium text-navy">
-                    Попытка {log.attempt_number} — {log.status_display}
-                  </p>
-                  {log.error_message && (
-                    <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>
-                  )}
-                  <p className="mt-1 text-xs text-foreground/40">
-                    {new Date(log.created_at).toLocaleString("ru-RU")}
-                  </p>
+                  <p className="font-medium text-navy">Попытка {log.attempt_number} — {log.status_display}</p>
+                  {log.error_message && <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>}
+                  <p className="mt-1 text-xs text-foreground/40">{new Date(log.created_at).toLocaleString("ru-RU")}</p>
                 </li>
               ))}
-              {lead.uon_sync_logs.length === 0 && (
-                <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>
-              )}
+              {lead.uon_sync_logs.length === 0 && <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>}
             </ul>
           </div>
         </div>
