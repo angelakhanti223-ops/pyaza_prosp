@@ -9,11 +9,11 @@ from integrations.models import UonLeadRecord, UonRequestRecord, UonSyncLog
 from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSerializer
 
 from .models import (
+    Contact,
     Direction,
     Lead,
     LeadAttachment,
     LeadComment,
-    LeadContact,
     LeadStatusHistory,
     LeadTag,
     TourOperator,
@@ -37,7 +37,7 @@ OPERATOR_RATE_FIELDS = [
     'operator_rate_direction', 'operator_rate_delta',
 ]
 
-CRM_CONTROL_FIELDS = ['preferred_messenger']
+CRM_CONTROL_FIELDS = ['preferred_messenger', 'contact']
 
 
 def _decimal_string(value):
@@ -47,7 +47,6 @@ def _decimal_string(value):
 
 
 def _latest_operator_rate(obj, context):
-    """Latest active operator-specific currency rate up to today."""
     if not obj.tour_operator_ref_id:
         return None
 
@@ -102,6 +101,37 @@ def _rate_payload(obj, context):
     }
 
 
+def _split_name(full_name: str):
+    parts = [part for part in (full_name or '').strip().split() if part]
+    if len(parts) >= 3:
+        return parts[0], parts[1], ' '.join(parts[2:])
+    if len(parts) == 2:
+        return parts[0], parts[1], ''
+    if len(parts) == 1:
+        return '', parts[0], ''
+    return '', '', ''
+
+
+def _sync_client_contact_from_lead(lead: Lead):
+    last_name, first_name, middle_name = _split_name(lead.name)
+    defaults = {
+        'last_name': last_name,
+        'first_name': first_name or lead.name,
+        'middle_name': middle_name,
+        'email_primary': lead.email or '',
+        'phone_primary': lead.phone or '',
+        'preferred_contact_method': lead.preferred_messenger or Contact.PreferredContactMethod.PHONE,
+    }
+
+    if lead.contact_id:
+        Contact.objects.filter(id=lead.contact_id).update(**defaults)
+        return
+
+    contact = Contact.objects.create(**defaults)
+    lead.contact = contact
+    lead.save(update_fields=['contact'])
+
+
 class DirectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Direction
@@ -125,39 +155,25 @@ class TourOperatorSerializer(serializers.ModelSerializer):
         ]
 
 
+class ContactSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(read_only=True)
+    preferred_contact_method_display = serializers.CharField(source='get_preferred_contact_method_display', read_only=True)
+
+    class Meta:
+        model = Contact
+        fields = [
+            'id', 'last_name', 'first_name', 'middle_name', 'full_name', 'birth_date',
+            'email_primary', 'email_secondary', 'phone_primary', 'phone_secondary',
+            'preferred_contact_method', 'preferred_contact_method_display',
+            'allow_email_marketing', 'allow_messenger_marketing', 'note', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'full_name', 'created_at', 'updated_at']
+
+
 class LeadTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeadTag
         fields = ['id', 'name', 'color', 'is_active']
-
-
-class LeadContactSerializer(serializers.ModelSerializer):
-    type_display = serializers.CharField(source='get_type_display', read_only=True)
-
-    class Meta:
-        model = LeadContact
-        fields = [
-            'id', 'type', 'type_display', 'value', 'label', 'is_primary',
-            'allow_marketing', 'note', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-def _sync_primary_contacts_from_lead(lead: Lead):
-    if lead.phone:
-        LeadContact.objects.update_or_create(
-            lead=lead,
-            type=LeadContact.Type.PHONE,
-            value=lead.phone,
-            defaults={'label': 'Основной телефон из заявки', 'is_primary': True, 'allow_marketing': False},
-        )
-    if lead.email:
-        LeadContact.objects.update_or_create(
-            lead=lead,
-            type=LeadContact.Type.EMAIL,
-            value=lead.email,
-            defaults={'label': 'Email из заявки', 'is_primary': not bool(lead.phone), 'allow_marketing': True},
-        )
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):
@@ -184,7 +200,7 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         validated_data.setdefault('source', Lead.Source.SITE_FORM)
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
-        _sync_primary_contacts_from_lead(lead)
+        _sync_client_contact_from_lead(lead)
 
         sync_lead_to_uon.delay(lead.id)
         send_lead_notification_task.delay(lead.id)
@@ -227,7 +243,7 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
         validated_data.setdefault('assigned_manager', request.user)
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
-        _sync_primary_contacts_from_lead(lead)
+        _sync_client_contact_from_lead(lead)
 
         sync_lead_to_uon.delay(lead.id)
         create_new_lead_task.delay(lead.id)
@@ -312,12 +328,14 @@ class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
     tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
+    contact_details = ContactSerializer(source='contact', read_only=True)
     tags = LeadTagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display', 'tags',
+            'id', 'contact', 'contact_details', 'name', 'phone', 'email',
+            'preferred_messenger', 'preferred_messenger_display', 'tags',
             'status', 'status_display', 'source', 'source_display', 'direction', 'direction_name',
             'assigned_manager', 'deal_amount', 'commission', 'next_contact_at', 'departure_city',
             'departure_date', 'nights', 'budget_from', 'budget_to', 'prepayment_amount', 'paid_amount',
@@ -333,8 +351,8 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     preferred_messenger_display = serializers.CharField(source='get_preferred_messenger_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
+    contact_details = ContactSerializer(source='contact', read_only=True)
     comments = LeadCommentSerializer(many=True, read_only=True)
-    contacts = LeadContactSerializer(many=True, read_only=True)
     tags = LeadTagSerializer(many=True, read_only=True)
     status_history = LeadStatusHistorySerializer(many=True, read_only=True)
     attachments = LeadAttachmentSerializer(many=True, read_only=True)
@@ -347,7 +365,8 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display', 'tags', 'contacts',
+            'id', 'contact', 'contact_details', 'name', 'phone', 'email',
+            'preferred_messenger', 'preferred_messenger_display', 'tags',
             'source', 'source_display', 'direction', 'direction_name', 'status', 'status_display',
             'assigned_manager', 'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
             'tour_operator_details', *OPERATOR_RATE_FIELDS, 'uon_ticket_id', 'uon_request_id',
@@ -385,5 +404,5 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
         instance = super().update(instance, validated_data)
         if tags is not None:
             instance.tags.set(tags)
-        _sync_primary_contacts_from_lead(instance)
+        _sync_client_contact_from_lead(instance)
         return instance
