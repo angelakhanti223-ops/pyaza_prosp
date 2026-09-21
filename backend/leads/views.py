@@ -71,7 +71,8 @@ class ContactListView(generics.ListAPIView):
                 Q(phone_primary__icontains=search) |
                 Q(phone_secondary__icontains=search) |
                 Q(email_primary__icontains=search) |
-                Q(email_secondary__icontains=search)
+                Q(email_secondary__icontains=search) |
+                Q(vk_profile__icontains=search)
             )
         if self.request.query_params.get('email_marketing'):
             qs = qs.exclude(email_primary='').filter(allow_email_marketing=True)
@@ -132,7 +133,8 @@ class LeadViewSet(
                 Q(contact__phone_primary__icontains=search) |
                 Q(contact__phone_secondary__icontains=search) |
                 Q(contact__email_primary__icontains=search) |
-                Q(contact__email_secondary__icontains=search)
+                Q(contact__email_secondary__icontains=search) |
+                Q(contact__vk_profile__icontains=search)
             ).distinct()
 
         return qs
@@ -205,9 +207,14 @@ class LeadViewSet(
             serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         contact = serializer.save()
-        if lead.contact_id != contact.id:
-            lead.contact = contact
-            lead.save(update_fields=['contact'])
+
+        lead.contact = contact
+        lead.name = contact.full_name or lead.name
+        lead.phone = contact.phone_primary or lead.phone
+        lead.email = contact.email_primary or lead.email
+        lead.preferred_messenger = contact.preferred_contact_method or lead.preferred_messenger
+        lead.save(update_fields=['contact', 'name', 'phone', 'email', 'preferred_messenger'])
+
         lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
