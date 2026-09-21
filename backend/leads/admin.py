@@ -6,7 +6,9 @@ from .models import (
     Lead,
     LeadAttachment,
     LeadComment,
+    LeadContact,
     LeadStatusHistory,
+    LeadTag,
     MonthlyPlan,
     TourOperator,
     TourOperatorExchangeRate,
@@ -18,6 +20,13 @@ class LeadCommentInline(admin.TabularInline):
     model = LeadComment
     extra = 0
     readonly_fields = ('created_at',)
+
+
+class LeadContactInline(admin.TabularInline):
+    model = LeadContact
+    extra = 1
+    fields = ('type', 'value', 'label', 'is_primary', 'allow_marketing', 'note')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 class LeadStatusHistoryInline(admin.TabularInline):
@@ -41,11 +50,36 @@ class TourOperatorExchangeRateInline(admin.TabularInline):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'status', 'source', 'assigned_manager', 'tour_operator_ref', 'tour_currency', 'payment_exchange_rate', 'created_at')
-    list_filter = ('status', 'source', 'direction', 'assigned_manager', 'tour_operator_ref', 'tour_currency')
-    search_fields = ('name', 'phone', 'email', 'uon_ticket_id', 'booking_number', 'tour_operator')
+    list_display = (
+        'name', 'phone', 'status', 'preferred_messenger', 'source', 'assigned_manager',
+        'tour_operator_ref', 'tour_currency', 'payment_exchange_rate', 'created_at',
+    )
+    list_filter = (
+        'status', 'source', 'preferred_messenger', 'tags', 'direction',
+        'assigned_manager', 'tour_operator_ref', 'tour_currency',
+    )
+    search_fields = (
+        'name', 'phone', 'email', 'contacts__value', 'uon_ticket_id',
+        'booking_number', 'tour_operator',
+    )
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
+    filter_horizontal = ('tags',)
+    inlines = [LeadContactInline, LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
+
+
+@admin.register(LeadTag)
+class LeadTagAdmin(admin.ModelAdmin):
+    list_display = ('name', 'color', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name',)
+
+
+@admin.register(LeadContact)
+class LeadContactAdmin(admin.ModelAdmin):
+    list_display = ('lead', 'type', 'value', 'label', 'is_primary', 'allow_marketing', 'updated_at')
+    list_filter = ('type', 'is_primary', 'allow_marketing')
+    search_fields = ('lead__name', 'lead__phone', 'lead__email', 'value', 'label')
+    autocomplete_fields = ('lead',)
 
 
 @admin.register(Direction)
