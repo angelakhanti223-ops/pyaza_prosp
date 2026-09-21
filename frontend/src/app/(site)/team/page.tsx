@@ -4,6 +4,7 @@ import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import { fetchTeamMembers } from "@/lib/api";
 import { mediaUrl } from "@/lib/articlesApi";
+import { fetchSiteImages, siteImageUrl } from "@/lib/siteImagesApi";
 
 export const metadata: Metadata = {
   title: "Наша команда — туристическое агентство Слетать.ру в Пензе",
@@ -12,13 +13,16 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamPage() {
-  const team = await fetchTeamMembers();
+  const [team, siteImages] = await Promise.all([fetchTeamMembers(), fetchSiteImages()]);
+  const heroImage = siteImageUrl(siteImages.team_hero);
 
   return (
     <div>
       <PageHero
         title="Наша команда"
         text="С вами работают живые люди, а не скрипт продаж — познакомьтесь с теми, кто подбирает вашу поездку."
+        image={heroImage}
+        imageAlt="Команда туристического агентства Слетать.ру"
       />
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
         {team.length > 0 ? (
