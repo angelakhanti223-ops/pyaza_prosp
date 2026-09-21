@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import { fetchDirections } from "@/lib/api";
@@ -23,6 +24,15 @@ export default async function DirectionsPage() {
           Ниже — актуальный список направлений, с которыми мы работаем. Для каждого подбираем
           отели, авиаперелёт и трансфер под ваш бюджет и даты.
         </p>
+
+        <SiteCtaBlock
+          className="mb-10"
+          title="Не нашли нужное направление?"
+          text="Напишите страну, город вылета, даты и бюджет — проверим варианты у туроператоров и предложим подходящий маршрут."
+          primaryLabel="Подобрать направление"
+          comment="Заявка со страницы направлений"
+        />
+
         {directions.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {directions.map((d) => (
