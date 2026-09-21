@@ -33,9 +33,9 @@ export const LEAD_STATUS_HINTS: Record<LeadStatus, string> = {
   check_in: "Контроль заселения: уточнить, всё ли хорошо с номером, питанием и отелем.",
   returned: "Турист вернулся. Запросите отзыв, фото и отметьте потенциал повторной продажи.",
   closed_won: "Продажа успешно завершена. Комиссия и итог по заявке должны быть зафиксированы.",
-  closed_lost: "Нормальная продажная заявка, но клиент не купил. Укажите причину: дорого, выбрал другого, передумал и т.п.",
-  failed: "Заявка потеряна из-за процесса: не перезвонили, забыли, долго отвечали, не отправили подборку. Укажите причину.",
-  not_target: "Обращение не является потенциальной продажей: спам, дубль, ошибочный номер, работа, сотрудничество и т.п.",
+  closed_lost: "Неуспешная — нормальная продажная заявка, но клиент не купил. Укажите причину неуспешной заявки: дорого, выбрал другого агента, передумал, не подошли даты и т.п.",
+  failed: "Провалена — заявка потеряна из-за процесса. Укажите причину провала: не перезвонили, забыли, долго отвечали, не отправили подборку, не назначили повторную связь.",
+  not_target: "Нецелевой — обращение не является потенциальной продажей. Укажите причину: спам, дубль, ошибочный номер, работа, сотрудничество и т.п.",
 };
 
 export function getLeadStatusLabel(status: LeadStatus, fallback?: string) {
@@ -44,6 +44,13 @@ export function getLeadStatusLabel(status: LeadStatus, fallback?: string) {
 
 export function getLeadStatusHint(status: LeadStatus) {
   return LEAD_STATUS_HINTS[status];
+}
+
+export function getLeadReasonLabel(status: LeadStatus) {
+  if (status === "failed") return "Причина провала";
+  if (status === "closed_lost") return "Причина неуспешной заявки";
+  if (status === "not_target") return "Причина нецелевого обращения";
+  return "Причина закрытия";
 }
 
 export function LeadStatusHint({ status }: { status: LeadStatus }) {
