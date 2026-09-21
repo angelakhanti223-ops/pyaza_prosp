@@ -8,6 +8,20 @@ import StatusBadge from "@/components/crm/StatusBadge";
 import NewLeadModal from "@/components/crm/NewLeadModal";
 import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStatusInfo";
 
+type RateDirection = "higher" | "lower" | "same" | "missing";
+
+type LeadWithOperatorRate = LeadListItem & {
+  tour_operator_ref?: number | null;
+  tour_operator_details?: { brand_name: string } | null;
+  tour_currency?: string;
+  payment_exchange_rate?: string | null;
+  operator_current_rate?: string | null;
+  operator_current_rate_date?: string | null;
+  operator_rate_source_note?: string;
+  operator_rate_direction?: RateDirection;
+  operator_rate_delta?: string | null;
+};
+
 function formatDateTime(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -23,6 +37,28 @@ function formatMoney(value: string | null) {
   const number = Number(value);
   if (Number.isNaN(number)) return `${value} ₽`;
   return `${new Intl.NumberFormat("ru-RU").format(number)} ₽`;
+}
+
+function formatRate(value: string | null | undefined) {
+  if (!value) return "—";
+  const number = Number(value);
+  if (Number.isNaN(number)) return value;
+  return new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(number);
+}
+
+function rateClass(direction?: RateDirection) {
+  if (direction === "higher") return "font-semibold text-red-600";
+  if (direction === "lower") return "font-semibold text-emerald-600";
+  if (direction === "same") return "font-semibold text-foreground/70";
+  return "text-foreground/45";
+}
+
+function rateDeltaLabel(delta: string | null | undefined) {
+  if (!delta) return "";
+  const number = Number(delta);
+  if (Number.isNaN(number)) return delta;
+  if (number > 0) return `+${formatRate(delta)}`;
+  return formatRate(delta);
 }
 
 function isPast(value: string | null) {
@@ -70,7 +106,7 @@ export default function CrmLeadsPage() {
         <div>
           <h1 className="text-xl font-bold text-navy">Заявки туристов</h1>
           <p className="mt-1 text-xs text-foreground/50">
-            Контроль повторных контактов, оплат и этапов продажи. Просрочено контактов: {overdueContacts}, оплат: {overduePayments}.
+            Контроль повторных контактов, оплат, этапов продажи и курсов туроператоров. Просрочено контактов: {overdueContacts}, оплат: {overduePayments}.
           </p>
         </div>
         <button
@@ -121,7 +157,7 @@ export default function CrmLeadsPage() {
       </div>
 
       <div className="overflow-auto rounded-2xl border border-black/5 bg-white">
-        <table className="min-w-[1180px] w-full text-left text-sm">
+        <table className="min-w-[1380px] w-full text-left text-sm">
           <thead className="border-b border-black/5 bg-blue-light/40 text-xs text-foreground/50">
             <tr>
               <th className="px-4 py-3 font-medium">Клиент</th>
@@ -129,6 +165,7 @@ export default function CrmLeadsPage() {
               <th className="px-4 py-3 font-medium">Статус</th>
               <th className="px-4 py-3 font-medium">Следующий контакт</th>
               <th className="px-4 py-3 font-medium">Оплата</th>
+              <th className="px-4 py-3 font-medium">Курс ТО</th>
               <th className="px-4 py-3 font-medium">Дедлайн оплаты</th>
               <th className="px-4 py-3 font-medium">Менеджер</th>
               <th className="px-4 py-3 font-medium">Создана</th>
@@ -136,8 +173,10 @@ export default function CrmLeadsPage() {
           </thead>
           <tbody>
             {leads.map((lead) => {
+              const row = lead as LeadWithOperatorRate;
               const contactOverdue = isPast(lead.next_contact_at);
               const paymentOverdue = isPast(lead.full_payment_due_at);
+              const hasOperator = Boolean(row.tour_operator_ref || row.tour_operator_details || row.tour_operator);
               return (
                 <tr key={lead.id} className="border-b border-black/5 last:border-0 hover:bg-blue-light/20">
                   <td className="px-4 py-3 align-top">
@@ -154,6 +193,12 @@ export default function CrmLeadsPage() {
                       {lead.departure_date && <> · {formatDate(lead.departure_date)}</>}
                       {lead.nights && <> · {lead.nights} н.</>}
                     </p>
+                    {row.tour_operator_details?.brand_name && (
+                      <p className="text-xs text-foreground/45">ТО: {row.tour_operator_details.brand_name}</p>
+                    )}
+                    {!row.tour_operator_details?.brand_name && row.tour_operator && (
+                      <p className="text-xs text-foreground/45">ТО: {row.tour_operator}</p>
+                    )}
                     {lead.budget_to && <p className="text-xs text-foreground/45">Бюджет до {formatMoney(lead.budget_to)}</p>}
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -170,10 +215,35 @@ export default function CrmLeadsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 align-top text-foreground/70">
-                    <p>Тур: {formatMoney(lead.deal_amount)}</p>
+                    <p>Тур: {formatMoney(lead.deal_amount)}{row.tour_currency && <> · {row.tour_currency}</>}</p>
                     <p className="text-xs text-foreground/45">Оплачено: {formatMoney(lead.paid_amount)}</p>
                     <p className="text-xs text-foreground/45">Остаток: {formatMoney(lead.balance_due)}</p>
                     <p className="text-xs text-foreground/45">Комиссия: {formatMoney(lead.commission)}</p>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {!hasOperator ? (
+                      <span className="text-xs text-foreground/35">ТО не выбран</span>
+                    ) : !row.operator_current_rate ? (
+                      <div className="text-xs text-foreground/45">
+                        <p>Курс ТО не задан</p>
+                        {row.tour_currency && <p>{row.tour_currency}</p>}
+                      </div>
+                    ) : (
+                      <div className="text-xs">
+                        <p className={rateClass(row.operator_rate_direction)}>
+                          Сейчас: {formatRate(row.operator_current_rate)} {row.tour_currency}
+                        </p>
+                        {row.operator_current_rate_date && (
+                          <p className="text-foreground/40">на {formatDate(row.operator_current_rate_date)}</p>
+                        )}
+                        <p className="text-foreground/45">Оплата: {formatRate(row.payment_exchange_rate)}</p>
+                        {row.operator_rate_delta && (
+                          <p className={rateClass(row.operator_rate_direction)}>
+                            Δ {rateDeltaLabel(row.operator_rate_delta)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 align-top">
                     <span className={paymentOverdue ? "font-semibold text-red-600" : "text-foreground/70"}>
@@ -191,7 +261,7 @@ export default function CrmLeadsPage() {
             })}
             {!loading && leads.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-foreground/40">
+                <td colSpan={9} className="px-4 py-10 text-center text-sm text-foreground/40">
                   Заявок пока нет
                 </td>
               </tr>
