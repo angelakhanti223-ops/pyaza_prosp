@@ -7,7 +7,6 @@ import BookingSteps from "@/components/home/BookingSteps";
 import SupportStages from "@/components/home/SupportStages";
 import Faq from "@/components/home/Faq";
 import NewsletterCTA from "@/components/home/NewsletterCTA";
-import MobileStickyCTA from "@/components/cta/MobileStickyCTA";
 import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import { fetchSiteImages } from "@/lib/siteImagesApi";
 
@@ -51,7 +50,6 @@ export default async function Home() {
         />
       </div>
       <NewsletterCTA />
-      <MobileStickyCTA />
     </>
   );
 }
