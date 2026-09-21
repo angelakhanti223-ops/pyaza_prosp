@@ -6,7 +6,7 @@ from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonRequestRecord, UonSyncLog
 from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSerializer
 
-from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
+from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory, TourOperator
 
 
 TRAVEL_FIELDS = [
@@ -16,7 +16,8 @@ TRAVEL_FIELDS = [
 
 PAYMENT_FIELDS = [
     'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
-    'tour_operator', 'booking_number', 'failure_reason',
+    'tour_operator', 'tour_operator_ref', 'tour_currency', 'payment_exchange_rate',
+    'booking_number', 'failure_reason',
 ]
 
 
@@ -24,6 +25,15 @@ class DirectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Direction
         fields = ['id', 'name']
+
+
+class TourOperatorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TourOperator
+        fields = [
+            'id', 'brand_name', 'legal_name', 'inn', 'ogrn', 'registry_number', 'activity_scope',
+            'website', 'phone', 'email', 'address', 'payment_details', 'note', 'is_active',
+        ]
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):
@@ -178,6 +188,7 @@ class LeadListSerializer(serializers.ModelSerializer):
     source_display = serializers.CharField(source='get_source_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
+    tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
 
     class Meta:
         model = Lead
@@ -186,7 +197,8 @@ class LeadListSerializer(serializers.ModelSerializer):
             'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission',
             'next_contact_at', 'departure_city', 'departure_date', 'nights', 'budget_from', 'budget_to',
             'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
-            'tour_operator', 'booking_number', 'failure_reason', 'created_at',
+            'tour_operator', 'tour_operator_ref', 'tour_operator_details', 'tour_currency', 'payment_exchange_rate',
+            'booking_number', 'failure_reason', 'created_at',
         ]
 
 
@@ -202,13 +214,14 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     uon_sync_logs = LeadUonSyncLogSerializer(many=True, read_only=True)
     uon_lead = serializers.SerializerMethodField()
     uon_request = serializers.SerializerMethodField()
+    tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
 
     class Meta:
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission',
-            *TRAVEL_FIELDS, *PAYMENT_FIELDS,
+            *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tour_operator_details',
             'uon_ticket_id', 'uon_request_id', 'initial_comment', 'consent_personal_data_at',
             'created_at', 'updated_at', 'comments', 'status_history', 'attachments', 'tasks',
             'uon_sync_logs', 'uon_lead', 'uon_request',
