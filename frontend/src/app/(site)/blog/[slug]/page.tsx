@@ -8,6 +8,7 @@ import ShareButtons from "@/components/blog/ShareButtons";
 import ImageCarousel from "@/components/blog/ImageCarousel";
 import ArticleHeroCarousel, { type ArticleHeroSlide } from "@/components/blog/ArticleHeroCarousel";
 import OctoberQuickGuide from "@/components/blog/OctoberQuickGuide";
+import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -130,6 +131,13 @@ export default async function ArticlePage({ params }: Props) {
       )}
 
       {isOctoberArticle && <OctoberQuickGuide />}
+      {isOctoberArticle && (
+        <ArticleLeadButtons
+          compact
+          title="Хотите понять, куда поехать именно вам?"
+          text="Опишите даты, состав туристов и бюджет — подберём направление и отели под ваш формат отдыха, а не просто покажем список туров."
+        />
+      )}
 
       <div
         className="prose prose-sm mt-8 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue"
@@ -137,6 +145,13 @@ export default async function ArticlePage({ params }: Props) {
       />
 
       <ImageCarousel images={article.gallery_images} />
+
+      {isOctoberArticle && (
+        <ArticleLeadButtons
+          title="Оставить заявку на подбор тура"
+          text="Сравним Египет, Турцию, ОАЭ, Таиланд, Вьетнам, Мальдивы, Россию и круизы под ваши даты. Можно написать в MAX, Telegram или заполнить заявку на сайте."
+        />
+      )}
 
       {article.tags.length > 0 && (
         <div className="mt-8 flex flex-wrap gap-2">
