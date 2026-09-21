@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
@@ -46,8 +46,7 @@ const CURRENCY_OPTIONS = [
 ];
 
 function dateValue(value: string | null) {
-  if (!value) return "";
-  return value.slice(0, 10);
+  return value ? value.slice(0, 10) : "";
 }
 
 function dateTimeValue(value: string | null) {
@@ -55,13 +54,11 @@ function dateTimeValue(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value.slice(0, 16);
   const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60_000);
-  return local.toISOString().slice(0, 16);
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
 }
 
 function isPast(value: string | null) {
-  if (!value) return false;
-  return new Date(value).getTime() < Date.now();
+  return Boolean(value && new Date(value).getTime() < Date.now());
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -103,8 +100,7 @@ export default function CrmLeadDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getLead(leadId);
-      setLead(data);
+      setLead(await getLead(leadId));
     } catch {
       setLead(null);
     } finally {
@@ -130,8 +126,7 @@ export default function CrmLeadDetailPage() {
     if (!lead) return;
     setSavingField(field);
     try {
-      const updated = await updateLead(lead.id, data);
-      setLead(updated);
+      setLead(await updateLead(lead.id, data));
     } finally {
       setSavingField(null);
     }
@@ -157,8 +152,7 @@ export default function CrmLeadDetailPage() {
     setConvertingToRequest(true);
     setConvertError(null);
     try {
-      const updated = await createUonRequest(lead.id);
-      setLead(updated);
+      setLead(await createUonRequest(lead.id));
     } catch (err) {
       setConvertError(err instanceof Error ? err.message : "Не удалось создать заявку в U-ON");
     } finally {
@@ -180,25 +174,13 @@ export default function CrmLeadDetailPage() {
   }
 
   const leadExtra = lead as LeadExtra;
-  const selectedTourOperator = useMemo(() => {
-    return leadExtra.tour_operator_details ?? tourOperators.find((item) => item.id === leadExtra.tour_operator_ref) ?? null;
-  }, [leadExtra.tour_operator_details, leadExtra.tour_operator_ref, tourOperators]);
-
+  const selectedTourOperator = leadExtra.tour_operator_details ?? tourOperators.find((item) => item.id === leadExtra.tour_operator_ref) ?? null;
   const contactOverdue = isPast(lead.next_contact_at);
   const paymentOverdue = isPast(lead.full_payment_due_at);
   const needsNextContact = ["follow_up", "selection", "options_proposed"].includes(lead.status) && !lead.next_contact_at;
   const needsFailureReason = ["closed_lost", "failed", "not_target"].includes(lead.status) && !lead.failure_reason;
   const needsPaymentControl = ["booked", "prepaid", "waiting_payment"].includes(lead.status) && !lead.full_payment_due_at;
-
-  const reasonLabel =
-    lead.status === "failed"
-      ? "Причина провала"
-      : lead.status === "closed_lost"
-        ? "Причина неуспешной заявки"
-        : lead.status === "not_target"
-          ? "Причина нецелевого обращения"
-          : "Причина";
-
+  const reasonLabel = lead.status === "failed" ? "Причина провала" : lead.status === "closed_lost" ? "Причина неуспешной заявки" : lead.status === "not_target" ? "Причина нецелевого обращения" : "Причина";
   const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
     ...lead.status_history.map((h) => ({ kind: "status" as const, date: h.changed_at, data: h })),
@@ -206,26 +188,17 @@ export default function CrmLeadDetailPage() {
 
   return (
     <div>
-      <button
-        onClick={() => router.push("/crm/leads")}
-        className="mb-4 flex items-center gap-1 text-sm text-foreground/50 hover:text-navy"
-      >
+      <button onClick={() => router.push("/crm/leads")} className="mb-4 flex items-center gap-1 text-sm text-foreground/50 hover:text-navy">
         <ArrowLeft size={15} />
         Все заявки
       </button>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div className="rounded-2xl border border-black/5 bg-white p-6">
+          <section className="rounded-2xl border border-black/5 bg-white p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex-1">
-                <input
-                  type="text"
-                  defaultValue={lead.name}
-                  onBlur={(e) => savePatch({ name: e.target.value }, "name")}
-                  disabled={savingField === "name"}
-                  className="-mx-1 w-full rounded-lg border border-transparent px-1 text-xl font-bold text-navy outline-none hover:border-black/10 focus:border-blue"
-                />
+                <input type="text" defaultValue={lead.name} onBlur={(e) => savePatch({ name: e.target.value }, "name")} disabled={savingField === "name"} className="-mx-1 w-full rounded-lg border border-transparent px-1 text-xl font-bold text-navy outline-none hover:border-black/10 focus:border-blue" />
                 <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-foreground/60">
                   <input type="tel" defaultValue={lead.phone} onBlur={(e) => savePatch({ phone: e.target.value }, "phone")} className="-mx-1 rounded-lg border border-transparent px-1 outline-none hover:border-black/10 focus:border-blue" />
                   <span>·</span>
@@ -238,34 +211,20 @@ export default function CrmLeadDetailPage() {
 
             <div className="mt-4">
               <FieldLabel>Комментарий</FieldLabel>
-              <textarea
-                defaultValue={lead.initial_comment}
-                onBlur={(e) => savePatch({ initial_comment: e.target.value }, "initial_comment")}
-                rows={2}
-                placeholder="Комментарий по заявке…"
-                className="mt-1 w-full resize-none rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70 outline-none focus:ring-1 focus:ring-blue"
-              />
+              <textarea defaultValue={lead.initial_comment} onBlur={(e) => savePatch({ initial_comment: e.target.value }, "initial_comment")} rows={2} placeholder="Комментарий по заявке…" className="mt-1 w-full resize-none rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70 outline-none focus:ring-1 focus:ring-blue" />
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <FieldLabel>Статус</FieldLabel>
-                <select
-                  value={lead.status}
-                  disabled={savingField === "status"}
-                  onChange={(e) => savePatch({ status: e.target.value as LeadStatus }, "status")}
-                  className={inputClass()}
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>{getLeadStatusLabel(s.value, s.label)}</option>
-                  ))}
+                <select value={lead.status} onChange={(e) => savePatch({ status: e.target.value as LeadStatus }, "status")} className={inputClass()}>
+                  {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{getLeadStatusLabel(s.value, s.label)}</option>)}
                 </select>
                 <LeadStatusHint status={lead.status} />
                 {needsNextContact && <p className="mt-1 text-xs text-red-600">Для этого статуса нужна дата следующего контакта.</p>}
                 {needsPaymentControl && <p className="mt-1 text-xs text-red-600">Для этого статуса нужен дедлайн полной оплаты.</p>}
                 {needsFailureReason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
               </div>
-
               <div>
                 <FieldLabel>Ответственный</FieldLabel>
                 {isHead ? (
@@ -277,7 +236,6 @@ export default function CrmLeadDetailPage() {
                   <p className="mt-1.5 text-sm text-navy">{lead.assigned_manager?.full_name ?? "—"}</p>
                 )}
               </div>
-
               <div>
                 <FieldLabel>Направление</FieldLabel>
                 <select value={lead.direction ?? ""} onChange={(e) => savePatch({ direction: e.target.value ? Number(e.target.value) : null }, "direction")} className={inputClass()}>
@@ -286,9 +244,9 @@ export default function CrmLeadDetailPage() {
                 </select>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-navy">Параметры тура</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div><FieldLabel>Город вылета</FieldLabel><input defaultValue={lead.departure_city} onBlur={(e) => savePatch({ departure_city: e.target.value }, "departure_city")} className={inputClass()} /></div>
@@ -301,170 +259,55 @@ export default function CrmLeadDetailPage() {
               <div><FieldLabel>Бюджет до, ₽</FieldLabel><input type="number" defaultValue={lead.budget_to ?? ""} onBlur={(e) => savePatch({ budget_to: e.target.value || null }, "budget_to")} className={inputClass()} /></div>
               <div><FieldLabel>Питание</FieldLabel><input defaultValue={lead.meal_type} onBlur={(e) => savePatch({ meal_type: e.target.value }, "meal_type")} placeholder="AI, HB, BB" className={inputClass()} /></div>
             </div>
-            <div className="mt-4">
-              <FieldLabel>Пожелания по отелю и отдыху</FieldLabel>
-              <textarea defaultValue={lead.hotel_wishes} onBlur={(e) => savePatch({ hotel_wishes: e.target.value }, "hotel_wishes")} rows={3} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
-            </div>
-          </div>
+            <div className="mt-4"><FieldLabel>Пожелания по отелю и отдыху</FieldLabel><textarea defaultValue={lead.hotel_wishes} onBlur={(e) => savePatch({ hotel_wishes: e.target.value }, "hotel_wishes")} rows={3} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" /></div>
+          </section>
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-navy">Контроль продаж и оплаты</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <FieldLabel>Следующий контакт</FieldLabel>
-                <input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={inputClass(contactOverdue ? "border-red-400" : "")} />
-                {contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}
-              </div>
+              <div><FieldLabel>Следующий контакт</FieldLabel><input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value || null }, "next_contact_at")} className={inputClass(contactOverdue ? "border-red-400" : "")} />{contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}</div>
               <div><FieldLabel>Сумма сделки</FieldLabel><input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className={inputClass()} /></div>
-              <div>
-                <FieldLabel>Валюта тура</FieldLabel>
-                <select value={leadExtra.tour_currency ?? "RUB"} onChange={(e) => savePatch({ tour_currency: e.target.value } as UpdatePatch, "tour_currency")} className={inputClass()}>
-                  {CURRENCY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <FieldLabel>Курс на момент оплаты</FieldLabel>
-                <input type="number" step="0.0001" placeholder="например: 92.5000" defaultValue={leadExtra.payment_exchange_rate ?? ""} onBlur={(e) => savePatch({ payment_exchange_rate: e.target.value || null } as UpdatePatch, "payment_exchange_rate")} className={inputClass()} />
-              </div>
+              <div><FieldLabel>Валюта тура</FieldLabel><select value={leadExtra.tour_currency ?? "RUB"} onChange={(e) => savePatch({ tour_currency: e.target.value } as UpdatePatch, "tour_currency")} className={inputClass()}>{CURRENCY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
+              <div><FieldLabel>Курс на момент оплаты</FieldLabel><input type="number" step="0.0001" placeholder="например: 92.5000" defaultValue={leadExtra.payment_exchange_rate ?? ""} onBlur={(e) => savePatch({ payment_exchange_rate: e.target.value || null } as UpdatePatch, "payment_exchange_rate")} className={inputClass()} /></div>
               <div><FieldLabel>Комиссия, ₽</FieldLabel><input type="number" defaultValue={lead.commission ?? ""} onBlur={(e) => savePatch({ commission: e.target.value || null }, "commission")} className={inputClass()} /></div>
               <div><FieldLabel>Предоплата, ₽</FieldLabel><input type="number" defaultValue={lead.prepayment_amount ?? ""} onBlur={(e) => savePatch({ prepayment_amount: e.target.value || null }, "prepayment_amount")} className={inputClass()} /></div>
               <div><FieldLabel>Оплачено туристом, ₽</FieldLabel><input type="number" defaultValue={lead.paid_amount ?? ""} onBlur={(e) => savePatch({ paid_amount: e.target.value || null }, "paid_amount")} className={inputClass()} /></div>
               <div><FieldLabel>Остаток, ₽</FieldLabel><input type="number" defaultValue={lead.balance_due ?? ""} onBlur={(e) => savePatch({ balance_due: e.target.value || null }, "balance_due")} className={inputClass()} /></div>
-              <div>
-                <FieldLabel>Дедлайн полной оплаты</FieldLabel>
-                <input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={inputClass(paymentOverdue ? "border-red-400" : "")} />
-                {paymentOverdue && <p className="mt-1 text-xs text-red-600">Оплата просрочена</p>}
-              </div>
-              <div>
-                <FieldLabel>Туроператор из справочника</FieldLabel>
-                <select value={leadExtra.tour_operator_ref ?? ""} onChange={(e) => savePatch({ tour_operator_ref: e.target.value ? Number(e.target.value) : null } as UpdatePatch, "tour_operator_ref")} className={inputClass()}>
-                  <option value="">Не выбран</option>
-                  {tourOperators.map((operator) => <option key={operator.id} value={operator.id}>{operator.brand_name}</option>)}
-                </select>
-              </div>
+              <div><FieldLabel>Дедлайн полной оплаты</FieldLabel><input type="datetime-local" defaultValue={dateTimeValue(lead.full_payment_due_at)} onBlur={(e) => savePatch({ full_payment_due_at: e.target.value || null }, "full_payment_due_at")} className={inputClass(paymentOverdue ? "border-red-400" : "")} />{paymentOverdue && <p className="mt-1 text-xs text-red-600">Оплата просрочена</p>}</div>
+              <div><FieldLabel>Туроператор из справочника</FieldLabel><select value={leadExtra.tour_operator_ref ?? ""} onChange={(e) => savePatch({ tour_operator_ref: e.target.value ? Number(e.target.value) : null } as UpdatePatch, "tour_operator_ref")} className={inputClass()}><option value="">Не выбран</option>{tourOperators.map((operator) => <option key={operator.id} value={operator.id}>{operator.brand_name}</option>)}</select></div>
               <div><FieldLabel>Туроператор текстом</FieldLabel><input defaultValue={lead.tour_operator} onBlur={(e) => savePatch({ tour_operator: e.target.value }, "tour_operator")} className={inputClass()} /></div>
               <div><FieldLabel>Номер брони</FieldLabel><input defaultValue={lead.booking_number} onBlur={(e) => savePatch({ booking_number: e.target.value }, "booking_number")} className={inputClass()} /></div>
             </div>
 
             {selectedTourOperator && (
               <div className="mt-4 rounded-2xl bg-blue-light/35 p-4">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-navy">{selectedTourOperator.brand_name}</p>
-                    {selectedTourOperator.legal_name && <p className="mt-1 text-xs text-foreground/60">{selectedTourOperator.legal_name}</p>}
-                  </div>
-                  {selectedTourOperator.website && <a href={selectedTourOperator.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue hover:underline">сайт <ExternalLink size={12} /></a>}
-                </div>
-                <dl className="grid gap-1 sm:grid-cols-2">
-                  <InfoRow label="ИНН" value={selectedTourOperator.inn} />
-                  <InfoRow label="ОГРН" value={selectedTourOperator.ogrn} />
-                  <InfoRow label="Реестр" value={selectedTourOperator.registry_number} />
-                  <InfoRow label="Сфера" value={selectedTourOperator.activity_scope} />
-                  <InfoRow label="Телефон" value={selectedTourOperator.phone} />
-                  <InfoRow label="Email" value={selectedTourOperator.email} />
-                </dl>
+                <div className="mb-2 flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-navy">{selectedTourOperator.brand_name}</p>{selectedTourOperator.legal_name && <p className="mt-1 text-xs text-foreground/60">{selectedTourOperator.legal_name}</p>}</div>{selectedTourOperator.website && <a href={selectedTourOperator.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue hover:underline">сайт <ExternalLink size={12} /></a>}</div>
+                <dl className="grid gap-1 sm:grid-cols-2"><InfoRow label="ИНН" value={selectedTourOperator.inn} /><InfoRow label="ОГРН" value={selectedTourOperator.ogrn} /><InfoRow label="Реестр" value={selectedTourOperator.registry_number} /><InfoRow label="Сфера" value={selectedTourOperator.activity_scope} /><InfoRow label="Телефон" value={selectedTourOperator.phone} /><InfoRow label="Email" value={selectedTourOperator.email} /></dl>
                 {selectedTourOperator.payment_details && <p className="mt-3 whitespace-pre-line text-xs text-foreground/65">{selectedTourOperator.payment_details}</p>}
                 {selectedTourOperator.note && <p className="mt-3 text-xs text-foreground/45">{selectedTourOperator.note}</p>}
               </div>
             )}
 
-            {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && (
-              <div className="mt-4">
-                <FieldLabel>{reasonLabel}</FieldLabel>
-                <textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />
-                {!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}
-              </div>
-            )}
-          </div>
+            {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && <div className="mt-4"><FieldLabel>{reasonLabel}</FieldLabel><textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />{!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}</div>}
+          </section>
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-3 text-sm font-semibold text-navy">История</h2>
-            <form onSubmit={handleAddComment} className="mb-4 flex gap-2">
-              <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Добавить комментарий…" className="flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue" />
-              <button type="submit" className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue">Добавить</button>
-            </form>
-            <div className="flex flex-col gap-3">
-              {timeline.map((item) => (
-                <div key={`${item.kind}-${item.data.id}`} className="rounded-xl bg-blue-light/30 p-3 text-sm">
-                  {item.kind === "comment" ? <p className="text-foreground/80">{item.data.text}</p> : <p className="text-foreground/80">Статус изменён: <span className="font-medium">{item.data.old_status_display || "—"} → {item.data.new_status_display}</span></p>}
-                  <p className="mt-1 text-xs text-foreground/40">{"author" in item.data ? item.data.author?.full_name : item.data.changed_by?.full_name}{" · "}{new Date(item.date).toLocaleString("ru-RU")}</p>
-                </div>
-              ))}
-              {timeline.length === 0 && <p className="text-sm text-foreground/40">Пока нет ни комментариев, ни изменений статуса.</p>}
-            </div>
-          </div>
+            <form onSubmit={handleAddComment} className="mb-4 flex gap-2"><input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Добавить комментарий…" className="flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue" /><button type="submit" className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue">Добавить</button></form>
+            <div className="flex flex-col gap-3">{timeline.map((item) => <div key={`${item.kind}-${item.data.id}`} className="rounded-xl bg-blue-light/30 p-3 text-sm">{item.kind === "comment" ? <p className="text-foreground/80">{item.data.text}</p> : <p className="text-foreground/80">Статус изменён: <span className="font-medium">{item.data.old_status_display || "—"} → {item.data.new_status_display}</span></p>}<p className="mt-1 text-xs text-foreground/40">{"author" in item.data ? item.data.author?.full_name : item.data.changed_by?.full_name}{" · "}{new Date(item.date).toLocaleString("ru-RU")}</p></div>)}{timeline.length === 0 && <p className="text-sm text-foreground/40">Пока нет ни комментариев, ни изменений статуса.</p>}</div>
+          </section>
         </div>
 
         <div>
-          <div className="rounded-2xl border border-black/5 bg-white p-6">
-            <h2 className="mb-3 text-sm font-semibold text-navy">Файлы</h2>
-            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/15 px-3 py-2.5 text-sm text-foreground/60 hover:border-blue hover:text-blue">
-              <Paperclip size={15} />
-              Прикрепить файл
-              <input type="file" className="hidden" onChange={handleFileUpload} />
-            </label>
-            <ul className="mt-3 flex flex-col gap-2">
-              {lead.attachments.map((a) => <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>)}
-              {lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}
-            </ul>
-          </div>
+          <section className="rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Файлы</h2><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/15 px-3 py-2.5 text-sm text-foreground/60 hover:border-blue hover:text-blue"><Paperclip size={15} />Прикрепить файл<input type="file" className="hidden" onChange={handleFileUpload} /></label><ul className="mt-3 flex flex-col gap-2">{lead.attachments.map((a) => <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>)}{lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}</ul></section>
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-navy">Связанные задачи</h2>
-              <button onClick={() => setShowTaskModal(true)} className="text-xs font-semibold text-blue hover:underline">+ Создать задачу</button>
-            </div>
-            <ul className="flex flex-col gap-2">
-              {lead.tasks.map((t) => (
-                <li key={t.id}>
-                  <Link href={`/crm/kanban?task=${t.id}`} className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light">
-                    <p className="font-medium text-navy">{t.title}</p>
-                    <p className="text-xs text-foreground/50">{t.column}{t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}</p>
-                  </Link>
-                </li>
-              ))}
-              {lead.tasks.length === 0 && <p className="text-xs text-foreground/40">Задач на канбан-доске пока нет</p>}
-            </ul>
-          </div>
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-navy">Связанные задачи</h2><button onClick={() => setShowTaskModal(true)} className="text-xs font-semibold text-blue hover:underline">+ Создать задачу</button></div><ul className="flex flex-col gap-2">{lead.tasks.map((t) => <li key={t.id}><Link href={`/crm/kanban?task=${t.id}`} className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light"><p className="font-medium text-navy">{t.title}</p><p className="text-xs text-foreground/50">{t.column}{t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}</p></Link></li>)}{lead.tasks.length === 0 && <p className="text-xs text-foreground/40">Задач на канбан-доске пока нет</p>}</ul></section>
 
-          {lead.uon_lead && (
-            <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-              <h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2>
-              <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd></div>
-                <div className="flex justify-between gap-2"><dt className="text-foreground/50">Источник</dt><dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd></div>
-              </dl>
-              <p className="mt-3 text-xs text-foreground/40">Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}</p>
-            </div>
-          )}
+          {lead.uon_lead && <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2><dl className="flex flex-col gap-2 text-sm"><div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Источник</dt><dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd></div></dl><p className="mt-3 text-xs text-foreground/40">Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}</p></section>}
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-            <h2 className="mb-3 text-sm font-semibold text-navy">Заявка в U-ON</h2>
-            {lead.uon_request_id ? (
-              <>
-                <p className="text-sm text-navy">ID заявки: {lead.uon_request_id}</p>
-                {lead.uon_request && <dl className="mt-2 flex flex-col gap-2 text-sm"><div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div></dl>}
-                <Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">Открыть и редактировать в «Заявки U-ON»</Link>
-              </>
-            ) : (
-              <>
-                <p className="text-sm leading-6 text-foreground/50">Первичное обращение в U-ON создаётся автоматически. Эту кнопку нажимайте только когда клиент выбрал тур или готов перейти к бронированию.</p>
-                <button onClick={handleCreateUonRequest} disabled={convertingToRequest} className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50">
-                  {convertingToRequest ? "Создание…" : "Перевести в заявку U-ON"}
-                </button>
-                {convertError && <p className="mt-2 text-xs text-red-600">{convertError}</p>}
-              </>
-            )}
-          </div>
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Заявка в U-ON</h2>{lead.uon_request_id ? <><p className="text-sm text-navy">ID заявки: {lead.uon_request_id}</p>{lead.uon_request && <dl className="mt-2 flex flex-col gap-2 text-sm"><div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_request.status_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_request.manager_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Номер брони</dt><dd className="text-navy">{lead.uon_request.reservation_number || "—"}</dd></div></dl>}<Link href={`/crm/uon-requests?uon_id=${lead.uon_request_id}`} className="mt-3 inline-block text-sm text-blue underline underline-offset-2 hover:text-navy">Открыть и редактировать в «Заявки U-ON»</Link></> : <><p className="text-sm leading-6 text-foreground/50">Первичное обращение в U-ON создаётся автоматически. Эту кнопку нажимайте только когда клиент выбрал тур или готов перейти к бронированию.</p><button onClick={handleCreateUonRequest} disabled={convertingToRequest} className="mt-3 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50">{convertingToRequest ? "Создание…" : "Перевести в заявку U-ON"}</button>{convertError && <p className="mt-2 text-xs text-red-600">{convertError}</p>}</>}</section>
 
-          <div className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
-            <h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2>
-            <ul className="flex flex-col gap-2">
-              {lead.uon_sync_logs.map((log) => <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm"><p className="font-medium text-navy">Попытка {log.attempt_number} — {log.status_display}</p>{log.error_message && <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>}<p className="mt-1 text-xs text-foreground/40">{new Date(log.created_at).toLocaleString("ru-RU")}</p></li>)}
-              {lead.uon_sync_logs.length === 0 && <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>}
-            </ul>
-          </div>
+          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Синхронизация с U-ON</h2><ul className="flex flex-col gap-2">{lead.uon_sync_logs.map((log) => <li key={log.id} className="rounded-xl bg-blue-light/30 p-3 text-sm"><p className="font-medium text-navy">Попытка {log.attempt_number} — {log.status_display}</p>{log.error_message && <p className="mt-0.5 text-xs text-red-600">{log.error_message}</p>}<p className="mt-1 text-xs text-foreground/40">{new Date(log.created_at).toLocaleString("ru-RU")}</p></li>)}{lead.uon_sync_logs.length === 0 && <p className="text-xs text-foreground/40">Попыток синхронизации ещё не было</p>}</ul></section>
         </div>
       </div>
 
