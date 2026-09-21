@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { FileText } from "lucide-react";
+import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
-import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 import { fetchCertificates } from "@/lib/api";
 import { mediaUrl } from "@/lib/articlesApi";
 
@@ -54,11 +54,15 @@ export default async function CertificatesPage() {
         ) : (
           <p className="text-center text-sm text-foreground/50">Сертификаты скоро появятся здесь.</p>
         )}
-        <div className="mt-12 text-center">
-          <OpenLeadFormButton className="rounded-full bg-navy px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue">
-            Подобрать тур
-          </OpenLeadFormButton>
-        </div>
+
+        <SiteCtaBlock
+          className="mt-12"
+          eyebrow="Подарочный сертификат"
+          title="Хотите подарить путешествие?"
+          text="Оформим подарочный сертификат на нужную сумму и поможем получателю подобрать тур, когда он будет готов выбрать поездку."
+          primaryLabel="Купить сертификат"
+          comment="Заявка на подарочный сертификат"
+        />
       </div>
     </div>
   );
