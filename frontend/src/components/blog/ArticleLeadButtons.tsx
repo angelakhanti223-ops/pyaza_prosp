@@ -10,12 +10,14 @@ type Props = {
   title?: string;
   text?: string;
   compact?: boolean;
+  comment?: string;
 };
 
 export default function ArticleLeadButtons({
   title = "Подобрать тур под ваш отпуск",
   text = "Напишите, когда хотите поехать, на сколько ночей, сколько человек едет и какой бюджет комфортен. Мы сравним направления, отели и перелёты и предложим подходящие варианты.",
   compact = false,
+  comment = "Заявка из статьи блога",
 }: Props) {
   return (
     <section className={`rounded-3xl border border-blue-light bg-blue-light/45 ${compact ? "mt-8 p-5" : "mt-10 p-5 sm:p-7"}`}>
@@ -46,7 +48,7 @@ export default function ArticleLeadButtons({
             Написать в Telegram
           </a>
           <OpenLeadFormButton
-            comment="Заявка из статьи: Где отдохнуть в октябре"
+            comment={comment}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-blue bg-white px-5 py-3 text-sm font-semibold text-blue shadow-sm transition hover:bg-blue-light"
           >
             <ClipboardList size={18} />
