@@ -16,6 +16,14 @@ export type SiteImages = {
   why_us_excursion: string | null;
   why_us_support: string | null;
   office_photo: string | null;
+  tours_hero: string | null;
+  directions_hero: string | null;
+  cruises_hero: string | null;
+  promotions_hero: string | null;
+  certificates_hero: string | null;
+  contacts_hero: string | null;
+  team_hero: string | null;
+  about_hero: string | null;
 };
 
 const EMPTY: SiteImages = {
@@ -26,6 +34,14 @@ const EMPTY: SiteImages = {
   why_us_excursion: null,
   why_us_support: null,
   office_photo: null,
+  tours_hero: null,
+  directions_hero: null,
+  cruises_hero: null,
+  promotions_hero: null,
+  certificates_hero: null,
+  contacts_hero: null,
+  team_hero: null,
+  about_hero: null,
 };
 
 // Media URLs render as <img src> in the browser, so — same reasoning as
@@ -42,7 +58,7 @@ export async function fetchSiteImages(): Promise<SiteImages> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/site-images/`, { cache: "no-store" });
     if (!res.ok) return EMPTY;
-    return res.json();
+    return { ...EMPTY, ...(await res.json()) };
   } catch {
     return EMPTY;
   }
