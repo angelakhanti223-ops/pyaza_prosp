@@ -13,7 +13,9 @@ from .models import (
     Lead,
     LeadAttachment,
     LeadComment,
+    LeadContact,
     LeadStatusHistory,
+    LeadTag,
     TourOperator,
     TourOperatorExchangeRate,
 )
@@ -34,6 +36,8 @@ OPERATOR_RATE_FIELDS = [
     'operator_current_rate', 'operator_current_rate_date', 'operator_rate_source_note',
     'operator_rate_direction', 'operator_rate_delta',
 ]
+
+CRM_CONTROL_FIELDS = ['preferred_messenger']
 
 
 def _decimal_string(value):
@@ -150,6 +154,24 @@ class TourOperatorSerializer(serializers.ModelSerializer):
         ]
 
 
+class LeadTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadTag
+        fields = ['id', 'name', 'color', 'is_active']
+
+
+class LeadContactSerializer(serializers.ModelSerializer):
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+
+    class Meta:
+        model = LeadContact
+        fields = [
+            'id', 'type', 'type_display', 'value', 'label', 'is_primary',
+            'allow_marketing', 'note', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
 class LeadCreateSerializer(serializers.ModelSerializer):
     consent = serializers.BooleanField(write_only=True)
     # Only site_form (default) or chatbot are reachable from this public endpoint —
@@ -182,6 +204,7 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         validated_data.setdefault('source', Lead.Source.SITE_FORM)
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
+        _sync_primary_contacts_from_lead(lead)
 
         sync_lead_to_uon.delay(lead.id)
         send_lead_notification_task.delay(lead.id)
@@ -195,15 +218,33 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 # --- Мини-CRM (внутренняя панель, ТЗ 5) ---
 
 
-class LeadCrmCreateSerializer(serializers.ModelSerializer):
-    """Ручное создание обращения сотрудником в CRM (например, со звонка) — те
-    же поля, что уходят в U-ON при создании обращения (source/u_name/u_phone/
-    u_email/note, см. integrations.adapters.build_ticket_payload), плюс
-    направление и ответственный, которых нет в публичной форме сайта.
+def _sync_primary_contacts_from_lead(lead: Lead):
+    if lead.phone:
+        LeadContact.objects.update_or_create(
+            lead=lead,
+            type=LeadContact.Type.PHONE,
+            value=lead.phone,
+            defaults={
+                'label': 'Основной телефон из заявки',
+                'is_primary': True,
+                'allow_marketing': False,
+            },
+        )
+    if lead.email:
+        LeadContact.objects.update_or_create(
+            lead=lead,
+            type=LeadContact.Type.EMAIL,
+            value=lead.email,
+            defaults={
+                'label': 'Email из заявки',
+                'is_primary': not bool(lead.phone),
+                'allow_marketing': True,
+            },
+        )
 
-    consent остаётся обязательным полем и здесь: согласие на обработку ПДн
-    нужно в любом случае, просто на этом пути его подтверждает сотрудник,
-    получивший его на словах (по телефону), а не сам клиент чекбоксом."""
+
+class LeadCrmCreateSerializer(serializers.ModelSerializer):
+    """Ручное создание обращения сотрудником в CRM (например, со звонка)."""
 
     consent = serializers.BooleanField(write_only=True)
 
@@ -211,7 +252,7 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'source',
-            'assigned_manager', 'consent', *TRAVEL_FIELDS,
+            'assigned_manager', 'consent', *CRM_CONTROL_FIELDS, *TRAVEL_FIELDS,
         ]
         read_only_fields = ['id']
 
@@ -240,6 +281,7 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
         validated_data.setdefault('assigned_manager', request.user)
         validated_data['consent_personal_data_at'] = timezone.now()
         lead = super().create(validated_data)
+        _sync_primary_contacts_from_lead(lead)
 
         sync_lead_to_uon.delay(lead.id)
         create_new_lead_task.delay(lead.id)
@@ -298,6 +340,12 @@ class LeadTaskSerializer(serializers.Serializer):
 
 
 class OperatorRateMixin:
+    operator_current_rate = serializers.SerializerMethodField()
+    operator_current_rate_date = serializers.SerializerMethodField()
+    operator_rate_source_note = serializers.SerializerMethodField()
+    operator_rate_direction = serializers.SerializerMethodField()
+    operator_rate_delta = serializers.SerializerMethodField()
+
     def _payload(self, obj):
         return _rate_payload(obj, self.context)
 
@@ -320,19 +368,17 @@ class OperatorRateMixin:
 class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
+    preferred_messenger_display = serializers.CharField(source='get_preferred_messenger_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
     tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
-    operator_current_rate = serializers.SerializerMethodField()
-    operator_current_rate_date = serializers.SerializerMethodField()
-    operator_rate_source_note = serializers.SerializerMethodField()
-    operator_rate_direction = serializers.SerializerMethodField()
-    operator_rate_delta = serializers.SerializerMethodField()
+    tags = LeadTagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'status', 'status_display', 'source', 'source_display',
+            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display',
+            'tags', 'status', 'status_display', 'source', 'source_display',
             'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission',
             'next_contact_at', 'departure_city', 'departure_date', 'nights', 'budget_from', 'budget_to',
             'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
@@ -345,9 +391,12 @@ class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
 class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
+    preferred_messenger_display = serializers.CharField(source='get_preferred_messenger_display', read_only=True)
     direction_name = serializers.CharField(source='direction.name', read_only=True, default=None)
     assigned_manager = UserSerializer(read_only=True)
     comments = LeadCommentSerializer(many=True, read_only=True)
+    contacts = LeadContactSerializer(many=True, read_only=True)
+    tags = LeadTagSerializer(many=True, read_only=True)
     status_history = LeadStatusHistorySerializer(many=True, read_only=True)
     attachments = LeadAttachmentSerializer(many=True, read_only=True)
     tasks = LeadTaskSerializer(many=True, read_only=True)
@@ -355,16 +404,12 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
     uon_lead = serializers.SerializerMethodField()
     uon_request = serializers.SerializerMethodField()
     tour_operator_details = TourOperatorSerializer(source='tour_operator_ref', read_only=True)
-    operator_current_rate = serializers.SerializerMethodField()
-    operator_current_rate_date = serializers.SerializerMethodField()
-    operator_rate_source_note = serializers.SerializerMethodField()
-    operator_rate_direction = serializers.SerializerMethodField()
-    operator_rate_delta = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
         fields = [
-            'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
+            'id', 'name', 'phone', 'email', 'preferred_messenger', 'preferred_messenger_display',
+            'tags', 'contacts', 'source', 'source_display', 'direction', 'direction_name',
             'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission',
             *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tour_operator_details', *OPERATOR_RATE_FIELDS,
             'uon_ticket_id', 'uon_request_id', 'initial_comment', 'consent_personal_data_at',
@@ -373,19 +418,14 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
         ]
 
     def get_uon_lead(self, obj):
-        """Данные обращения из U-ON-зеркала — если заявка уже синхронизирована (панель
-        на карточке заявки, не заменяет существующий рабочий процесс редактирования
-        Lead). Lead.uon_ticket_id — это ID обращения (lead) в U-ON, полученный при
-        отправке через sync_lead_to_uon/create_ticket (POST /lead/create.json), а
-        не ID заявки (request) — это разные сущности с разными ID в этом API."""
+        """Данные обращения из U-ON-зеркала — если заявка уже синхронизирована."""
         if not obj.uon_ticket_id:
             return None
         record = UonLeadRecord.objects.filter(uon_id=obj.uon_ticket_id).first()
         return UonLeadRecordSerializer(record).data if record else None
 
     def get_uon_request(self, obj):
-        """Данные заявки из U-ON-зеркала — заполняется после перевода обращения в
-        заявку через LeadViewSet.create_uon_request (POST /request/create.json)."""
+        """Данные заявки из U-ON-зеркала — заполняется после перевода обращения в заявку."""
         if not obj.uon_request_id:
             return None
         record = UonRequestRecord.objects.filter(uon_id=obj.uon_request_id).first()
@@ -393,16 +433,22 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
 
 
 class LeadUpdateSerializer(serializers.ModelSerializer):
-    """Правка карточки обращения из CRM. Контактные поля и туристические параметры
-    редактирует любой сотрудник с доступом к заявке; переназначение ответственного
-    по-прежнему только для руководителя, проверка в LeadViewSet.partial_update.
-
-    Правки здесь НЕ уходят обратно в U-ON — у адаптера есть только create_ticket,
-    метода обновления обращения там нет (решение отложено, 28.08.2026)."""
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        source='tags', queryset=LeadTag.objects.filter(is_active=True), many=True,
+        required=False, write_only=True,
+    )
 
     class Meta:
         model = Lead
         fields = [
             'name', 'phone', 'email', 'direction', 'initial_comment', 'status', 'assigned_manager',
-            'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
+            'deal_amount', 'commission', *CRM_CONTROL_FIELDS, *TRAVEL_FIELDS, *PAYMENT_FIELDS, 'tag_ids',
         ]
+
+    def update(self, instance, validated_data):
+        tags = validated_data.pop('tags', None)
+        instance = super().update(instance, validated_data)
+        if tags is not None:
+            instance.tags.set(tags)
+        _sync_primary_contacts_from_lead(instance)
+        return instance
