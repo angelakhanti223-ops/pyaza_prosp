@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Mail, MapPin, Phone } from "lucide-react";
+import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import PageHero from "@/components/ui/PageHero";
 
 export const metadata: Metadata = {
@@ -57,15 +58,23 @@ export default function ContactsPage() {
                 Telegram: @sletat_ru_pnz
               </a>
               <a
-                href="https://vk.com/sletat_ru_pnz"
+                href="https://vk.com/sletat58"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-0.5 block text-sm text-foreground/60 hover:text-blue"
               >
-                ВКонтакте: @sletat_ru_pnz
+                ВКонтакте: vk.com/sletat58
               </a>
             </div>
           </div>
+
+          <SiteCtaBlock
+            compact
+            title="Оставьте заявку — менеджер свяжется с вами"
+            text="Подберём тур, рассчитаем стоимость и расскажем, какие документы нужны для поездки."
+            primaryLabel="Оставить заявку"
+            comment="Заявка со страницы контактов"
+          />
         </div>
 
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl lg:aspect-auto">
