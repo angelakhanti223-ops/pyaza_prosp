@@ -18,12 +18,7 @@ class Direction(models.Model):
 
 
 class TourOperator(models.Model):
-    """Справочник туроператоров для CRM: бренд, юридические данные, реестр и реквизиты.
-
-    Используется как отдельная сущность, чтобы в заявке выбирать туроператора из списка,
-    а не вводить каждый раз вручную. Старое текстовое поле Lead.tour_operator сохранено
-    для совместимости с уже созданными заявками.
-    """
+    """Справочник туроператоров для CRM: бренд, юридические данные, реестр и реквизиты."""
 
     brand_name = models.CharField('Бренд / название для выбора', max_length=120, unique=True)
     legal_name = models.CharField('Юридическое наименование', max_length=255, blank=True)
@@ -49,11 +44,7 @@ class TourOperator(models.Model):
 
 
 class TourOperatorExchangeRate(models.Model):
-    """Курс валюты конкретного туроператора на дату.
-
-    У разных туроператоров внутренний курс может отличаться от ЦБ и друг от друга,
-    поэтому курс хранится отдельно по каждому ТО, валюте и дате.
-    """
+    """Курс валюты конкретного туроператора на дату."""
 
     class Currency(models.TextChoices):
         RUB = 'RUB', 'RUB — рубль'
@@ -80,12 +71,62 @@ class TourOperatorExchangeRate(models.Model):
     class Meta:
         ordering = ['operator__brand_name', 'currency', '-rate_date']
         unique_together = ('operator', 'currency', 'rate_date')
-        indexes = [
-            models.Index(fields=['operator', 'currency', 'rate_date']),
-        ]
+        indexes = [models.Index(fields=['operator', 'currency', 'rate_date'])]
 
     def __str__(self):
         return f'{self.operator} — {self.currency} {self.rate} на {self.rate_date}'
+
+
+class Contact(models.Model):
+    """Клиент / контактная карточка клиента.
+
+    Это самостоятельная сущность: один клиент может иметь несколько заявок,
+    а телефоны и email используются для последующих рассылок и сегментации.
+    """
+
+    class PreferredContactMethod(models.TextChoices):
+        PHONE = 'phone', 'Телефон'
+        WHATSAPP = 'whatsapp', 'WhatsApp'
+        TELEGRAM = 'telegram', 'Telegram'
+        MAX = 'max', 'MAX'
+        VK = 'vk', 'ВК'
+        EMAIL = 'email', 'Email'
+        OTHER = 'other', 'Другое'
+
+    last_name = models.CharField('Фамилия', max_length=120, blank=True)
+    first_name = models.CharField('Имя', max_length=120, blank=True)
+    middle_name = models.CharField('Отчество', max_length=120, blank=True)
+    birth_date = models.DateField('Дата рождения', null=True, blank=True)
+    email_primary = models.EmailField('Email основной', blank=True)
+    email_secondary = models.EmailField('Email дополнительный', blank=True)
+    phone_primary = models.CharField('Телефон основной', max_length=32, blank=True)
+    phone_secondary = models.CharField('Телефон дополнительный', max_length=32, blank=True)
+    preferred_contact_method = models.CharField(
+        'Предпочтительный тип связи',
+        max_length=20,
+        choices=PreferredContactMethod.choices,
+        default=PreferredContactMethod.PHONE,
+    )
+    allow_email_marketing = models.BooleanField('Можно использовать email для рассылок', default=True)
+    allow_messenger_marketing = models.BooleanField('Можно использовать мессенджеры для рассылок', default=True)
+    note = models.TextField('Примечание', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['last_name', 'first_name', 'phone_primary']
+        indexes = [
+            models.Index(fields=['phone_primary']),
+            models.Index(fields=['email_primary']),
+            models.Index(fields=['preferred_contact_method']),
+        ]
+
+    @property
+    def full_name(self):
+        return ' '.join(part for part in [self.last_name, self.first_name, self.middle_name] if part).strip()
+
+    def __str__(self):
+        return self.full_name or self.phone_primary or self.email_primary or f'Контакт #{self.pk}'
 
 
 class LeadTag(models.Model):
@@ -143,9 +184,13 @@ class Lead(models.Model):
         WHATSAPP = 'whatsapp', 'WhatsApp'
         TELEGRAM = 'telegram', 'Telegram'
         MAX = 'max', 'MAX'
+        VK = 'vk', 'ВК'
         EMAIL = 'email', 'Email'
         OTHER = 'other', 'Другое'
 
+    contact = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, null=True, blank=True, related_name='leads', verbose_name='Клиент / контакт',
+    )
     name = models.CharField('Имя клиента', max_length=255)
     phone = models.CharField('Телефон', max_length=32)
     email = models.EmailField('Email', blank=True)
@@ -163,8 +208,6 @@ class Lead(models.Model):
     )
     tags = models.ManyToManyField(LeadTag, blank=True, related_name='leads', verbose_name='Метки заявки')
 
-    # Туристические параметры заявки. Все поля nullable/blank, чтобы миграция не меняла
-    # и не перезаписывала уже существующие обращения и заявки.
     departure_city = models.CharField('Город вылета', max_length=100, blank=True)
     departure_date = models.DateField('Дата вылета', null=True, blank=True)
     nights = models.PositiveSmallIntegerField('Количество ночей', null=True, blank=True)
@@ -197,7 +240,7 @@ class Lead(models.Model):
     uon_request_id = models.CharField(
         'ID заявки U-ON', max_length=64, blank=True,
         help_text='Заполняется при переводе обращения в заявку (POST /request/create.json) — '
-                   'отдельная сущность и ID-последовательность от uon_ticket_id.',
+                  'отдельная сущность и ID-последовательность от uon_ticket_id.',
     )
     initial_comment = models.TextField('Комментарий из формы', blank=True)
     consent_personal_data_at = models.DateTimeField('Согласие на обработку ПДн', null=True, blank=True)
@@ -211,51 +254,8 @@ class Lead(models.Model):
         return f'{self.name} ({self.phone})'
 
 
-class LeadContact(models.Model):
-    """Отдельный контакт клиента в заявке: телефоны, почта, мессенджеры.
-
-    Нужен для истории коммуникаций и будущих email/мессенджер-рассылок.
-    """
-
-    class Type(models.TextChoices):
-        PHONE = 'phone', 'Телефон'
-        WHATSAPP = 'whatsapp', 'WhatsApp'
-        TELEGRAM = 'telegram', 'Telegram'
-        MAX = 'max', 'MAX'
-        EMAIL = 'email', 'Email'
-        OTHER = 'other', 'Другое'
-
-    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='contacts')
-    type = models.CharField('Тип контакта', max_length=20, choices=Type.choices)
-    value = models.CharField('Значение контакта', max_length=255)
-    label = models.CharField('Комментарий / кому принадлежит', max_length=100, blank=True)
-    is_primary = models.BooleanField('Основной контакт', default=False)
-    allow_marketing = models.BooleanField('Можно использовать для рассылок', default=True)
-    note = models.TextField('Примечание', blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-is_primary', 'type', 'value']
-        unique_together = ('lead', 'type', 'value')
-        indexes = [
-            models.Index(fields=['type', 'value']),
-            models.Index(fields=['allow_marketing', 'type']),
-        ]
-
-    def __str__(self):
-        return f'{self.get_type_display()}: {self.value}'
-
-
 class CommissionTier(models.Model):
-    """Единая (одна на всех менеджеров и на все месяцы) лестница уровней плана —
-    заменяет собой персональную «Целевую комиссию» и фиксированный
-    commission_percent на MonthlyPlan (решение заказчика, 07.09.2026).
-    threshold — сумма СВОЕЙ комиссии за месяц, начиная с которой засчитан этот
-    уровень; commission_percent — % от своей комиссии, идущий в зарплату, пока
-    держится этот уровень (см. plan_progress_rows). Ниже порога самого нижнего
-    уровня всё равно применяется его commission_percent — отдельной, более
-    низкой ступени для «не дотянул» нет."""
+    """Единая лестница уровней плана менеджера."""
 
     name = models.CharField('Название уровня', max_length=50, unique=True)
     threshold = models.DecimalField('Порог (своя комиссия за месяц)', max_digits=10, decimal_places=2, unique=True)
@@ -269,29 +269,13 @@ class CommissionTier(models.Model):
 
 
 class MonthlyPlan(models.Model):
-    """Параметры расчёта зарплаты менеджера за месяц (решение заказчика,
-    25.08.2026): оклад + % от своей комиссии (по уровню из CommissionTier,
-    см. plan_progress_rows) + bonus_percent % от суммарной комиссии остальных
-    держателей плана в этом месяце.
+    """Параметры расчёта зарплаты менеджера за месяц."""
 
-    bonus_percent — единственное поле здесь, которое нельзя посчитать
-    автоматически: зависит от SLA и пропущенных ежедневных задач, а трекинга
-    этого в системе пока нет, поэтому руководитель выставляет его вручную
-    каждый месяц по своей оценке (3% / 1% / 0% — см. регламент)."""
-
-    manager = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_plans',
-    )
+    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_plans')
     year = models.PositiveSmallIntegerField('Год')
     month = models.PositiveSmallIntegerField('Месяц')
     base_salary = models.DecimalField('Оклад', max_digits=10, decimal_places=2, default=Decimal('30000'))
-    bonus_percent = models.DecimalField(
-        '% от комиссии остальных (SLA/ежедневные задачи)', max_digits=5, decimal_places=2, default=Decimal('3'),
-        help_text='По умолчанию 3% — SLA считается выполненным, если руководитель явно не указал иное. '
-                   'Понижается вручную по итогам месяца: 1% при более серьёзных нарушениях, 0% при грубом '
-                   'нарушении (решение заказчика, 06.09.2026 — раньше по умолчанию было 0%, из-за чего '
-                   'бонус нужно было включать вручную каждый месяц, а не выключать при нарушении).',
-    )
+    bonus_percent = models.DecimalField('% от комиссии остальных (SLA/ежедневные задачи)', max_digits=5, decimal_places=2, default=Decimal('3'))
 
     class Meta:
         ordering = ['-year', '-month']
@@ -302,14 +286,10 @@ class MonthlyPlan(models.Model):
 
 
 class WorkShift(models.Model):
-    """Рабочий график менеджеров по дням — кто в этот день на смене, показывается
-    внизу дашборда CRM (решение заказчика, 07.09.2026). Редактируется через
-    Django admin, по одной записи на день."""
+    """Рабочий график менеджеров по дням."""
 
     date = models.DateField('Дата', unique=True)
-    manager = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_shifts',
-    )
+    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_shifts')
 
     class Meta:
         ordering = ['date']
@@ -319,12 +299,10 @@ class WorkShift(models.Model):
 
 
 class LeadComment(models.Model):
-    """Лента комментариев менеджера по ходу работы с заявкой (ТЗ 5.1, 5.4)."""
+    """Лента комментариев менеджера по ходу работы с заявкой."""
 
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='comments')
-    author = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='lead_comments',
-    )
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='lead_comments')
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -336,14 +314,12 @@ class LeadComment(models.Model):
 
 
 class LeadStatusHistory(models.Model):
-    """Аудит изменений статуса заявки (ТЗ 5.4, 13.1). Заполняется на уровне API при смене статуса."""
+    """Аудит изменений статуса заявки."""
 
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='status_history')
     old_status = models.CharField(max_length=20, choices=Lead.Status.choices, blank=True)
     new_status = models.CharField(max_length=20, choices=Lead.Status.choices)
-    changed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='lead_status_changes',
-    )
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='lead_status_changes')
     changed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -355,13 +331,11 @@ class LeadStatusHistory(models.Model):
 
 
 class LeadAttachment(models.Model):
-    """Прикреплённые файлы (документы, счета) — ТЗ 5.4."""
+    """Прикреплённые файлы (документы, счета)."""
 
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='attachments')
     file = models.FileField(upload_to='lead_attachments/%Y/%m/')
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+',
-    )
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
