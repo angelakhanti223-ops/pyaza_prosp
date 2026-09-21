@@ -12,6 +12,7 @@ urlpatterns = [
     path('directions/', views.DirectionListView.as_view(), name='direction-list'),
     path('crm/tour-operators/', views.TourOperatorListView.as_view(), name='crm-tour-operators'),
     path('crm/lead-tags/', views.LeadTagListView.as_view(), name='crm-lead-tags'),
+    path('crm/contacts/', views.ContactListView.as_view(), name='crm-contacts'),
     path('crm/dashboard/', DashboardView.as_view(), name='crm-dashboard'),
     path('crm/plan/', PlanView.as_view(), name='crm-plan'),
     path('crm/summary/', WorkSummaryView.as_view(), name='crm-work-summary'),
