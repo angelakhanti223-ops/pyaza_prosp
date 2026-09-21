@@ -163,7 +163,7 @@ class ContactSerializer(serializers.ModelSerializer):
         model = Contact
         fields = [
             'id', 'last_name', 'first_name', 'middle_name', 'full_name', 'birth_date',
-            'email_primary', 'email_secondary', 'phone_primary', 'phone_secondary',
+            'email_primary', 'email_secondary', 'phone_primary', 'phone_secondary', 'vk_profile',
             'preferred_contact_method', 'preferred_contact_method_display',
             'allow_email_marketing', 'allow_messenger_marketing', 'note', 'created_at', 'updated_at',
         ]
