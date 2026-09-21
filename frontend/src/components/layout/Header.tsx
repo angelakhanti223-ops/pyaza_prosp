@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, Phone, X } from "lucide-react";
-import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
+import { Menu, X } from "lucide-react";
+import ContactCtaButtons from "@/components/lead-form/ContactCtaButtons";
 import Logo from "@/components/ui/Logo";
 
 const NAV_LINKS = [
@@ -26,7 +26,7 @@ export default function Header() {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <Logo />
 
-        <nav className="hidden items-center gap-6 lg:flex">
+        <nav className="hidden items-center gap-5 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -38,18 +38,7 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-4 lg:flex">
-          <a
-            href="tel:+79502302555"
-            className="flex items-center gap-2 text-sm font-semibold text-navy"
-          >
-            <Phone size={18} className="text-gold" />
-            8-950-230-25-55
-          </a>
-          <OpenLeadFormButton className="rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-navy-dark transition-colors hover:bg-gold-dark">
-            Подобрать тур
-          </OpenLeadFormButton>
-        </div>
+        <ContactCtaButtons variant="header" comment="Заявка из шапки сайта" className="hidden lg:flex" />
 
         <button
           type="button"
@@ -75,15 +64,7 @@ export default function Header() {
               </Link>
             ))}
           </nav>
-          <div className="mt-4 flex flex-col gap-3">
-            <a href="tel:+79502302555" className="flex items-center gap-2 text-sm font-semibold text-navy">
-              <Phone size={18} className="text-gold" />
-              8-950-230-25-55
-            </a>
-            <OpenLeadFormButton className="rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-navy-dark">
-              Подобрать тур
-            </OpenLeadFormButton>
-          </div>
+          <ContactCtaButtons variant="panel" comment="Заявка из мобильной шапки сайта" className="mt-4" />
         </div>
       )}
     </header>
