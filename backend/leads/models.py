@@ -101,6 +101,7 @@ class Contact(models.Model):
     email_secondary = models.EmailField('Email дополнительный', blank=True)
     phone_primary = models.CharField('Телефон основной', max_length=32, blank=True)
     phone_secondary = models.CharField('Телефон дополнительный', max_length=32, blank=True)
+    vk_profile = models.CharField('ВК', max_length=255, blank=True)
     preferred_contact_method = models.CharField(
         'Предпочтительный тип связи',
         max_length=20,
