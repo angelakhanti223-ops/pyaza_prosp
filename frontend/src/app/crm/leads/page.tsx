@@ -95,6 +95,10 @@ function tagChipClass(active = true) {
     : "inline-flex items-center rounded-full border border-black/10 px-2 py-0.5 text-[11px] text-foreground/45";
 }
 
+function autoTagChipClass() {
+  return "inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700";
+}
+
 export default function CrmLeadsPage() {
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [allTags, setAllTags] = useState<LeadTag[]>([]);
@@ -128,6 +132,15 @@ export default function CrmLeadsPage() {
       clearTimeout(timeout);
     };
   }, [status, search]);
+
+  const filterTags = useMemo(() => {
+    const byId = new Map<number, LeadTag>();
+    for (const tag of allTags) byId.set(tag.id, tag);
+    for (const lead of leads) {
+      for (const tag of ((lead as LeadWithOperatorRate).tags ?? [])) byId.set(tag.id, tag);
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  }, [allTags, leads]);
 
   const displayedLeads = useMemo(() => {
     if (!tagFilter) return leads;
@@ -207,7 +220,7 @@ export default function CrmLeadsPage() {
           className="rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue"
         >
           <option value="">Все метки</option>
-          {allTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+          {filterTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
         </select>
       </div>
 
@@ -234,7 +247,10 @@ export default function CrmLeadsPage() {
           <tbody>
             {displayedLeads.map((lead) => {
               const row = lead as LeadWithOperatorRate;
-              const rowTagIds = (row.tags ?? []).map((tag) => tag.id);
+              const rowTags = row.tags ?? [];
+              const manualTagIds = new Set(allTags.map((tag) => tag.id));
+              const rowTagIds = rowTags.map((tag) => tag.id);
+              const autoTags = rowTags.filter((tag) => !manualTagIds.has(tag.id));
               const contactOverdue = isPast(lead.next_contact_at);
               const paymentOverdue = isPast(lead.full_payment_due_at);
               const hasOperator = Boolean(row.tour_operator_ref || row.tour_operator_details || row.tour_operator);
@@ -267,6 +283,11 @@ export default function CrmLeadsPage() {
                   </td>
                   <td className="px-4 py-3 align-top">
                     <div className="flex max-w-[210px] flex-wrap gap-1">
+                      {autoTags.map((tag) => (
+                        <span key={tag.id} className={autoTagChipClass()} title="Автоматическая метка">
+                          ⚙ {tag.name}
+                        </span>
+                      ))}
                       {allTags.map((tag) => {
                         const active = rowTagIds.includes(tag.id);
                         return (
@@ -282,7 +303,7 @@ export default function CrmLeadsPage() {
                           </button>
                         );
                       })}
-                      {allTags.length === 0 && <span className="text-xs text-foreground/35">Метки не заведены</span>}
+                      {allTags.length === 0 && autoTags.length === 0 && <span className="text-xs text-foreground/35">Метки не заведены</span>}
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">
