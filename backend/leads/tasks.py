@@ -97,6 +97,17 @@ def check_stale_leads():
 
 
 @shared_task
+def sync_automatic_lead_tags():
+    """Пересчитывает автоматические метки заявок по дедлайнам оплаты,
+    следующему контакту и ближайшей дате вылета."""
+    from .auto_tags import sync_automatic_tags_for_all_leads
+
+    result = sync_automatic_tags_for_all_leads()
+    logger.info('Автоматические метки заявок: %s', result)
+    return result
+
+
+@shared_task
 def sync_uon_operator_exchange_rates():
     """Ежедневно забирает курсы туроператоров из U-ON и сохраняет их в CRM.
 
