@@ -9,6 +9,17 @@ from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSe
 from .models import Direction, Lead, LeadAttachment, LeadComment, LeadStatusHistory
 
 
+TRAVEL_FIELDS = [
+    'departure_city', 'departure_date', 'nights', 'adults', 'children_count', 'children_ages',
+    'budget_from', 'budget_to', 'meal_type', 'hotel_wishes', 'next_contact_at',
+]
+
+PAYMENT_FIELDS = [
+    'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
+    'tour_operator', 'booking_number', 'failure_reason',
+]
+
+
 class DirectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Direction
@@ -74,7 +85,10 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
-        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'source', 'assigned_manager', 'consent']
+        fields = [
+            'id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'source',
+            'assigned_manager', 'consent', *TRAVEL_FIELDS,
+        ]
         read_only_fields = ['id']
 
     def validate_consent(self, value):
@@ -169,7 +183,10 @@ class LeadListSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'status', 'status_display', 'source', 'source_display',
-            'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission', 'created_at',
+            'direction', 'direction_name', 'assigned_manager', 'deal_amount', 'commission',
+            'next_contact_at', 'departure_city', 'departure_date', 'nights', 'budget_from', 'budget_to',
+            'prepayment_amount', 'paid_amount', 'balance_due', 'full_payment_due_at',
+            'tour_operator', 'booking_number', 'failure_reason', 'created_at',
         ]
 
 
@@ -190,9 +207,11 @@ class LeadDetailSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'source', 'source_display', 'direction', 'direction_name',
-            'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission', 'uon_ticket_id',
-            'uon_request_id', 'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at',
-            'comments', 'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead', 'uon_request',
+            'status', 'status_display', 'assigned_manager', 'deal_amount', 'commission',
+            *TRAVEL_FIELDS, *PAYMENT_FIELDS,
+            'uon_ticket_id', 'uon_request_id', 'initial_comment', 'consent_personal_data_at',
+            'created_at', 'updated_at', 'comments', 'status_history', 'attachments', 'tasks',
+            'uon_sync_logs', 'uon_lead', 'uon_request',
         ]
 
     def get_uon_lead(self, obj):
@@ -216,11 +235,9 @@ class LeadDetailSerializer(serializers.ModelSerializer):
 
 
 class LeadUpdateSerializer(serializers.ModelSerializer):
-    """Правка карточки обращения из CRM. Контактные поля (name/phone/email/
-    direction/initial_comment) редактирует любой, кому доступна сама заявка
-    (см. LeadViewSet.get_queryset — менеджер видит только свои); переназначение
-    ответственного (assigned_manager) по-прежнему только для руководителя,
-    проверка в LeadViewSet.partial_update.
+    """Правка карточки обращения из CRM. Контактные поля и туристические параметры
+    редактирует любой сотрудник с доступом к заявке; переназначение ответственного
+    по-прежнему только для руководителя, проверка в LeadViewSet.partial_update.
 
     Правки здесь НЕ уходят обратно в U-ON — у адаптера есть только create_ticket,
     метода обновления обращения там нет (решение отложено, 28.08.2026)."""
@@ -228,6 +245,6 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = [
-            'name', 'phone', 'email', 'direction', 'initial_comment',
-            'status', 'assigned_manager', 'deal_amount', 'commission',
+            'name', 'phone', 'email', 'direction', 'initial_comment', 'status', 'assigned_manager',
+            'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
         ]
