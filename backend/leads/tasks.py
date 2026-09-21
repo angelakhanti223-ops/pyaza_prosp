@@ -94,3 +94,18 @@ def check_stale_leads():
         created += 1
 
     logger.info('Проверка застрявших лидов: создано задач — %s', created)
+
+
+@shared_task
+def sync_uon_operator_exchange_rates():
+    """Ежедневно забирает курсы туроператоров из U-ON и сохраняет их в CRM.
+
+    Источник — страница кабинета U-ON "Финансы → Курсы валют → Курсы валют ТО".
+    Курс хранится отдельно по каждому туроператору, валюте и дате, потому что у
+    разных ТО внутренние курсы отличаются друг от друга.
+    """
+    from .uon_operator_rates import sync_operator_exchange_rates_from_uon
+
+    result = sync_operator_exchange_rates_from_uon()
+    logger.info('Синхронизация курсов ТО из U-ON: %s', result)
+    return result
