@@ -82,6 +82,16 @@ class SiteImages(models.Model):
     office_photo = models.ImageField(
         'Фото офиса', upload_to='site/', blank=True, null=True,
     )
+
+    tours_hero = models.ImageField('Страница «Туры»', upload_to='site/pages/', blank=True, null=True)
+    directions_hero = models.ImageField('Страница «Направления»', upload_to='site/pages/', blank=True, null=True)
+    cruises_hero = models.ImageField('Страница «Круизы»', upload_to='site/pages/', blank=True, null=True)
+    promotions_hero = models.ImageField('Страница «Акции»', upload_to='site/pages/', blank=True, null=True)
+    certificates_hero = models.ImageField('Страница «Сертификаты»', upload_to='site/pages/', blank=True, null=True)
+    contacts_hero = models.ImageField('Страница «Контакты»', upload_to='site/pages/', blank=True, null=True)
+    team_hero = models.ImageField('Страница «Команда»', upload_to='site/pages/', blank=True, null=True)
+    about_hero = models.ImageField('Страница «О компании»', upload_to='site/pages/', blank=True, null=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
