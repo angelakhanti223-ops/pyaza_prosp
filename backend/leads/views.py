@@ -10,6 +10,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from accounts.permissions import is_head
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
+from .auto_tags import AUTO_TAG_NAMES, sync_automatic_lead_tags
 from .models import Contact, Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
 from .serializers import (
     ContactSerializer,
@@ -45,9 +46,13 @@ class TourOperatorListView(generics.ListAPIView):
 
 
 class LeadTagListView(generics.ListAPIView):
-    """Справочник меток заявки для CRM."""
+    """Справочник ручных меток заявки для CRM.
 
-    queryset = LeadTag.objects.filter(is_active=True).order_by('name')
+    Автоматические метки рассчитываются системой и не показываются как кнопки
+    ручного назначения, чтобы менеджер не управлял ими вручную.
+    """
+
+    queryset = LeadTag.objects.filter(is_active=True).exclude(name__in=AUTO_TAG_NAMES).order_by('name')
     serializer_class = LeadTagSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
@@ -158,6 +163,8 @@ class LeadViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
+        sync_automatic_lead_tags(lead)
+        lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data, status=201)
 
     def partial_update(self, request, *args, **kwargs):
@@ -187,6 +194,7 @@ class LeadViewSet(
         if lead.assigned_manager_id and lead.assigned_manager_id != old_assigned_manager_id:
             notify_lead_assignment.delay(lead.id)
 
+        sync_automatic_lead_tags(lead)
         lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
@@ -215,6 +223,7 @@ class LeadViewSet(
         lead.preferred_messenger = contact.preferred_contact_method or lead.preferred_messenger
         lead.save(update_fields=['contact', 'name', 'phone', 'email', 'preferred_messenger'])
 
+        sync_automatic_lead_tags(lead)
         lead.refresh_from_db()
         return Response(LeadDetailSerializer(lead, context=self.get_serializer_context()).data)
 
