@@ -3,7 +3,7 @@
 import { ClipboardList, MessageCircle, Send } from "lucide-react";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
 
-const MAX_LINK = "https://max.ru/sletat_ru_pnz";
+const MAX_LINK = "https://max.ru/u/f9LHodD0cOKXx27XgipyAzI5okKvOG6U1UMUKwBiAs7TOdQPGEkqcG7cLH8";
 const TELEGRAM_LINK = "https://t.me/sletat_ru_pnz";
 
 type Props = {
