@@ -17,6 +17,37 @@ class Direction(models.Model):
         return self.name
 
 
+class TourOperator(models.Model):
+    """Справочник туроператоров для CRM: бренд, юридические данные, реестр и реквизиты.
+
+    Используется как отдельная сущность, чтобы в заявке выбирать туроператора из списка,
+    а не вводить каждый раз вручную. Старое текстовое поле Lead.tour_operator сохранено
+    для совместимости с уже созданными заявками.
+    """
+
+    brand_name = models.CharField('Бренд / название для выбора', max_length=120, unique=True)
+    legal_name = models.CharField('Юридическое наименование', max_length=255, blank=True)
+    inn = models.CharField('ИНН', max_length=20, blank=True)
+    ogrn = models.CharField('ОГРН', max_length=20, blank=True)
+    registry_number = models.CharField('Реестровый номер туроператора', max_length=64, blank=True)
+    activity_scope = models.CharField('Сфера деятельности', max_length=255, blank=True)
+    website = models.URLField('Сайт', blank=True)
+    phone = models.CharField('Телефон', max_length=100, blank=True)
+    email = models.EmailField('Email', blank=True)
+    address = models.TextField('Юридический / почтовый адрес', blank=True)
+    payment_details = models.TextField('Реквизиты / договорные данные', blank=True)
+    note = models.TextField('Примечание', blank=True)
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['brand_name']
+
+    def __str__(self):
+        return self.brand_name
+
+
 class Lead(models.Model):
     class Source(models.TextChoices):
         SITE_FORM = 'site_form', 'Сайт (форма)'
@@ -41,6 +72,16 @@ class Lead(models.Model):
         CLOSED_LOST = 'closed_lost', 'Неуспешная'
         FAILED = 'failed', 'Провалена'
         NOT_TARGET = 'not_target', 'Нецелевой'
+
+    class Currency(models.TextChoices):
+        RUB = 'RUB', 'RUB — рубль'
+        USD = 'USD', 'USD — доллар США'
+        EUR = 'EUR', 'EUR — евро'
+        CNY = 'CNY', 'CNY — юань'
+        AED = 'AED', 'AED — дирхам ОАЭ'
+        THB = 'THB', 'THB — бат'
+        TRY = 'TRY', 'TRY — турецкая лира'
+        OTHER = 'OTHER', 'Другая валюта'
 
     name = models.CharField('Имя клиента', max_length=255)
     phone = models.CharField('Телефон', max_length=32)
@@ -69,12 +110,18 @@ class Lead(models.Model):
     next_contact_at = models.DateTimeField('Следующий контакт', null=True, blank=True)
 
     deal_amount = models.DecimalField('Сумма сделки', max_digits=10, decimal_places=2, null=True, blank=True)
+    tour_currency = models.CharField('Валюта тура', max_length=10, choices=Currency.choices, default=Currency.RUB)
+    payment_exchange_rate = models.DecimalField('Курс на момент оплаты', max_digits=12, decimal_places=4, null=True, blank=True)
     commission = models.DecimalField('Комиссия', max_digits=10, decimal_places=2, null=True, blank=True)
     prepayment_amount = models.DecimalField('Предоплата', max_digits=10, decimal_places=2, null=True, blank=True)
     paid_amount = models.DecimalField('Оплачено туристом', max_digits=10, decimal_places=2, null=True, blank=True)
     balance_due = models.DecimalField('Остаток к оплате', max_digits=10, decimal_places=2, null=True, blank=True)
     full_payment_due_at = models.DateTimeField('Дедлайн полной оплаты', null=True, blank=True)
-    tour_operator = models.CharField('Туроператор', max_length=100, blank=True)
+    tour_operator = models.CharField('Туроператор (текст, старое поле)', max_length=100, blank=True)
+    tour_operator_ref = models.ForeignKey(
+        TourOperator, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='leads', verbose_name='Туроператор из справочника',
+    )
     booking_number = models.CharField('Номер брони', max_length=100, blank=True)
     failure_reason = models.CharField('Причина отказа / нецелевой заявки', max_length=255, blank=True)
 
