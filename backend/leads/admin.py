@@ -2,11 +2,11 @@ from django.contrib import admin
 
 from .models import (
     CommissionTier,
+    Contact,
     Direction,
     Lead,
     LeadAttachment,
     LeadComment,
-    LeadContact,
     LeadStatusHistory,
     LeadTag,
     MonthlyPlan,
@@ -20,13 +20,6 @@ class LeadCommentInline(admin.TabularInline):
     model = LeadComment
     extra = 0
     readonly_fields = ('created_at',)
-
-
-class LeadContactInline(admin.TabularInline):
-    model = LeadContact
-    extra = 1
-    fields = ('type', 'value', 'label', 'is_primary', 'allow_marketing', 'note')
-    readonly_fields = ('created_at', 'updated_at')
 
 
 class LeadStatusHistoryInline(admin.TabularInline):
@@ -48,38 +41,49 @@ class TourOperatorExchangeRateInline(admin.TabularInline):
     fields = ('currency', 'rate', 'rate_date', 'source_note', 'source_url', 'is_active')
 
 
+@admin.register(Contact)
+class ContactAdmin(admin.ModelAdmin):
+    list_display = (
+        'full_name', 'phone_primary', 'phone_secondary', 'email_primary',
+        'email_secondary', 'preferred_contact_method', 'allow_email_marketing', 'updated_at',
+    )
+    list_filter = ('preferred_contact_method', 'allow_email_marketing', 'allow_messenger_marketing')
+    search_fields = (
+        'last_name', 'first_name', 'middle_name', 'phone_primary', 'phone_secondary',
+        'email_primary', 'email_secondary',
+    )
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('ФИО и данные клиента', {'fields': ('last_name', 'first_name', 'middle_name', 'birth_date')}),
+        ('Контакты', {'fields': ('phone_primary', 'phone_secondary', 'email_primary', 'email_secondary', 'preferred_contact_method')}),
+        ('Рассылки', {'fields': ('allow_email_marketing', 'allow_messenger_marketing')}),
+        ('Примечание', {'fields': ('note',)}),
+        ('Служебное', {'fields': ('created_at', 'updated_at')}),
+    )
+
+
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'phone', 'status', 'preferred_messenger', 'source', 'assigned_manager',
+        'name', 'phone', 'status', 'source', 'assigned_manager', 'contact',
         'tour_operator_ref', 'tour_currency', 'payment_exchange_rate', 'created_at',
     )
-    list_filter = (
-        'status', 'source', 'preferred_messenger', 'tags', 'direction',
-        'assigned_manager', 'tour_operator_ref', 'tour_currency',
-    )
+    list_filter = ('status', 'source', 'direction', 'assigned_manager', 'tour_operator_ref', 'tour_currency', 'preferred_messenger', 'tags')
     search_fields = (
-        'name', 'phone', 'email', 'contacts__value', 'uon_ticket_id',
-        'booking_number', 'tour_operator',
+        'name', 'phone', 'email', 'uon_ticket_id', 'booking_number', 'tour_operator',
+        'contact__last_name', 'contact__first_name', 'contact__middle_name',
+        'contact__phone_primary', 'contact__phone_secondary', 'contact__email_primary', 'contact__email_secondary',
     )
     readonly_fields = ('created_at', 'updated_at')
     filter_horizontal = ('tags',)
-    inlines = [LeadContactInline, LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
+    inlines = [LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
 
 
 @admin.register(LeadTag)
 class LeadTagAdmin(admin.ModelAdmin):
-    list_display = ('name', 'color', 'is_active', 'created_at')
+    list_display = ('name', 'color', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name',)
-
-
-@admin.register(LeadContact)
-class LeadContactAdmin(admin.ModelAdmin):
-    list_display = ('lead', 'type', 'value', 'label', 'is_primary', 'allow_marketing', 'updated_at')
-    list_filter = ('type', 'is_primary', 'allow_marketing')
-    search_fields = ('lead__name', 'lead__phone', 'lead__email', 'value', 'label')
-    autocomplete_fields = ('lead',)
 
 
 @admin.register(Direction)
