@@ -9,17 +9,17 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  Download,
   Gauge,
   Megaphone,
   Plane,
-  Target,
   TrendingUp,
-  Users,
   WalletCards,
 } from "lucide-react";
 import {
   fetchManagementDashboard,
   type ManagementDashboardData,
+  type ManagementDrilldownKey,
   type ManagementPeriod,
 } from "@/lib/managementDashboardApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
@@ -39,8 +39,14 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("ru-RU").format(value || 0);
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string | null): string {
+  if (!value) return "—";
   return new Date(value).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function percent(part: number, total: number): number {
@@ -68,6 +74,8 @@ function StatCard({
   value,
   subtitle,
   href,
+  onClick,
+  active = false,
   tone = "default",
   icon,
 }: {
@@ -75,11 +83,14 @@ function StatCard({
   value: string | number;
   subtitle?: string;
   href?: string;
+  onClick?: () => void;
+  active?: boolean;
   tone?: "default" | "danger" | "warning" | "success" | "money" | "info";
   icon?: ReactNode;
 }) {
+  const className = `group h-full w-full rounded-3xl border p-5 text-left shadow-sm transition ${toneClasses(tone)} ${href || onClick ? "hover:-translate-y-0.5 hover:shadow-md" : ""} ${active ? "ring-2 ring-navy/25" : ""}`;
   const content = (
-    <div className={`group h-full rounded-3xl border p-5 shadow-sm transition ${toneClasses(tone)} ${href ? "hover:-translate-y-0.5 hover:shadow-md" : ""}`}>
+    <div className={className}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-60">{title}</p>
@@ -88,18 +99,19 @@ function StatCard({
         {icon && <div className="rounded-2xl bg-white/75 p-2.5 shadow-sm opacity-90">{icon}</div>}
       </div>
       {subtitle && <p className="mt-3 min-h-8 text-xs leading-5 opacity-70">{subtitle}</p>}
-      {href && (
+      {(href || onClick) && (
         <p className="mt-3 inline-flex items-center gap-1 text-xs font-semibold opacity-80 transition group-hover:gap-2">
-          Открыть список <ArrowRight size={13} />
+          {onClick ? "Показать детали" : "Открыть список"} <ArrowRight size={13} />
         </p>
       )}
     </div>
   );
 
+  if (onClick) return <button type="button" onClick={onClick} className="block h-full w-full">{content}</button>;
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function Section({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -107,6 +119,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
           <h2 className="text-sm font-semibold text-navy">{title}</h2>
           {subtitle && <p className="mt-1 text-xs leading-5 text-foreground/45">{subtitle}</p>}
         </div>
+        {action}
       </div>
       {children}
     </section>
@@ -151,12 +164,87 @@ function EmptyState({ children }: { children: ReactNode }) {
   return <p className="rounded-2xl bg-blue-light/30 px-4 py-5 text-sm text-foreground/45">{children}</p>;
 }
 
+function DailyTrend({ data }: { data: ManagementDashboardData }) {
+  const step = data.daily_rows.length > 70 ? Math.ceil(data.daily_rows.length / 60) : 1;
+  const rows = data.daily_rows.filter((_, index) => index % step === 0 || index === data.daily_rows.length - 1);
+  const maxLeads = Math.max(...rows.map((row) => row.leads), 1);
+  const maxCommission = Math.max(...rows.map((row) => row.commission), 1);
+
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="flex min-h-[210px] min-w-[760px] items-end gap-2 rounded-2xl bg-blue-light/20 px-4 pb-8 pt-4">
+        {rows.map((row) => {
+          const leadsHeight = 16 + percent(row.leads, maxLeads) * 0.9;
+          const commissionHeight = 16 + percent(row.commission, maxCommission) * 0.9;
+          return (
+            <div key={row.date} className="group relative flex flex-1 min-w-[16px] items-end justify-center gap-0.5">
+              <div className="w-2 rounded-t bg-blue" style={{ height: `${leadsHeight}px` }} />
+              <div className="w-2 rounded-t bg-gold" style={{ height: `${commissionHeight}px` }} />
+              <div className="pointer-events-none absolute bottom-full z-10 mb-2 hidden min-w-[150px] rounded-xl bg-navy px-3 py-2 text-xs text-white shadow-lg group-hover:block">
+                <p className="font-semibold">{formatDate(row.date)}</p>
+                <p className="mt-1 text-white/75">Заявки: {row.leads}</p>
+                <p className="text-white/75">Продажи: {row.deals}</p>
+                <p className="text-white/75">Комиссия: {formatMoney(row.commission)}</p>
+              </div>
+              <span className="absolute top-full mt-2 -rotate-45 whitespace-nowrap text-[10px] text-foreground/35">
+                {new Date(row.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-4 text-xs text-foreground/45">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue" /> заявки</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gold" /> комиссия</span>
+      </div>
+    </div>
+  );
+}
+
+function csvValue(value: unknown) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function downloadCsv(data: ManagementDashboardData) {
+  const lines: string[] = [];
+  lines.push(`Управленческий дашборд;${data.period.label};${formatDate(data.period.from)} - ${formatDate(data.period.to)}`);
+  lines.push("");
+  lines.push("KPI;Значение");
+  lines.push(`Комиссия за период;${data.money.commission_total}`);
+  lines.push(`Сумма сделок;${data.money.deal_amount_total}`);
+  lines.push(`Продаж;${data.money.deals_count}`);
+  lines.push(`Потенциал активных;${data.operational.active_potential_commission}`);
+  lines.push(`Остаток к оплате;${data.operational.active_balance}`);
+  lines.push("");
+  lines.push("Менеджер;Активные;Новые;Просроченные контакты;Просроченные оплаты;Продажи;Комиссия;Конверсия;Неуспешные;Проваленные");
+  data.manager_rows.forEach((row) => lines.push([
+    row.manager_name, row.active, row.new_leads, row.overdue_contacts, row.overdue_payments, row.sold, row.commission, `${row.conversion_percent}%`, row.lost, row.failed,
+  ].map(csvValue).join(";")));
+  lines.push("");
+  lines.push("Источник;Заявок;Продаж;Комиссия;Конверсия");
+  data.source_rows.forEach((row) => lines.push([row.source_display, row.count, row.sold, row.commission, `${row.conversion_percent}%`].map(csvValue).join(";")));
+  lines.push("");
+  lines.push("Дата;Заявки;Продажи;Комиссия");
+  data.daily_rows.forEach((row) => lines.push([row.date, row.leads, row.deals, row.commission].map(csvValue).join(";")));
+
+  const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `management-dashboard-${data.period.code}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function ManagementDashboardPage() {
   const { user } = useCrmAuth();
   const [period, setPeriod] = useState<ManagementPeriod>("current_month");
   const [data, setData] = useState<ManagementDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [drilldownKey, setDrilldownKey] = useState<ManagementDrilldownKey | null>(null);
 
   const canView = canViewManagementDashboard(user);
 
@@ -165,6 +253,7 @@ export default function ManagementDashboardPage() {
     let active = true;
     setLoading(true);
     setError("");
+    setDrilldownKey(null);
     fetchManagementDashboard(period)
       .then((result) => {
         if (active) setData(result);
@@ -183,15 +272,15 @@ export default function ManagementDashboardPage() {
   const derived = useMemo(() => {
     if (!data) return null;
     const attentionTotal = data.operational.tasks_overdue + data.operational.contacts_overdue + data.operational.payments_overdue_count;
-    const paymentsTotal = data.operational.payments_soon_count + data.operational.payments_overdue_count;
     const funnelMax = Math.max(...data.status_rows.map((row) => row.count), 1);
     const managerMaxCommission = Math.max(...data.manager_rows.map((row) => row.commission), 1);
     const sourceMax = Math.max(...data.source_rows.map((row) => row.count), 1);
     const reasonMax = Math.max(...data.reason_rows.map((row) => row.count), 1);
     const sourceTotal = data.source_rows.reduce((sum, row) => sum + row.count, 0);
     const soldConversion = percent(data.money.deals_count, data.money.active_period_count);
-    return { attentionTotal, paymentsTotal, funnelMax, managerMaxCommission, sourceMax, reasonMax, sourceTotal, soldConversion };
-  }, [data]);
+    const selectedDrilldown = drilldownKey ? data.drilldowns[drilldownKey] : null;
+    return { attentionTotal, funnelMax, managerMaxCommission, sourceMax, reasonMax, sourceTotal, soldConversion, selectedDrilldown };
+  }, [data, drilldownKey]);
 
   if (!canView) {
     return (
@@ -212,7 +301,7 @@ export default function ManagementDashboardPage() {
             </div>
             <h1 className="mt-4 text-2xl font-bold tracking-tight">Управленческий дашборд</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
-              Операционный экран руководителя: задачи, контакты, оплаты, вылеты, деньги, менеджеры, источники и причины потерь.
+              Операционный экран руководителя: drill-down по проблемам, график динамики, выгрузка CSV и управленческая аналитика.
             </p>
             {data && (
               <p className="mt-3 text-xs text-white/60">
@@ -221,20 +310,31 @@ export default function ManagementDashboardPage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-1.5 backdrop-blur">
-            {PERIODS.map((item) => (
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-1.5 backdrop-blur">
+              {PERIODS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setPeriod(item.value)}
+                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                    period === item.value ? "bg-white text-navy shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"
+                  }`}
+                  title={item.label}
+                >
+                  {item.short}
+                </button>
+              ))}
+            </div>
+            {data && (
               <button
-                key={item.value}
                 type="button"
-                onClick={() => setPeriod(item.value)}
-                className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-                  period === item.value ? "bg-white text-navy shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"
-                }`}
-                title={item.label}
+                onClick={() => downloadCsv(data)}
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs font-semibold text-white/80 hover:bg-white/15 hover:text-white"
               >
-                {item.short}
+                <Download size={14} /> Скачать CSV
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -271,25 +371,71 @@ export default function ManagementDashboardPage() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-navy">Сегодня требует внимания</h2>
-                <p className="mt-1 text-xs text-foreground/45">Кликабельные карточки для быстрого перехода к проблемным заявкам.</p>
+                <p className="mt-1 text-xs text-foreground/45">Нажми на карточку — ниже откроется детальный список заявок.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Задачи сегодня" value={data.operational.tasks_today} subtitle="невыполненные задачи на сегодня" href="/crm/leads?task_filter=today" tone="info" icon={<CalendarClock size={18} />} />
-              <StatCard title="Просроченные задачи" value={data.operational.tasks_overdue} subtitle="срочно разобрать и закрыть" href="/crm/leads?task_filter=overdue" tone={data.operational.tasks_overdue > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
-              <StatCard title="Контакты сегодня" value={data.operational.contacts_today} subtitle="по дате следующего контакта" href="/crm/leads" tone="info" icon={<Clock3 size={18} />} />
-              <StatCard title="Просроченные контакты" value={data.operational.contacts_overdue} subtitle="есть риск потерять клиента" href="/crm/leads" tone={data.operational.contacts_overdue > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
+              <StatCard title="Задачи сегодня" value={data.operational.tasks_today} subtitle="невыполненные задачи на сегодня" onClick={() => setDrilldownKey("tasks_today")} active={drilldownKey === "tasks_today"} tone="info" icon={<CalendarClock size={18} />} />
+              <StatCard title="Просроченные задачи" value={data.operational.tasks_overdue} subtitle="срочно разобрать и закрыть" onClick={() => setDrilldownKey("tasks_overdue")} active={drilldownKey === "tasks_overdue"} tone={data.operational.tasks_overdue > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
+              <StatCard title="Контакты сегодня" value={data.operational.contacts_today} subtitle="по дате следующего контакта" onClick={() => setDrilldownKey("contacts_today")} active={drilldownKey === "contacts_today"} tone="info" icon={<Clock3 size={18} />} />
+              <StatCard title="Просроченные контакты" value={data.operational.contacts_overdue} subtitle="есть риск потерять клиента" onClick={() => setDrilldownKey("contacts_overdue")} active={drilldownKey === "contacts_overdue"} tone={data.operational.contacts_overdue > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
             </div>
           </section>
 
           <section>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Оплаты до 7 дней" value={data.operational.payments_soon_count} subtitle={formatMoney(data.operational.payments_soon_amount)} href="/crm/leads" tone="warning" icon={<WalletCards size={18} />} />
-              <StatCard title="Просроченные оплаты" value={data.operational.payments_overdue_count} subtitle={formatMoney(data.operational.payments_overdue_amount)} href="/crm/leads" tone={data.operational.payments_overdue_count > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
-              <StatCard title="Вылеты до 7 дней" value={data.operational.departures_soon} subtitle="проверить документы и связь" href="/crm/leads" tone="info" icon={<Plane size={18} />} />
-              <StatCard title="Документы к выдаче" value={data.operational.docs_to_issue} subtitle="по ближайшим вылетам" href="/crm/leads" tone="warning" icon={<CheckCircle2 size={18} />} />
+              <StatCard title="Оплаты до 7 дней" value={data.operational.payments_soon_count} subtitle={formatMoney(data.operational.payments_soon_amount)} onClick={() => setDrilldownKey("payments_soon")} active={drilldownKey === "payments_soon"} tone="warning" icon={<WalletCards size={18} />} />
+              <StatCard title="Просроченные оплаты" value={data.operational.payments_overdue_count} subtitle={formatMoney(data.operational.payments_overdue_amount)} onClick={() => setDrilldownKey("payments_overdue")} active={drilldownKey === "payments_overdue"} tone={data.operational.payments_overdue_count > 0 ? "danger" : "success"} icon={<AlertTriangle size={18} />} />
+              <StatCard title="Вылеты до 7 дней" value={data.operational.departures_soon} subtitle="проверить документы и связь" onClick={() => setDrilldownKey("departures_soon")} active={drilldownKey === "departures_soon"} tone="info" icon={<Plane size={18} />} />
+              <StatCard title="Документы к выдаче" value={data.operational.docs_to_issue} subtitle="по ближайшим вылетам" onClick={() => setDrilldownKey("docs_to_issue")} active={drilldownKey === "docs_to_issue"} tone="warning" icon={<CheckCircle2 size={18} />} />
             </div>
           </section>
+
+          {derived.selectedDrilldown && (
+            <Section
+              title={derived.selectedDrilldown.title}
+              subtitle="Drill-down: до 20 заявок, которые формируют выбранный показатель."
+              action={<button type="button" onClick={() => setDrilldownKey(null)} className="text-xs font-semibold text-foreground/45 hover:text-navy">Скрыть</button>}
+            >
+              {derived.selectedDrilldown.rows.length === 0 ? (
+                <EmptyState>По этому показателю сейчас нет заявок.</EmptyState>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-foreground/45">
+                      <tr>
+                        <th className="pb-3">Клиент</th>
+                        <th className="pb-3">Статус</th>
+                        <th className="pb-3">Менеджер</th>
+                        <th className="pb-3">Контакт</th>
+                        <th className="pb-3">Оплата</th>
+                        <th className="pb-3">Вылет</th>
+                        <th className="pb-3 text-right">Остаток</th>
+                        <th className="pb-3 text-right">Комиссия</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5">
+                      {derived.selectedDrilldown.rows.map((lead) => (
+                        <tr key={lead.id}>
+                          <td className="py-3">
+                            <Link href={`/crm/leads/${lead.id}`} className="font-semibold text-navy hover:underline">{lead.name}</Link>
+                            <p className="mt-0.5 text-xs text-foreground/45">{lead.phone} · {lead.source_display}</p>
+                          </td>
+                          <td className="py-3 text-foreground/70">{lead.status_display}</td>
+                          <td className="py-3 text-foreground/70">{lead.manager_name}</td>
+                          <td className="py-3 text-foreground/70">{formatDateTime(lead.next_contact_at)}</td>
+                          <td className="py-3 text-foreground/70">{formatDateTime(lead.full_payment_due_at)}</td>
+                          <td className="py-3 text-foreground/70">{formatDate(lead.departure_date)}</td>
+                          <td className="py-3 text-right text-foreground/70">{formatMoney(lead.balance_due)}</td>
+                          <td className="py-3 text-right font-semibold text-navy">{formatMoney(lead.commission)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+          )}
 
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-3xl border border-gold/20 bg-gradient-to-br from-white via-gold/10 to-white p-5 shadow-sm">
@@ -326,11 +472,15 @@ export default function ManagementDashboardPage() {
 
             <Section title="Где застряли заявки" subtitle="Быстрые управленческие сигналы без лишней детализации.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                <StatCard title="Без следующего контакта" value={data.operational.no_next_contact} subtitle="в рабочих статусах" href="/crm/leads" tone={data.operational.no_next_contact > 0 ? "warning" : "success"} />
-                <StatCard title="Без ответственного" value={data.operational.no_manager} subtitle="нужно назначить менеджера" href="/crm/leads" tone={data.operational.no_manager > 0 ? "warning" : "success"} />
+                <StatCard title="Без следующего контакта" value={data.operational.no_next_contact} subtitle="в рабочих статусах" onClick={() => setDrilldownKey("no_next_contact")} active={drilldownKey === "no_next_contact"} tone={data.operational.no_next_contact > 0 ? "warning" : "success"} />
+                <StatCard title="Без ответственного" value={data.operational.no_manager} subtitle="нужно назначить менеджера" onClick={() => setDrilldownKey("no_manager")} active={drilldownKey === "no_manager"} tone={data.operational.no_manager > 0 ? "warning" : "success"} />
               </div>
             </Section>
           </section>
+
+          <Section title="Динамика за период" subtitle="Синие столбцы — входящие заявки, золотые — комиссия по продажам.">
+            <DailyTrend data={data} />
+          </Section>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <Section title="Воронка за выбранный период" subtitle="Видно, где сейчас концентрируются заявки.">
@@ -362,7 +512,7 @@ export default function ManagementDashboardPage() {
 
           <Section title="Менеджеры: продажи и дисциплина" subtitle="Комиссия считается за выбранный период, просрочки — по текущему состоянию заявок.">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px] border-separate border-spacing-y-2 text-sm">
+              <table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-sm">
                 <thead className="text-left text-xs uppercase tracking-wide text-foreground/45">
                   <tr>
                     <th className="px-3 pb-2">Менеджер</th>
@@ -371,6 +521,7 @@ export default function ManagementDashboardPage() {
                     <th className="px-3 pb-2 text-right">Контакты</th>
                     <th className="px-3 pb-2 text-right">Оплаты</th>
                     <th className="px-3 pb-2 text-right">Продажи</th>
+                    <th className="px-3 pb-2 text-right">Конверсия</th>
                     <th className="px-3 pb-2 text-right">Комиссия</th>
                     <th className="px-3 pb-2 text-right">Потери</th>
                   </tr>
@@ -384,6 +535,7 @@ export default function ManagementDashboardPage() {
                       <td className={`px-3 py-3 text-right ${row.overdue_contacts > 0 ? "font-semibold text-red-600" : "text-foreground/65"}`}>{row.overdue_contacts}</td>
                       <td className={`px-3 py-3 text-right ${row.overdue_payments > 0 ? "font-semibold text-red-600" : "text-foreground/65"}`}>{row.overdue_payments}</td>
                       <td className="px-3 py-3 text-right">{row.sold}</td>
+                      <td className="px-3 py-3 text-right">{row.conversion_percent}%</td>
                       <td className="px-3 py-3 text-right">
                         <div className="ml-auto max-w-[170px]">
                           <p className="font-semibold text-navy">{formatMoney(row.commission)}</p>
@@ -394,7 +546,7 @@ export default function ManagementDashboardPage() {
                     </tr>
                   ))}
                   {data.manager_rows.length === 0 && (
-                    <tr><td colSpan={8}><EmptyState>Нет данных по менеджерам за выбранный период.</EmptyState></td></tr>
+                    <tr><td colSpan={9}><EmptyState>Нет данных по менеджерам за выбранный период.</EmptyState></td></tr>
                   )}
                 </tbody>
               </table>
@@ -434,7 +586,7 @@ export default function ManagementDashboardPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-navy">{row.source_display}</p>
-                          <p className="mt-1 text-xs text-foreground/45">Конверсия: {percent(row.sold, row.count)}%</p>
+                          <p className="mt-1 text-xs text-foreground/45">Конверсия: {row.conversion_percent}%</p>
                         </div>
                         <Megaphone size={17} className="text-blue" />
                       </div>
