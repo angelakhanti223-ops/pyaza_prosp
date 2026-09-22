@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { listLeads, updateLead, STATUS_OPTIONS, type LeadListItem, type LeadStatus } from "@/lib/crmApi";
+import { listLeads, updateLead, STATUS_OPTIONS, type LeadListItem, type LeadStatus, type LeadTaskFilter } from "@/lib/crmApi";
 import StatusBadge from "@/components/crm/StatusBadge";
 import NewLeadModal from "@/components/crm/NewLeadModal";
 import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStatusInfo";
@@ -11,6 +11,7 @@ import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStat
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 type RateDirection = "higher" | "lower" | "same" | "missing";
+type TaskQuickFilter = "" | LeadTaskFilter;
 
 type LeadTag = {
   id: number;
@@ -99,6 +100,12 @@ function autoTagChipClass() {
   return "inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700";
 }
 
+function quickFilterButtonClass(active: boolean, danger = false) {
+  if (active && danger) return "rounded-full bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm";
+  if (active) return "rounded-full bg-navy px-3 py-2 text-xs font-semibold text-white shadow-sm";
+  return "rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-foreground/60 transition hover:border-blue hover:text-navy";
+}
+
 export default function CrmLeadsPage() {
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [allTags, setAllTags] = useState<LeadTag[]>([]);
@@ -106,6 +113,7 @@ export default function CrmLeadsPage() {
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [taskFilter, setTaskFilter] = useState<TaskQuickFilter>("");
   const [savingTagLeadId, setSavingTagLeadId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -117,7 +125,11 @@ export default function CrmLeadsPage() {
     let active = true;
     const timeout = setTimeout(() => {
       setLoading(true);
-      listLeads({ status: status || undefined, search: search || undefined }).then((data) => {
+      listLeads({
+        status: status || undefined,
+        search: search || undefined,
+        task_filter: taskFilter || undefined,
+      }).then((data) => {
         if (!active) return;
         setLeads(data);
         setLoading(false);
@@ -131,7 +143,7 @@ export default function CrmLeadsPage() {
       active = false;
       clearTimeout(timeout);
     };
-  }, [status, search]);
+  }, [status, search, taskFilter]);
 
   const filterTags = useMemo(() => {
     const byId = new Map<number, LeadTag>();
@@ -150,6 +162,11 @@ export default function CrmLeadsPage() {
   const overdueContacts = useMemo(() => displayedLeads.filter((lead) => isPast(lead.next_contact_at)).length, [displayedLeads]);
   const overduePayments = useMemo(() => displayedLeads.filter((lead) => isPast(lead.full_payment_due_at)).length, [displayedLeads]);
   const selectedStatusHint = status ? getLeadStatusHint(status as LeadStatus) : "Выберите статус, чтобы увидеть подсказку по этапу работы с заявкой.";
+  const controlHint = taskFilter === "today"
+    ? "Показаны заявки, где следующий контакт сегодня или есть невыполненная задача со сроком сегодня."
+    : taskFilter === "overdue"
+      ? "Показаны заявки, где просрочен следующий контакт или есть невыполненная задача с истёкшим сроком."
+      : selectedStatusHint;
 
   async function toggleTag(lead: LeadWithOperatorRate, tagId: number) {
     const currentTagIds = (lead.tags ?? []).map((tag) => tag.id);
@@ -193,7 +210,7 @@ export default function CrmLeadsPage() {
         />
       )}
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-3 flex flex-wrap gap-3">
         <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
           <input
@@ -224,8 +241,35 @@ export default function CrmLeadsPage() {
         </select>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-foreground/45">Быстрые фильтры:</span>
+        <button
+          type="button"
+          onClick={() => setTaskFilter((value) => value === "today" ? "" : "today")}
+          className={quickFilterButtonClass(taskFilter === "today")}
+        >
+          Задачи на сегодня
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskFilter((value) => value === "overdue" ? "" : "overdue")}
+          className={quickFilterButtonClass(taskFilter === "overdue", true)}
+        >
+          Просроченные задачи
+        </button>
+        {taskFilter && (
+          <button
+            type="button"
+            onClick={() => setTaskFilter("")}
+            className="rounded-full px-3 py-2 text-xs font-semibold text-foreground/45 transition hover:text-navy"
+          >
+            Сбросить
+          </button>
+        )}
+      </div>
+
       <div className="mb-4 rounded-2xl border border-blue-light bg-blue-light/35 px-4 py-3 text-xs leading-relaxed text-foreground/70">
-        {selectedStatusHint}
+        {controlHint}
       </div>
 
       <div className="overflow-auto rounded-2xl border border-black/5 bg-white">
