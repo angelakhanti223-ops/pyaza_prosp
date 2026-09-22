@@ -64,6 +64,7 @@ export type ManagementDailyRow = {
   date: string;
   leads: number;
   deals: number;
+  deal_amount: number;
   commission: number;
 };
 
