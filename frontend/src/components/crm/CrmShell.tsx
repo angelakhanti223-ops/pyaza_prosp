@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Award,
+  BarChart3,
   BookOpen,
   Columns3,
   FileText,
@@ -22,6 +23,7 @@ import { useCrmAuth } from "./CrmAuthProvider";
 
 const NAV = [
   { href: "/crm/dashboard", label: "Дашборд", icon: LayoutDashboard },
+  { href: "/crm/management-dashboard", label: "Управление", icon: BarChart3, management: true },
   { href: "/crm/leads", label: "Заявки", icon: Inbox },
   { href: "/crm/appeals", label: "Обращения", icon: MessageSquare },
   { href: "/crm/uon-requests", label: "Заявки U-ON", icon: FileText },
@@ -33,12 +35,19 @@ const NAV = [
   { href: "/crm/certificates", label: "Сертификаты", icon: Award },
 ];
 
+function canViewManagementDashboard(user: { username: string; full_name: string; is_head: boolean } | null | undefined) {
+  const username = user?.username?.toLowerCase() ?? "";
+  const fullName = user?.full_name?.toLowerCase() ?? "";
+  return Boolean(user?.is_head || username === "admin" || username === "elena" || fullName.includes("елена"));
+}
+
 export default function CrmShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useCrmAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const showManagementDashboard = canViewManagementDashboard(user);
 
   async function handleLogout() {
     await logout();
@@ -69,7 +78,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <p className="text-[11px] text-foreground/50">мини-CRM</p>
         </div>
         <nav className="flex flex-col gap-1 px-3">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.filter((item) => !item.management || showManagementDashboard).map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
               <Link
