@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -13,7 +12,6 @@ import {
   Gauge,
   Megaphone,
   Plane,
-  TrendingUp,
   WalletCards,
 } from "lucide-react";
 import {
@@ -168,18 +166,18 @@ function DailyTrend({ data }: { data: ManagementDashboardData }) {
   const step = data.daily_rows.length > 70 ? Math.ceil(data.daily_rows.length / 60) : 1;
   const rows = data.daily_rows.filter((_, index) => index % step === 0 || index === data.daily_rows.length - 1);
   const maxLeads = Math.max(...rows.map((row) => row.leads), 1);
-  const maxCommission = Math.max(...rows.map((row) => row.commission), 1);
+  const maxDeals = Math.max(...rows.map((row) => row.deals), 1);
 
   return (
     <div className="overflow-x-auto pb-2">
       <div className="flex min-h-[210px] min-w-[760px] items-end gap-2 rounded-2xl bg-blue-light/20 px-4 pb-8 pt-4">
         {rows.map((row) => {
           const leadsHeight = 16 + percent(row.leads, maxLeads) * 0.9;
-          const commissionHeight = 16 + percent(row.commission, maxCommission) * 0.9;
+          const dealsHeight = 16 + percent(row.deals, maxDeals) * 0.9;
           return (
             <div key={row.date} className="group relative flex flex-1 min-w-[16px] items-end justify-center gap-0.5">
               <div className="w-2 rounded-t bg-blue" style={{ height: `${leadsHeight}px` }} />
-              <div className="w-2 rounded-t bg-gold" style={{ height: `${commissionHeight}px` }} />
+              <div className="w-2 rounded-t bg-gold" style={{ height: `${dealsHeight}px` }} />
               <div className="pointer-events-none absolute bottom-full z-10 mb-2 hidden min-w-[150px] rounded-xl bg-navy px-3 py-2 text-xs text-white shadow-lg group-hover:block">
                 <p className="font-semibold">{formatDate(row.date)}</p>
                 <p className="mt-1 text-white/75">Заявки: {row.leads}</p>
@@ -195,14 +193,14 @@ function DailyTrend({ data }: { data: ManagementDashboardData }) {
       </div>
       <div className="mt-3 flex items-center gap-4 text-xs text-foreground/45">
         <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue" /> заявки</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gold" /> комиссия</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gold" /> продажи</span>
       </div>
     </div>
   );
 }
 
 function csvValue(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
 function downloadCsv(data: ManagementDashboardData) {
@@ -317,9 +315,7 @@ export default function ManagementDashboardPage() {
                   key={item.value}
                   type="button"
                   onClick={() => setPeriod(item.value)}
-                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-                    period === item.value ? "bg-white text-navy shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"
-                  }`}
+                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${period === item.value ? "bg-white text-navy shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"}`}
                   title={item.label}
                 >
                   {item.short}
@@ -478,7 +474,7 @@ export default function ManagementDashboardPage() {
             </Section>
           </section>
 
-          <Section title="Динамика за период" subtitle="Синие столбцы — входящие заявки, золотые — комиссия по продажам.">
+          <Section title="Динамика: заявки / продажи" subtitle="Синие столбцы — входящие заявки, золотые — продажи. Комиссия остаётся в подсказке при наведении.">
             <DailyTrend data={data} />
           </Section>
 
