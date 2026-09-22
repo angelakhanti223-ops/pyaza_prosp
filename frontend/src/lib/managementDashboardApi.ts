@@ -37,6 +37,7 @@ export type ManagementManagerRow = {
   commission: number;
   lost: number;
   failed: number;
+  conversion_percent: number;
 };
 
 export type ManagementStatusRow = {
@@ -51,11 +52,52 @@ export type ManagementSourceRow = {
   count: number;
   sold: number;
   commission: number;
+  conversion_percent: number;
 };
 
 export type ManagementReasonRow = {
   reason: string;
   count: number;
+};
+
+export type ManagementDailyRow = {
+  date: string;
+  leads: number;
+  deals: number;
+  commission: number;
+};
+
+export type ManagementDrilldownKey =
+  | "tasks_today"
+  | "tasks_overdue"
+  | "contacts_today"
+  | "contacts_overdue"
+  | "payments_soon"
+  | "payments_overdue"
+  | "departures_soon"
+  | "docs_to_issue"
+  | "no_next_contact"
+  | "no_manager";
+
+export type ManagementDrilldownLead = {
+  id: number;
+  name: string;
+  phone: string;
+  status: string;
+  status_display: string;
+  manager_name: string;
+  source_display: string;
+  direction_name: string;
+  next_contact_at: string | null;
+  full_payment_due_at: string | null;
+  departure_date: string | null;
+  balance_due: number;
+  commission: number;
+};
+
+export type ManagementDrilldown = {
+  title: string;
+  rows: ManagementDrilldownLead[];
 };
 
 export type ManagementDashboardData = {
@@ -66,6 +108,8 @@ export type ManagementDashboardData = {
   status_rows: ManagementStatusRow[];
   source_rows: ManagementSourceRow[];
   reason_rows: ManagementReasonRow[];
+  daily_rows: ManagementDailyRow[];
+  drilldowns: Record<ManagementDrilldownKey, ManagementDrilldown>;
 };
 
 export async function fetchManagementDashboard(period: ManagementPeriod): Promise<ManagementDashboardData> {
