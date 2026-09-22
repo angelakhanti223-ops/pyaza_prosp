@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,8 +12,7 @@ from rest_framework.views import APIView
 from accounts.permissions import is_head
 from kanban.models import Task
 
-from .dashboard import _revenue_recognized_qs
-from .models import Lead
+from .models import Lead, LeadStatusHistory
 
 CLOSED_STATUSES = [
     Lead.Status.CLOSED_WON,
@@ -102,13 +102,79 @@ def amount_sum(qs, field):
     return money(qs.aggregate(total=Sum(field))['total'])
 
 
+def recognized_revenue_dates(base_qs, date_from, date_to):
+    """Return {lead_id: recognized_at} by first transition to money status.
+
+    This mirrors the plan/fact logic but also exposes the exact recognition date
+    so the management dashboard can build daily charts.
+    """
+    candidate_ids = list(
+        base_qs.filter(
+            Q(status__in=MONEY_STATUSES) | Q(status_history__new_status__in=MONEY_STATUSES),
+        ).values_list('id', flat=True).distinct()
+    )
+
+    first_recognized_at = {}
+    for lead_id, changed_at in (
+        LeadStatusHistory.objects.filter(lead_id__in=candidate_ids, new_status__in=MONEY_STATUSES)
+        .order_by('lead_id', 'changed_at')
+        .values_list('lead_id', 'changed_at')
+    ):
+        first_recognized_at.setdefault(lead_id, changed_at)
+
+    recognized = {}
+    for lead_id, status, updated_at in base_qs.filter(id__in=candidate_ids).values_list('id', 'status', 'updated_at'):
+        recognized_at = first_recognized_at.get(lead_id)
+        if recognized_at is None and status in MONEY_STATUSES:
+            recognized_at = updated_at
+        if recognized_at is not None and date_from <= recognized_at <= date_to:
+            recognized[lead_id] = recognized_at
+
+    return recognized
+
+
+def lead_drilldown_rows(qs, limit=20):
+    rows = []
+    for lead in qs.select_related('assigned_manager', 'direction').order_by('-updated_at')[:limit]:
+        rows.append({
+            'id': lead.id,
+            'name': lead.name,
+            'phone': lead.phone,
+            'status': lead.status,
+            'status_display': lead.get_status_display(),
+            'manager_name': user_name(lead.assigned_manager),
+            'source_display': lead.get_source_display(),
+            'direction_name': lead.direction.name if lead.direction_id else '',
+            'next_contact_at': lead.next_contact_at.isoformat() if lead.next_contact_at else None,
+            'full_payment_due_at': lead.full_payment_due_at.isoformat() if lead.full_payment_due_at else None,
+            'departure_date': lead.departure_date.isoformat() if lead.departure_date else None,
+            'balance_due': money(lead.balance_due),
+            'commission': money(lead.commission),
+        })
+    return rows
+
+
+def empty_manager_row(lead):
+    return {
+        'manager_id': lead.assigned_manager_id,
+        'manager_name': user_name(lead.assigned_manager),
+        'active': 0,
+        'new_leads': 0,
+        'overdue_contacts': 0,
+        'overdue_payments': 0,
+        'sold': 0,
+        'commission': 0.0,
+        'lost': 0,
+        'failed': 0,
+        'conversion_percent': 0,
+    }
+
+
 class ManagementDashboardView(APIView):
     """Operational/management dashboard for owner/admin.
 
-    Unlike the ordinary CRM dashboard, this endpoint returns a period-aware
-    management view: week/month/last month/year. Money is counted by the same
-    recognized-revenue logic as plan/fact: first transition into prepaid/paid/
-    successful status within the selected period.
+    Periods: current week, current month, previous month, current year.
+    Money is counted by first transition into prepaid/paid/successful status.
     """
 
     permission_classes = [IsAuthenticated]
@@ -122,7 +188,8 @@ class ManagementDashboardView(APIView):
 
         all_leads = Lead.objects.select_related('assigned_manager', 'direction')
         period_leads = all_leads.filter(created_at__gte=date_from, created_at__lte=date_to)
-        revenue_leads = _revenue_recognized_qs(all_leads, date_from, date_to).select_related('assigned_manager')
+        recognized_dates = recognized_revenue_dates(all_leads, date_from, date_to)
+        revenue_leads = all_leads.filter(id__in=list(recognized_dates.keys())).select_related('assigned_manager', 'direction')
 
         now = timezone.now()
         today_start = timezone.make_aware(datetime.combine(timezone.localdate(), datetime.min.time()))
@@ -137,6 +204,9 @@ class ManagementDashboardView(APIView):
         tasks_today = tasks.filter(deadline__gte=today_start, deadline__lte=today_end)
         tasks_overdue = tasks.filter(deadline__lt=now)
 
+        task_today_leads = active_leads.filter(tasks__in=tasks_today).distinct()
+        task_overdue_leads = active_leads.filter(tasks__in=tasks_overdue).distinct()
+
         contacts_today = workable_leads.filter(next_contact_at__gte=today_start, next_contact_at__lte=today_end)
         contacts_overdue = workable_leads.filter(next_contact_at__lt=now)
         no_next_contact = workable_leads.filter(
@@ -146,8 +216,14 @@ class ManagementDashboardView(APIView):
 
         payments_soon = active_leads.filter(full_payment_due_at__gte=today_start, full_payment_due_at__lte=seven_days_end)
         payments_overdue = active_leads.filter(full_payment_due_at__lt=now)
-        departures_soon = active_leads.filter(departure_date__gte=timezone.localdate(), departure_date__lte=timezone.localdate() + timedelta(days=7))
-        docs_to_issue = departures_soon.filter(status__in=[Lead.Status.PAID, Lead.Status.DEPARTURE, Lead.Status.CHECK_IN, Lead.Status.WAITING_PAYMENT])
+        departures_soon = active_leads.filter(
+            departure_date__gte=timezone.localdate(),
+            departure_date__lte=timezone.localdate() + timedelta(days=7),
+        )
+        docs_to_issue = departures_soon.filter(
+            status__in=[Lead.Status.PAID, Lead.Status.DEPARTURE, Lead.Status.CHECK_IN, Lead.Status.WAITING_PAYMENT]
+        )
+        no_manager = active_leads.filter(assigned_manager__isnull=True)
 
         money_totals = revenue_leads.aggregate(
             commission=Sum('commission'),
@@ -158,18 +234,7 @@ class ManagementDashboardView(APIView):
         manager_map = {}
         for lead in all_leads:
             key = str(lead.assigned_manager_id or 'no-manager')
-            row = manager_map.setdefault(key, {
-                'manager_id': lead.assigned_manager_id,
-                'manager_name': user_name(lead.assigned_manager),
-                'active': 0,
-                'new_leads': 0,
-                'overdue_contacts': 0,
-                'overdue_payments': 0,
-                'sold': 0,
-                'commission': 0.0,
-                'lost': 0,
-                'failed': 0,
-            })
+            row = manager_map.setdefault(key, empty_manager_row(lead))
             if lead.status not in CLOSED_STATUSES:
                 row['active'] += 1
             if lead.next_contact_at and lead.next_contact_at < now and lead.status in WORK_STATUSES:
@@ -179,41 +244,19 @@ class ManagementDashboardView(APIView):
 
         for lead in period_leads:
             key = str(lead.assigned_manager_id or 'no-manager')
-            row = manager_map.setdefault(key, {
-                'manager_id': lead.assigned_manager_id,
-                'manager_name': user_name(lead.assigned_manager),
-                'active': 0,
-                'new_leads': 0,
-                'overdue_contacts': 0,
-                'overdue_payments': 0,
-                'sold': 0,
-                'commission': 0.0,
-                'lost': 0,
-                'failed': 0,
-            })
-            if lead.status == Lead.Status.NEW:
-                row['new_leads'] += 1
-            if lead.status == Lead.Status.CLOSED_LOST:
-                row['lost'] += 1
-            if lead.status == Lead.Status.FAILED:
-                row['failed'] += 1
+            row = manager_map.setdefault(key, empty_manager_row(lead))
+            row['new_leads'] += 1 if lead.status == Lead.Status.NEW else 0
+            row['lost'] += 1 if lead.status == Lead.Status.CLOSED_LOST else 0
+            row['failed'] += 1 if lead.status == Lead.Status.FAILED else 0
 
         for lead in revenue_leads:
             key = str(lead.assigned_manager_id or 'no-manager')
-            row = manager_map.setdefault(key, {
-                'manager_id': lead.assigned_manager_id,
-                'manager_name': user_name(lead.assigned_manager),
-                'active': 0,
-                'new_leads': 0,
-                'overdue_contacts': 0,
-                'overdue_payments': 0,
-                'sold': 0,
-                'commission': 0.0,
-                'lost': 0,
-                'failed': 0,
-            })
+            row = manager_map.setdefault(key, empty_manager_row(lead))
             row['sold'] += 1
             row['commission'] += money(lead.commission)
+
+        for row in manager_map.values():
+            row['conversion_percent'] = round(row['sold'] / row['new_leads'] * 100, 1) if row['new_leads'] else 0
 
         status_counts = {row['status']: row['count'] for row in period_leads.values('status').annotate(count=Count('id'))}
         status_rows = [
@@ -235,6 +278,7 @@ class ManagementDashboardView(APIView):
                 'count': count,
                 'sold': sales['sold'],
                 'commission': sales['commission'],
+                'conversion_percent': round(sales['sold'] / count * 100, 1) if count else 0,
             })
         source_rows.sort(key=lambda row: (row['commission'], row['count']), reverse=True)
 
@@ -246,6 +290,43 @@ class ManagementDashboardView(APIView):
             .order_by('-count')[:10]
         ):
             reason_rows.append({'reason': row['failure_reason'] or 'Причина не указана', 'count': row['count']})
+
+        daily_created = {
+            row['day']: row['count']
+            for row in period_leads.annotate(day=TruncDate('created_at')).values('day').annotate(count=Count('id'))
+        }
+        revenue_by_day = {}
+        for lead in revenue_leads:
+            recognized_day = recognized_dates.get(lead.id).date()
+            day_row = revenue_by_day.setdefault(recognized_day, {'deals': 0, 'commission': 0.0})
+            day_row['deals'] += 1
+            day_row['commission'] += money(lead.commission)
+
+        daily_rows = []
+        day = date_from.date()
+        last_day = min(date_to.date(), timezone.localdate())
+        while day <= last_day:
+            revenue_row = revenue_by_day.get(day, {'deals': 0, 'commission': 0.0})
+            daily_rows.append({
+                'date': day.isoformat(),
+                'leads': daily_created.get(day, 0),
+                'deals': revenue_row['deals'],
+                'commission': revenue_row['commission'],
+            })
+            day += timedelta(days=1)
+
+        drilldowns = {
+            'tasks_today': {'title': 'Заявки с задачами на сегодня', 'rows': lead_drilldown_rows(task_today_leads)},
+            'tasks_overdue': {'title': 'Заявки с просроченными задачами', 'rows': lead_drilldown_rows(task_overdue_leads)},
+            'contacts_today': {'title': 'Контакты на сегодня', 'rows': lead_drilldown_rows(contacts_today)},
+            'contacts_overdue': {'title': 'Просроченные контакты', 'rows': lead_drilldown_rows(contacts_overdue)},
+            'payments_soon': {'title': 'Оплаты в ближайшие 7 дней', 'rows': lead_drilldown_rows(payments_soon)},
+            'payments_overdue': {'title': 'Просроченные оплаты', 'rows': lead_drilldown_rows(payments_overdue)},
+            'departures_soon': {'title': 'Вылеты в ближайшие 7 дней', 'rows': lead_drilldown_rows(departures_soon)},
+            'docs_to_issue': {'title': 'Документы к выдаче', 'rows': lead_drilldown_rows(docs_to_issue)},
+            'no_next_contact': {'title': 'Заявки без следующего контакта', 'rows': lead_drilldown_rows(no_next_contact)},
+            'no_manager': {'title': 'Заявки без ответственного', 'rows': lead_drilldown_rows(no_manager)},
+        }
 
         return Response({
             'period': {
@@ -268,7 +349,7 @@ class ManagementDashboardView(APIView):
                 'docs_to_issue': count_qs(docs_to_issue),
                 'active_potential_commission': amount_sum(active_leads, 'commission'),
                 'active_balance': amount_sum(active_leads, 'balance_due'),
-                'no_manager': active_leads.filter(assigned_manager__isnull=True).count(),
+                'no_manager': no_manager.count(),
             },
             'money': {
                 'commission_total': money(money_totals['commission']),
@@ -280,4 +361,6 @@ class ManagementDashboardView(APIView):
             'status_rows': status_rows,
             'source_rows': source_rows[:10],
             'reason_rows': reason_rows,
+            'daily_rows': daily_rows,
+            'drilldowns': drilldowns,
         })
