@@ -328,10 +328,12 @@ export default function CrmLeadDetailPage() {
   const selectedTourOperator = leadExtra.tour_operator_details ?? tourOperators.find((item) => item.id === leadExtra.tour_operator_ref) ?? null;
   const contactOverdue = isPast(lead.next_contact_at);
   const paymentOverdue = isPast(lead.full_payment_due_at);
+  const closedStatuses: LeadStatus[] = ["closed_won", "closed_lost", "failed", "not_target"];
+  const isClosedStatus = closedStatuses.includes(lead.status);
   const needsNextContact = ["follow_up", "selection", "options_proposed"].includes(lead.status) && !lead.next_contact_at;
-  const needsFailureReason = ["closed_lost", "failed", "not_target"].includes(lead.status) && !lead.failure_reason;
+  const needsFailureReason = isClosedStatus && !lead.failure_reason;
   const needsPaymentControl = ["booked", "prepaid", "waiting_payment"].includes(lead.status) && !lead.full_payment_due_at;
-  const reasonLabel = lead.status === "failed" ? "Причина провала" : lead.status === "closed_lost" ? "Причина неуспешной заявки" : lead.status === "not_target" ? "Причина нецелевого обращения" : "Причина";
+  const reasonLabel = lead.status === "failed" ? "Причина провала" : lead.status === "closed_lost" ? "Причина неуспешной заявки" : lead.status === "not_target" ? "Причина нецелевого обращения" : "Причина закрытия";
   const timeline = [
     ...lead.comments.map((c) => ({ kind: "comment" as const, date: c.created_at, data: c })),
     ...lead.status_history.map((h) => ({ kind: "status" as const, date: h.changed_at, data: h })),
@@ -465,7 +467,7 @@ export default function CrmLeadDetailPage() {
               </div>
             )}
 
-            {(lead.status === "failed" || lead.status === "closed_lost" || lead.status === "not_target") && <div className="mt-4"><FieldLabel>{reasonLabel}</FieldLabel><textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />{!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}</div>}
+            {isClosedStatus && <div className="mt-4"><FieldLabel>{reasonLabel}</FieldLabel><textarea defaultValue={lead.failure_reason} onBlur={(e) => savePatch({ failure_reason: e.target.value }, "failure_reason")} rows={2} className="mt-1 w-full resize-none rounded-xl border border-black/10 p-3 text-sm outline-none focus:border-blue" />{!lead.failure_reason && <p className="mt-1 text-xs text-red-600">Для закрытия нужна причина.</p>}</div>}
           </section>
 
           <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
