@@ -103,11 +103,7 @@ def amount_sum(qs, field):
 
 
 def recognized_revenue_dates(base_qs, date_from, date_to):
-    """Return {lead_id: recognized_at} by first transition to money status.
-
-    This mirrors the plan/fact logic but also exposes the exact recognition date
-    so the management dashboard can build daily charts.
-    """
+    """Return {lead_id: recognized_at} by first transition to money status."""
     candidate_ids = list(
         base_qs.filter(
             Q(status__in=MONEY_STATUSES) | Q(status_history__new_status__in=MONEY_STATUSES),
@@ -171,11 +167,7 @@ def empty_manager_row(lead):
 
 
 class ManagementDashboardView(APIView):
-    """Operational/management dashboard for owner/admin.
-
-    Periods: current week, current month, previous month, current year.
-    Money is counted by first transition into prepaid/paid/successful status.
-    """
+    """Operational/management dashboard for owner/admin."""
 
     permission_classes = [IsAuthenticated]
 
@@ -298,19 +290,21 @@ class ManagementDashboardView(APIView):
         revenue_by_day = {}
         for lead in revenue_leads:
             recognized_day = recognized_dates.get(lead.id).date()
-            day_row = revenue_by_day.setdefault(recognized_day, {'deals': 0, 'commission': 0.0})
+            day_row = revenue_by_day.setdefault(recognized_day, {'deals': 0, 'deal_amount': 0.0, 'commission': 0.0})
             day_row['deals'] += 1
+            day_row['deal_amount'] += money(lead.deal_amount)
             day_row['commission'] += money(lead.commission)
 
         daily_rows = []
         day = date_from.date()
         last_day = min(date_to.date(), timezone.localdate())
         while day <= last_day:
-            revenue_row = revenue_by_day.get(day, {'deals': 0, 'commission': 0.0})
+            revenue_row = revenue_by_day.get(day, {'deals': 0, 'deal_amount': 0.0, 'commission': 0.0})
             daily_rows.append({
                 'date': day.isoformat(),
                 'leads': daily_created.get(day, 0),
                 'deals': revenue_row['deals'],
+                'deal_amount': revenue_row['deal_amount'],
                 'commission': revenue_row['commission'],
             })
             day += timedelta(days=1)
