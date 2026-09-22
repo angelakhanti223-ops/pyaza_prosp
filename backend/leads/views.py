@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -8,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.permissions import is_head
+from kanban.models import Task
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
 from .auto_tags import AUTO_TAG_NAMES, sync_automatic_lead_tags
@@ -125,6 +127,22 @@ class LeadViewSet(
         tag_param = self.request.query_params.get('tag')
         if tag_param:
             qs = qs.filter(tags__id=tag_param)
+
+        task_filter = self.request.query_params.get('task_filter')
+        if task_filter:
+            now = timezone.now()
+            today = timezone.localdate()
+            active_task = ~Q(tasks__status__in=[Task.Status.DONE, Task.Status.CANCELLED])
+            if task_filter == 'today':
+                qs = qs.filter(
+                    Q(next_contact_at__date=today) |
+                    (Q(tasks__deadline__date=today) & active_task)
+                ).distinct()
+            elif task_filter == 'overdue':
+                qs = qs.filter(
+                    Q(next_contact_at__lt=now) |
+                    (Q(tasks__deadline__lt=now) & active_task)
+                ).distinct()
 
         search = self.request.query_params.get('search')
         if search:
