@@ -48,6 +48,8 @@ export const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "not_target", label: "Нецелевой" },
 ];
 
+export type LeadTaskFilter = "today" | "overdue";
+
 export type LeadTravelFields = {
   departure_city: string;
   departure_date: string | null;
@@ -213,10 +215,11 @@ export async function listManagers(): Promise<CrmUser[]> {
   return apiJson<CrmUser[]>("/api/managers/");
 }
 
-export async function listLeads(params: { status?: string; search?: string } = {}): Promise<LeadListItem[]> {
+export async function listLeads(params: { status?: string; search?: string; task_filter?: LeadTaskFilter } = {}): Promise<LeadListItem[]> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.search) qs.set("search", params.search);
+  if (params.task_filter) qs.set("task_filter", params.task_filter);
   const query = qs.toString() ? `?${qs.toString()}` : "";
   const data = await apiJson<LeadListItem[] | { results: LeadListItem[] }>(`/api/crm/leads/${query}`);
   return Array.isArray(data) ? data : data.results;
