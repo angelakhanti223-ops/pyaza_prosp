@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { listLeads, updateLead, STATUS_OPTIONS, type LeadListItem, type LeadStatus, type LeadTaskFilter } from "@/lib/crmApi";
 import StatusBadge from "@/components/crm/StatusBadge";
 import NewLeadModal from "@/components/crm/NewLeadModal";
@@ -184,21 +184,32 @@ export default function CrmLeadsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-navy">Заявки туристов</h1>
-          <p className="mt-1 text-xs text-foreground/50">
-            Контроль повторных контактов, оплат, этапов продажи и курсов туроператоров. Просрочено контактов: {overdueContacts}, оплат: {overduePayments}.
-          </p>
+    <div className="max-w-full overflow-hidden">
+      <div className="mb-5 rounded-3xl border border-black/5 bg-white/80 p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-navy">Заявки туристов</h1>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-foreground/50">
+              Контроль повторных контактов, оплат, этапов продажи и курсов туроператоров. Просрочено контактов: {overdueContacts}, оплат: {overduePayments}.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue sm:w-auto lg:shrink-0"
+          >
+            <Plus size={16} /> Создать обращение
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue"
-        >
-          + Создать обращение
-        </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setShowCreate(true)}
+        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-blue"
+      >
+        <Plus size={16} /> Заявка
+      </button>
 
       {showCreate && (
         <NewLeadModal
@@ -210,21 +221,21 @@ export default function CrmLeadsPage() {
         />
       )}
 
-      <div className="mb-3 flex flex-wrap gap-3">
-        <div className="relative">
+      <div className="mb-3 flex max-w-full flex-wrap gap-3">
+        <div className="relative w-full sm:w-72">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
           <input
             type="text"
             placeholder="Поиск по имени, телефону, email"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-72 rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue"
+            className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue"
           />
         </div>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue"
+          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue sm:w-auto"
         >
           <option value="">Все статусы</option>
           {STATUS_OPTIONS.map((s) => (
@@ -234,7 +245,7 @@ export default function CrmLeadsPage() {
         <select
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className="rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue"
+          className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue sm:w-auto"
         >
           <option value="">Все метки</option>
           {filterTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
@@ -272,8 +283,8 @@ export default function CrmLeadsPage() {
         {controlHint}
       </div>
 
-      <div className="overflow-auto rounded-2xl border border-black/5 bg-white">
-        <table className="min-w-[1540px] w-full text-left text-sm">
+      <div className="max-w-full overflow-x-auto rounded-2xl border border-black/5 bg-white">
+        <table className="w-full min-w-[1540px] text-left text-sm">
           <thead className="border-b border-black/5 bg-blue-light/40 text-xs text-foreground/50">
             <tr>
               <th className="px-4 py-3 font-medium">Клиент</th>
