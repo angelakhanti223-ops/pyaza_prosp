@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from accounts.permissions import is_head
 from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonRequestRecord, UonSyncLog
 from integrations.serializers import UonLeadRecordSerializer, UonRequestRecordSerializer
@@ -224,12 +223,6 @@ class LeadCrmCreateSerializer(serializers.ModelSerializer):
     def validate_consent(self, value):
         if not value:
             raise serializers.ValidationError('Подтвердите, что согласие клиента на обработку персональных данных получено.')
-        return value
-
-    def validate_assigned_manager(self, value):
-        request = self.context['request']
-        if value and value != request.user and not is_head(request.user):
-            raise serializers.ValidationError('Назначать заявку другому сотруднику может только руководитель.')
         return value
 
     def create(self, validated_data):
