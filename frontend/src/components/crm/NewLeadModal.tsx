@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { fetchDirections, type Direction } from "@/lib/api";
 import { createLead, listManagers, type CrmUser, type LeadDetail } from "@/lib/crmApi";
-import { useCrmAuth } from "./CrmAuthProvider";
+
+type Props = {
+  onClose: () => void;
+  onCreated: (lead: LeadDetail) => void;
+};
 
 const SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: "phone_call", label: "Телефонный звонок" },
@@ -23,15 +27,7 @@ const SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: "other", label: "Другое" },
 ];
 
-type Props = {
-  onClose: () => void;
-  onCreated: (lead: LeadDetail) => void;
-};
-
 export default function NewLeadModal({ onClose, onCreated }: Props) {
-  const { user } = useCrmAuth();
-  const isHead = user?.is_head ?? false;
-
   const [directions, setDirections] = useState<Direction[]>([]);
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [name, setName] = useState("");
@@ -54,8 +50,8 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
 
   useEffect(() => {
     fetchDirections().then(setDirections);
-    if (isHead) listManagers().then(setManagers);
-  }, [isHead]);
+    listManagers().then(setManagers).catch(() => setManagers([]));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +65,7 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
         direction: directionId ? Number(directionId) : undefined,
         initial_comment: comment || undefined,
         source,
-        assigned_manager: isHead && assignedManagerId ? Number(assignedManagerId) : undefined,
+        assigned_manager: assignedManagerId ? Number(assignedManagerId) : undefined,
         departure_city: departureCity || undefined,
         departure_date: departureDate || undefined,
         nights: nights ? Number(nights) : undefined,
@@ -116,12 +112,10 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
             <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue">
               {SOURCE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            {isHead && (
-              <select value={assignedManagerId} onChange={(e) => setAssignedManagerId(e.target.value)} className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue">
-                <option value="">Ответственный — я сама</option>
-                {managers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-              </select>
-            )}
+            <select value={assignedManagerId} onChange={(e) => setAssignedManagerId(e.target.value)} className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue">
+              <option value="">Ответственный — я сама</option>
+              {managers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+            </select>
           </div>
 
           <div className="mt-2 rounded-2xl bg-blue-light/40 p-4">
