@@ -69,7 +69,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-blue-light/40">
+    <div className="flex min-h-screen overflow-x-hidden bg-blue-light/40">
       <aside className="flex w-60 shrink-0 flex-col border-r border-black/5 bg-white">
         <div className="px-5 py-5">
           <span className="text-lg font-bold text-navy">
@@ -96,16 +96,16 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-black/5 bg-white px-6 py-3">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex min-w-0 items-center justify-between gap-3 border-b border-black/5 bg-white px-4 py-3 sm:px-6">
           <div />
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-4">
             {user?.is_head && (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   onClick={handleUonSync}
                   disabled={syncing}
-                  className="flex items-center gap-2 rounded-full border border-navy/15 px-4 py-2 text-xs font-semibold text-navy transition-colors hover:bg-blue-light disabled:opacity-60"
+                  className="flex shrink-0 items-center gap-2 rounded-full border border-navy/15 px-4 py-2 text-xs font-semibold text-navy transition-colors hover:bg-blue-light disabled:opacity-60"
                 >
                   <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
                   {syncing ? "Синхронизация…" : "Синхронизировать с U-ON"}
@@ -113,8 +113,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 {syncMessage && <span className="text-xs text-foreground/50">{syncMessage}</span>}
               </div>
             )}
-            <div className="text-right">
-              <p className="text-sm font-semibold text-navy">{user?.full_name}</p>
+            <div className="min-w-0 text-right">
+              <p className="truncate text-sm font-semibold text-navy">{user?.full_name}</p>
               <p className="text-[11px] text-foreground/50">
                 {user?.is_head ? "Руководитель" : "Менеджер"}
               </p>
@@ -122,13 +122,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={handleLogout}
               aria-label="Выйти"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy"
             >
               <LogOut size={17} />
             </button>
           </div>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-hidden p-3 sm:p-6">{children}</main>
       </div>
     </div>
   );
