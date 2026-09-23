@@ -2,13 +2,11 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import generics, mixins, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from accounts.permissions import is_head
 from kanban.models import Task
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
@@ -102,7 +100,7 @@ class LeadViewSet(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Мини-CRM: список/карточка заявки, создание вручную, смена статуса, комментарии, файлы."""
+    """Мини-CRM: все авторизованные сотрудники видят, создают и редактируют все заявки."""
 
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'post', 'head', 'options']
@@ -192,10 +190,6 @@ class LeadViewSet(
 
         serializer = self.get_serializer(lead, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-
-        if 'assigned_manager' in serializer.validated_data and not is_head(request.user):
-            raise PermissionDenied('Переназначать ответственного может только руководитель.')
-
         lead = serializer.save()
 
         new_status = serializer.validated_data.get('status')
