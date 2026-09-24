@@ -31,20 +31,29 @@ ARTICLE_SLUG = "gde-otdohnut-na-osennih-kanikulah"
 ZIP_PATH = Path("/tmp/autumn_holidays_article_images.zip")
 TARGET_DIR = Path(settings.MEDIA_ROOT) / "articles" / "autumn-holidays"
 
-FILES = {
-    "семья_на_закате_у_моря.png": ("cover.png", "Семейный отдых на осенних каникулах у моря", "Осенние каникулы можно провести у моря, в городе или в горах — главное подобрать формат под семью."),
-    "семейный_отдых_на_лазурном_берегу.png": ("beach.png", "Пляжный семейный отдых на осенних каникулах", "Пляжные направления на осенние каникулы чаще выбирают ради all inclusive, тёплого моря и детской инфраструктуры."),
-    "золотой_час_над_босфором.png": ("istanbul.png", "Осенний Стамбул для семейной поездки", "Стамбул подходит для осенних каникул, если хочется прогулок, Босфора, гастрономии и насыщенной экскурсионной программы."),
-    "осенний_курорт_с_видом_на_горы.png": ("mountains.png", "Горы и SPA на осенних каникулах", "Горные курорты и SPA-отели — спокойный вариант для семей, которые не хотят дальнего перелёта."),
-    "семейная_прогулка_у_золотого_собора.png": ("city.png", "Экскурсионные каникулы в красивом городе", "Городские поездки по России удобны для школьников: музеи, архитектура, прогулки и короткая дорога."),
-}
+# Канонические имена, если архив скачан с исходными русскими названиями.
+CANONICAL_SOURCES = [
+    "семья_на_закате_у_моря.png",
+    "семейный_отдых_на_лазурном_берегу.png",
+    "золотой_час_над_босфором.png",
+    "осенний_курорт_с_видом_на_горы.png",
+    "семейная_прогулка_у_золотого_собора.png",
+]
+
+TARGETS = [
+    ("cover.png", "Семейный отдых на осенних каникулах у моря", "Осенние каникулы можно провести у моря, в городе или в горах — главное подобрать формат под семью."),
+    ("beach.png", "Пляжный семейный отдых на осенних каникулах", "Пляжные направления на осенние каникулы чаще выбирают ради all inclusive, тёплого моря и детской инфраструктуры."),
+    ("istanbul.png", "Осенний Стамбул для семейной поездки", "Стамбул подходит для осенних каникул, если хочется прогулок, Босфора, гастрономии и насыщенной экскурсионной программы."),
+    ("mountains.png", "Горы и SPA на осенних каникулах", "Горные курорты и SPA-отели — спокойный вариант для семей, которые не хотят дальнего перелёта."),
+    ("city.png", "Экскурсионные каникулы в красивом городе", "Городские поездки по России удобны для школьников: музеи, архитектура, прогулки и короткая дорога."),
+]
 
 FIGURES = {
-    "cover": ("/media/articles/autumn-holidays/cover.png", FILES["семья_на_закате_у_моря.png"][1], FILES["семья_на_закате_у_моря.png"][2]),
-    "beach": ("/media/articles/autumn-holidays/beach.png", FILES["семейный_отдых_на_лазурном_берегу.png"][1], FILES["семейный_отдых_на_лазурном_берегу.png"][2]),
-    "istanbul": ("/media/articles/autumn-holidays/istanbul.png", FILES["золотой_час_над_босфором.png"][1], FILES["золотой_час_над_босфором.png"][2]),
-    "mountains": ("/media/articles/autumn-holidays/mountains.png", FILES["осенний_курорт_с_видом_на_горы.png"][1], FILES["осенний_курорт_с_видом_на_горы.png"][2]),
-    "city": ("/media/articles/autumn-holidays/city.png", FILES["семейная_прогулка_у_золотого_собора.png"][1], FILES["семейная_прогулка_у_золотого_собора.png"][2]),
+    "cover": ("/media/articles/autumn-holidays/cover.png", TARGETS[0][1], TARGETS[0][2]),
+    "beach": ("/media/articles/autumn-holidays/beach.png", TARGETS[1][1], TARGETS[1][2]),
+    "istanbul": ("/media/articles/autumn-holidays/istanbul.png", TARGETS[2][1], TARGETS[2][2]),
+    "mountains": ("/media/articles/autumn-holidays/mountains.png", TARGETS[3][1], TARGETS[3][2]),
+    "city": ("/media/articles/autumn-holidays/city.png", TARGETS[4][1], TARGETS[4][2]),
 }
 
 
@@ -77,11 +86,24 @@ if not ZIP_PATH.exists():
 
 TARGET_DIR.mkdir(parents=True, exist_ok=True)
 with ZipFile(ZIP_PATH) as archive:
-    names = set(archive.namelist())
-    missing = [name for name in FILES if name not in names]
-    if missing:
-        raise SystemExit("В архиве нет файлов: " + ", ".join(missing))
-    for source_name, (target_name, _alt, _caption) in FILES.items():
+    names = archive.namelist()
+    image_names = [name for name in names if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")) and not name.endswith("/")]
+    print("Файлы в архиве:")
+    for name in names:
+        print(" -", name)
+
+    canonical_ok = all(name in names for name in CANONICAL_SOURCES)
+    if canonical_ok:
+        selected = CANONICAL_SOURCES
+    else:
+        if len(image_names) < 5:
+            raise SystemExit("В архиве найдено меньше 5 изображений. Найдено: " + ", ".join(image_names))
+        selected = image_names[:5]
+        print("Русские имена не найдены, использую первые 5 изображений из архива по порядку:")
+        for name in selected:
+            print(" *", name)
+
+    for source_name, (target_name, _alt, _caption) in zip(selected, TARGETS):
         target = TARGET_DIR / target_name
         target.write_bytes(archive.read(source_name))
         print("saved", target)
