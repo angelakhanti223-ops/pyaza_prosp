@@ -112,6 +112,9 @@ export type SeaHotelSummary = {
   detail_level: string;
   needs_check_count: number;
   photo: string | null;
+  agent_perks_id?: string;
+  has_agent_perks: boolean;
+  contacts_count: number;
 };
 
 export type SeaDestination = {
