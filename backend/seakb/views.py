@@ -12,8 +12,21 @@ def _first_photo(data):
     return photos[0]['file'] if photos else None
 
 
+def _hotel_contacts_count(data):
+    contacts = data.get('hotel_contacts') or {}
+    if isinstance(contacts, dict):
+        return len([value for value in contacts.values() if value])
+    if isinstance(contacts, list):
+        return len([value for value in contacts if value])
+    return 0
+
+
 def hotel_summary(hotel):
     d = hotel.data
+    contacts_count = getattr(hotel, 'contacts_count', None)
+    if contacts_count is None:
+        contacts_count = hotel.contacts.count()
+    contacts_count += _hotel_contacts_count(d)
     return {
         'id': hotel.slug,
         'name': hotel.name,
@@ -31,6 +44,9 @@ def hotel_summary(hotel):
         'detail_level': hotel.detail_level,
         'needs_check_count': len(d.get('needs_check') or []),
         'photo': _first_photo(d),
+        'agent_perks_id': hotel.agent_perks_id,
+        'has_agent_perks': bool(hotel.agent_perks_id or d.get('agent_programs')),
+        'contacts_count': contacts_count,
     }
 
 
@@ -49,7 +65,7 @@ def destination_summary(dest):
 
 
 def _hotels_qs():
-    return Hotel.objects.select_related('country', 'destination')
+    return Hotel.objects.select_related('country', 'destination').prefetch_related('contacts')
 
 
 class SeaOverviewView(APIView):
