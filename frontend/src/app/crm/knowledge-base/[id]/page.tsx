@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Info, Pencil, Search, Trash2, X } from "lucide-react";
 import {
   deleteKnowledgeArticle,
   getKnowledgeArticle,
@@ -25,10 +25,6 @@ export default function CrmKnowledgeArticlePage() {
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Поиск внутри статьи сделан полностью императивно (refs, без useState) —
-  // в этой версии React повторный рендер сбрасывает dangerouslySetInnerHTML
-  // обратно к article.content, даже когда сама строка не изменилась, и любой
-  // setState здесь стирал бы только что вставленные <mark>.
   const contentRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const matchControlsRef = useRef<HTMLDivElement>(null);
@@ -157,9 +153,7 @@ export default function CrmKnowledgeArticlePage() {
     matchCountValue.current = count;
     currentMatchValue.current = count > 0 ? 0 : -1;
     updateCounterDisplay();
-    if (count > 0) {
-      scrollToMatch(0, container.querySelectorAll<HTMLElement>("mark.kb-highlight"));
-    }
+    if (count > 0) scrollToMatch(0, container.querySelectorAll<HTMLElement>("mark.kb-highlight"));
   }
 
   function goToMatch(delta: number) {
@@ -180,13 +174,8 @@ export default function CrmKnowledgeArticlePage() {
     updateCounterDisplay();
   }
 
-  if (loading) {
-    return <p className="text-sm text-foreground/50">Загрузка…</p>;
-  }
-
-  if (!article) {
-    return <p className="text-sm text-foreground/50">Статья не найдена.</p>;
-  }
+  if (loading) return <p className="text-sm text-foreground/50">Загрузка…</p>;
+  if (!article) return <p className="text-sm text-foreground/50">Статья не найдена.</p>;
 
   return (
     <div>
@@ -198,7 +187,7 @@ export default function CrmKnowledgeArticlePage() {
         База знаний
       </button>
 
-      <div className="rounded-2xl border border-black/5 bg-white p-6 sm:p-8">
+      <div className="rounded-2xl border border-black/5 bg-white p-5 sm:p-7">
         {editing ? (
           <div className="flex flex-col gap-3">
             <input
@@ -222,12 +211,11 @@ export default function CrmKnowledgeArticlePage() {
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={20}
+              rows={22}
               className="w-full rounded-lg border border-black/10 px-3 py-2 font-mono text-xs outline-none focus:border-blue"
             />
             <p className="text-xs text-foreground/40">
-              HTML-разметка (для форматированного текста удобнее правки через /admin →
-              Knowledgebase → Knowledge articles — там полноценный редактор).
+              HTML-разметка. Для больших правок лучше держать единый формат: кому предлагать, кому не предлагать, фишки, минусы, бонусы агенту, контакты, что проверить перед продажей.
             </p>
             <div className="flex gap-2">
               <button
@@ -249,9 +237,11 @@ export default function CrmKnowledgeArticlePage() {
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="text-xl font-bold text-navy">{article.title}</h1>
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue">
+                  {article.direction_name || "Внутренняя база"}
+                </p>
+                <h1 className="mt-1 text-2xl font-bold leading-tight text-navy">{article.title}</h1>
                 <p className="mt-1 text-xs text-foreground/40">
-                  {article.direction_name && <>{article.direction_name} · </>}
                   {article.author?.full_name && <>{article.author.full_name} · </>}
                   обновлено {new Date(article.updated_at).toLocaleDateString("ru-RU")}
                 </p>
@@ -274,52 +264,84 @@ export default function CrmKnowledgeArticlePage() {
               </div>
             </div>
 
-            <div className="relative mt-6 max-w-md">
-              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Найти в тексте статьи…"
-                defaultValue=""
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-24 text-sm outline-none focus:border-blue"
-              />
-              <div ref={matchControlsRef} className="absolute right-9 top-1/2 hidden -translate-y-1/2 items-center gap-1">
-                <span ref={counterRef} className="mr-1 text-xs text-foreground/50" />
-                <button
-                  onClick={() => goToMatch(-1)}
-                  aria-label="Предыдущее совпадение"
-                  className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  onClick={() => goToMatch(1)}
-                  aria-label="Следующее совпадение"
-                  className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
-                >
-                  <ChevronDown size={14} />
-                </button>
+            <div className="mt-5 rounded-2xl border border-gold/25 bg-gold/10 p-4">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gold-dark">
+                <Info size={15} /> Как читать базу
+              </p>
+              <div className="mt-2 grid grid-cols-1 gap-2 text-sm text-navy/80 md:grid-cols-2">
+                <p>• ищи отель, курорт, сеть, бонус, контакт или фамилию представителя;</p>
+                <p>• проверяй: кому подходит, кому не предлагать, плюсы/минусы, условия агенту и контакты.</p>
               </div>
-              <button
-                onClick={handleClearSearch}
-                aria-label="Очистить поиск"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy"
-              >
-                <X size={14} />
-              </button>
             </div>
-            <p ref={noResultsRef} className="mt-1.5 hidden text-xs text-foreground/40">Ничего не найдено.</p>
+
+            <div className="mt-5 rounded-2xl border border-black/5 bg-cream p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/40">Поиск внутри этой базы</p>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <div className="relative flex-1">
+                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Например: контакты, бонус, семейный, пляж, вилла, отель…"
+                    defaultValue=""
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSearch}
+                    className="rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue"
+                  >
+                    Найти
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-foreground/60 hover:bg-blue-light/40"
+                  >
+                    Сброс
+                  </button>
+                  <div ref={matchControlsRef} className="hidden items-center gap-1 rounded-full bg-white px-2 py-1">
+                    <span ref={counterRef} className="mr-1 text-xs text-foreground/50" />
+                    <button onClick={() => goToMatch(-1)} aria-label="Предыдущее совпадение" className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy">
+                      <ChevronUp size={14} />
+                    </button>
+                    <button onClick={() => goToMatch(1)} aria-label="Следующее совпадение" className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy">
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p ref={noResultsRef} className="mt-1.5 hidden text-xs text-foreground/40">Ничего не найдено.</p>
+            </div>
 
             <style>{`
-              .kb-content nav#nav a { display: block; padding: 3px 0; }
+              .kb-content { font-size: 15px; line-height: 1.75; }
+              .kb-content nav#nav { margin: 18px 0; padding: 14px 16px; border-radius: 16px; background: #f7fbff; border: 1px solid rgba(15, 48, 87, .08); }
+              .kb-content nav#nav a { display: block; padding: 4px 0; color: #0a63b7; text-decoration: none; }
               .kb-content #q, .kb-content #hits { display: none; }
-              .kb-content mark.kb-highlight { background: #fde68a; border-radius: 2px; }
+              .kb-content h2 { margin-top: 34px; padding-top: 18px; border-top: 1px solid rgba(15, 48, 87, .10); font-size: 20px; line-height: 1.35; }
+              .kb-content h3 { margin-top: 24px; font-size: 16px; line-height: 1.4; }
+              .kb-content p { margin-top: 10px; margin-bottom: 10px; }
+              .kb-content ul, .kb-content ol { padding-left: 20px; }
+              .kb-content li { margin: 5px 0; }
+              .kb-content table { width: 100%; display: block; overflow-x: auto; border-collapse: separate; border-spacing: 0; margin: 18px 0; border: 1px solid rgba(15, 48, 87, .10); border-radius: 16px; background: white; }
+              .kb-content thead { background: #eef7ff; }
+              .kb-content th { color: #082b5f; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+              .kb-content th, .kb-content td { padding: 10px 12px; border-bottom: 1px solid rgba(15, 48, 87, .08); vertical-align: top; }
+              .kb-content tr:last-child td { border-bottom: 0; }
+              .kb-content img { max-width: 100%; border-radius: 16px; margin: 16px 0; }
+              .kb-content blockquote { margin: 18px 0; padding: 14px 18px; border-left: 4px solid #d9a52b; border-radius: 12px; background: #fff9e8; color: #082b5f; }
+              .kb-content hr { margin: 28px 0; border-color: rgba(15, 48, 87, .10); }
+              .kb-content mark.kb-highlight { background: #fde68a; border-radius: 3px; padding: 0 2px; }
               .kb-content mark.kb-highlight-active { background: #f59e0b; }
             `}</style>
+
             <div
               ref={contentRef}
-              className="kb-content prose prose-sm mt-4 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-img:rounded-xl"
+              className="kb-content prose prose-sm mt-6 max-w-none rounded-2xl border border-black/5 bg-white text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-strong:text-navy"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
           </>
