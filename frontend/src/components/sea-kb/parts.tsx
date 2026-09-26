@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Mail, MessageCircle, Phone, Send, X } from "lucide-react";
+import { AlertTriangle, Gift, Mail, MessageCircle, Phone, Send, UserRoundCheck, X } from "lucide-react";
 import {
   seaPhotoUrl,
   type SeaContact,
@@ -324,6 +324,9 @@ export function PerkGroupView({ group, showHotels = true }: { group: SeaPerkGrou
 }
 
 export function HotelCard({ hotel }: { hotel: SeaHotelSummary }) {
+  const audience = hotel.for_whom.slice(0, 3);
+  const hiddenAudienceCount = Math.max(0, hotel.for_whom.length - audience.length);
+
   return (
     <Link
       href={`/crm/kb/sea/hotels/${hotel.id}`}
@@ -351,7 +354,38 @@ export function HotelCard({ hotel }: { hotel: SeaHotelSummary }) {
         </h3>
         {hotel.brand && <p className="text-xs text-foreground/50">{hotel.brand}</p>}
         {hotel.positioning && <p className="line-clamp-3 text-xs leading-relaxed text-foreground/70">{hotel.positioning}</p>}
+
+        <div className="mt-2 rounded-xl bg-blue-light/35 p-2">
+          <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-blue">
+            <UserRoundCheck size={12} /> Кому предлагать
+          </p>
+          {audience.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {audience.map((w) => (
+                <span key={w} className="rounded-full bg-white px-2 py-0.5 text-[11px] text-navy">
+                  {w}
+                </span>
+              ))}
+              {hiddenAudienceCount > 0 && (
+                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-navy/60">+{hiddenAudienceCount}</span>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-foreground/45">Не заполнено</p>
+          )}
+        </div>
+
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+          {hotel.has_agent_perks && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[11px] font-semibold text-gold-dark">
+              <Gift size={11} /> Плюшки агенту
+            </span>
+          )}
+          {hotel.contacts_count > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-light px-2 py-0.5 text-[11px] font-semibold text-navy">
+              <Phone size={11} /> Контакты отеля
+            </span>
+          )}
           <NeedsCheckPill count={hotel.needs_check_count} />
           {hotel.detail_level === "brief" && (
             <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] text-foreground/50">Краткая карточка</span>
