@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Info, Pencil, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Search, Trash2, X } from "lucide-react";
 import {
   deleteKnowledgeArticle,
   getKnowledgeArticle,
@@ -10,6 +10,47 @@ import {
   type KnowledgeArticleDetail,
 } from "@/lib/crmApi";
 import { fetchDirections, type Direction } from "@/lib/api";
+
+type TocItem = { id: string; label: string; level: number };
+
+function slugify(value: string, index: number) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-zа-яё0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return slug || `section-${index}`;
+}
+
+function splitLongPlainParagraph(paragraph: HTMLParagraphElement) {
+  if (paragraph.dataset.kbSplit === "1") return;
+  if (paragraph.querySelector("a, img, table, ul, ol, br")) return;
+  const text = (paragraph.textContent ?? "").replace(/\s+/g, " ").trim();
+  if (text.length < 420) return;
+
+  const sentences = text.split(/(?<=[.!?…])\s+/).filter(Boolean);
+  if (sentences.length < 3) return;
+
+  const fragment = document.createDocumentFragment();
+  let buffer = "";
+  const push = () => {
+    const value = buffer.trim();
+    if (!value) return;
+    const p = document.createElement("p");
+    p.dataset.kbSplit = "1";
+    p.textContent = value;
+    fragment.appendChild(p);
+    buffer = "";
+  };
+
+  for (const sentence of sentences) {
+    if ((buffer + " " + sentence).trim().length > 280) push();
+    buffer = `${buffer} ${sentence}`.trim();
+  }
+  push();
+
+  paragraph.replaceWith(fragment);
+}
 
 export default function CrmKnowledgeArticlePage() {
   const params = useParams<{ id: string }>();
@@ -24,6 +65,7 @@ export default function CrmKnowledgeArticlePage() {
   const [directionId, setDirectionId] = useState("");
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [toc, setToc] = useState<TocItem[]>([]);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +93,28 @@ export default function CrmKnowledgeArticlePage() {
   useEffect(() => {
     fetchDirections().then(setDirections);
   }, []);
+
+  useEffect(() => {
+    if (!article || editing) return;
+    const timer = window.setTimeout(() => {
+      const container = contentRef.current;
+      if (!container) return;
+
+      container.querySelectorAll<HTMLParagraphElement>("p").forEach(splitLongPlainParagraph);
+
+      const headings = Array.from(container.querySelectorAll<HTMLElement>("h2, h3"));
+      const items = headings.map((heading, index) => {
+        if (!heading.id) heading.id = slugify(heading.textContent ?? "", index);
+        return {
+          id: heading.id,
+          label: (heading.textContent ?? "").trim(),
+          level: heading.tagName === "H3" ? 3 : 2,
+        };
+      });
+      setToc(items.filter((item) => item.label).slice(0, 18));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [article, editing]);
 
   async function handleSave() {
     setSaving(true);
@@ -187,7 +251,7 @@ export default function CrmKnowledgeArticlePage() {
         База знаний
       </button>
 
-      <div className="rounded-2xl border border-black/5 bg-white p-5 sm:p-7">
+      <div className="rounded-2xl border border-black/5 bg-white p-6 sm:p-8">
         {editing ? (
           <div className="flex flex-col gap-3">
             <input
@@ -211,11 +275,11 @@ export default function CrmKnowledgeArticlePage() {
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={22}
+              rows={20}
               className="w-full rounded-lg border border-black/10 px-3 py-2 font-mono text-xs outline-none focus:border-blue"
             />
             <p className="text-xs text-foreground/40">
-              HTML-разметка. Для больших правок лучше держать единый формат: кому предлагать, кому не предлагать, фишки, минусы, бонусы агенту, контакты, что проверить перед продажей.
+              HTML-разметка. Для крупной базы лучше делать структуру: h2 → блок → списки → карточки.
             </p>
             <div className="flex gap-2">
               <button
@@ -237,73 +301,37 @@ export default function CrmKnowledgeArticlePage() {
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue">
-                  {article.direction_name || "Внутренняя база"}
-                </p>
-                <h1 className="mt-1 text-2xl font-bold leading-tight text-navy">{article.title}</h1>
+                <h1 className="text-xl font-bold text-navy">{article.title}</h1>
                 <p className="mt-1 text-xs text-foreground/40">
+                  {article.direction_name && <>{article.direction_name} · </>}
                   {article.author?.full_name && <>{article.author.full_name} · </>}
                   обновлено {new Date(article.updated_at).toLocaleDateString("ru-RU")}
                 </p>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setEditing(true)}
-                  aria-label="Редактировать"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy"
-                >
+                <button onClick={() => setEditing(true)} aria-label="Редактировать" className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy">
                   <Pencil size={16} />
                 </button>
-                <button
-                  onClick={handleDelete}
-                  aria-label="Удалить"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-red-50 hover:text-red-600"
-                >
+                <button onClick={handleDelete} aria-label="Удалить" className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-red-50 hover:text-red-600">
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-gold/25 bg-gold/10 p-4">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gold-dark">
-                <Info size={15} /> Как читать базу
-              </p>
-              <div className="mt-2 grid grid-cols-1 gap-2 text-sm text-navy/80 md:grid-cols-2">
-                <p>• ищи отель, курорт, сеть, бонус, контакт или фамилию представителя;</p>
-                <p>• проверяй: кому подходит, кому не предлагать, плюсы/минусы, условия агенту и контакты.</p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-black/5 bg-cream p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/40">Поиск внутри этой базы</p>
-              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="mt-6 rounded-2xl border border-blue/10 bg-blue-light/30 p-4">
+              <p className="text-sm font-semibold text-navy">Поиск по этой базе</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                 <div className="relative flex-1">
                   <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Например: контакты, бонус, семейный, пляж, вилла, отель…"
+                    placeholder="Например: депозит, семейным, Dubai Marina, трансфер, бонус…"
                     defaultValue=""
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue"
+                    className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-24 text-sm outline-none focus:border-blue"
                   />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSearch}
-                    className="rounded-full bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue"
-                  >
-                    Найти
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearSearch}
-                    className="rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-foreground/60 hover:bg-blue-light/40"
-                  >
-                    Сброс
-                  </button>
-                  <div ref={matchControlsRef} className="hidden items-center gap-1 rounded-full bg-white px-2 py-1">
+                  <div ref={matchControlsRef} className="absolute right-9 top-1/2 hidden -translate-y-1/2 items-center gap-1">
                     <span ref={counterRef} className="mr-1 text-xs text-foreground/50" />
                     <button onClick={() => goToMatch(-1)} aria-label="Предыдущее совпадение" className="rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy">
                       <ChevronUp size={14} />
@@ -312,36 +340,55 @@ export default function CrmKnowledgeArticlePage() {
                       <ChevronDown size={14} />
                     </button>
                   </div>
+                  <button onClick={handleClearSearch} aria-label="Очистить поиск" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-foreground/50 hover:bg-blue-light hover:text-navy">
+                    <X size={14} />
+                  </button>
                 </div>
+                <button onClick={handleSearch} className="rounded-xl bg-navy px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue">
+                  Найти
+                </button>
               </div>
               <p ref={noResultsRef} className="mt-1.5 hidden text-xs text-foreground/40">Ничего не найдено.</p>
             </div>
 
+            {toc.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-black/5 bg-cream p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/40">Содержание</p>
+                <div className="flex flex-wrap gap-2">
+                  {toc.map((item) => (
+                    <a key={item.id} href={`#${item.id}`} className={`rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs text-navy hover:border-blue hover:text-blue ${item.level === 3 ? "opacity-80" : "font-semibold"}`}>
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <style>{`
               .kb-content { font-size: 15px; line-height: 1.75; }
-              .kb-content nav#nav { margin: 18px 0; padding: 14px 16px; border-radius: 16px; background: #f7fbff; border: 1px solid rgba(15, 48, 87, .08); }
-              .kb-content nav#nav a { display: block; padding: 4px 0; color: #0a63b7; text-decoration: none; }
+              .kb-content nav#nav a { display: block; padding: 3px 0; }
               .kb-content #q, .kb-content #hits { display: none; }
-              .kb-content h2 { margin-top: 34px; padding-top: 18px; border-top: 1px solid rgba(15, 48, 87, .10); font-size: 20px; line-height: 1.35; }
-              .kb-content h3 { margin-top: 24px; font-size: 16px; line-height: 1.4; }
-              .kb-content p { margin-top: 10px; margin-bottom: 10px; }
-              .kb-content ul, .kb-content ol { padding-left: 20px; }
-              .kb-content li { margin: 5px 0; }
-              .kb-content table { width: 100%; display: block; overflow-x: auto; border-collapse: separate; border-spacing: 0; margin: 18px 0; border: 1px solid rgba(15, 48, 87, .10); border-radius: 16px; background: white; }
-              .kb-content thead { background: #eef7ff; }
-              .kb-content th { color: #082b5f; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
-              .kb-content th, .kb-content td { padding: 10px 12px; border-bottom: 1px solid rgba(15, 48, 87, .08); vertical-align: top; }
-              .kb-content tr:last-child td { border-bottom: 0; }
-              .kb-content img { max-width: 100%; border-radius: 16px; margin: 16px 0; }
-              .kb-content blockquote { margin: 18px 0; padding: 14px 18px; border-left: 4px solid #d9a52b; border-radius: 12px; background: #fff9e8; color: #082b5f; }
-              .kb-content hr { margin: 28px 0; border-color: rgba(15, 48, 87, .10); }
               .kb-content mark.kb-highlight { background: #fde68a; border-radius: 3px; padding: 0 2px; }
-              .kb-content mark.kb-highlight-active { background: #f59e0b; }
+              .kb-content mark.kb-highlight-active { background: #f59e0b; color: #111827; }
+              .kb-content h2 { margin-top: 34px; border-top: 1px solid rgba(0,0,0,.08); padding-top: 24px; font-size: 22px; line-height: 1.25; }
+              .kb-content h3 { margin-top: 22px; font-size: 18px; line-height: 1.35; }
+              .kb-content h4 { margin-top: 18px; font-size: 15px; font-weight: 700; color: #092a5e; }
+              .kb-content p { margin: 10px 0; max-width: 82ch; }
+              .kb-content ul, .kb-content ol { margin: 10px 0 16px 0; padding-left: 20px; }
+              .kb-content li { margin: 6px 0; }
+              .kb-content table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 13px; }
+              .kb-content th, .kb-content td { border: 1px solid rgba(0,0,0,.08); padding: 10px 12px; vertical-align: top; }
+              .kb-content th { background: #f1f6ff; color: #092a5e; font-weight: 700; }
+              .kb-content img { max-height: 420px; object-fit: cover; }
+              .kb-content .grid { display: flex !important; flex-direction: column !important; gap: 14px !important; }
+              .kb-content .grid > * { width: 100% !important; max-width: 100% !important; }
+              .kb-content .grid > div, .kb-content .grid > section, .kb-content .grid > article { border-left: 4px solid #f0c76a !important; padding: 18px 20px !important; }
+              .kb-content .grid > * p { max-width: 88ch; }
+              .kb-content :where(section, article, h2, h3) { scroll-margin-top: 90px; }
             `}</style>
-
             <div
               ref={contentRef}
-              className="kb-content prose prose-sm mt-6 max-w-none rounded-2xl border border-black/5 bg-white text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-strong:text-navy"
+              className="kb-content prose prose-sm mt-6 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue prose-img:rounded-xl"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
           </>
