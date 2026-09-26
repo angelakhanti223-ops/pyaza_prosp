@@ -22,13 +22,34 @@ function slugify(value: string, index: number) {
   return slug || `section-${index}`;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function splitSentences(text: string) {
+  return normalizeText(text)
+    .split(/(?<=[.!?…])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function splitLongPlainParagraph(paragraph: HTMLParagraphElement) {
   if (paragraph.dataset.kbSplit === "1") return;
+  if (paragraph.closest(".kb-smart-card")) return;
   if (paragraph.querySelector("a, img, table, ul, ol, br")) return;
-  const text = (paragraph.textContent ?? "").replace(/\s+/g, " ").trim();
+  const text = normalizeText(paragraph.textContent ?? "");
   if (text.length < 420) return;
 
-  const sentences = text.split(/(?<=[.!?…])\s+/).filter(Boolean);
+  const sentences = splitSentences(text);
   if (sentences.length < 3) return;
 
   const fragment = document.createDocumentFragment();
@@ -50,6 +71,168 @@ function splitLongPlainParagraph(paragraph: HTMLParagraphElement) {
   push();
 
   paragraph.replaceWith(fragment);
+}
+
+function directHeading(element: HTMLElement) {
+  return Array.from(element.children).find((child) => ["H3", "H4"].includes(child.tagName)) as HTMLElement | undefined;
+}
+
+function uniqueList(items: string[], limit = 5) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of items) {
+    const clean = normalizeText(item).replace(/^[•\-–—\s]+/, "").replace(/[.;,\s]+$/, "");
+    if (!clean || clean.length < 6) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function pickSentences(sentences: string[], words: string[], limit = 3) {
+  return uniqueList(
+    sentences.filter((sentence) => {
+      const lower = sentence.toLowerCase();
+      return words.some((word) => lower.includes(word));
+    }),
+    limit,
+  );
+}
+
+function splitItems(value: string, limit = 7) {
+  return uniqueList(
+    value
+      .split(/[,;]\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    limit,
+  );
+}
+
+function extractAfterMarker(text: string, markers: string[], stopMarkers: string[], limit = 7) {
+  const lower = text.toLowerCase();
+  for (const marker of markers) {
+    const idx = lower.indexOf(marker.toLowerCase());
+    if (idx === -1) continue;
+    let part = text.slice(idx + marker.length);
+    let end = part.length;
+    const partLower = part.toLowerCase();
+    for (const stop of stopMarkers) {
+      const stopIdx = partLower.indexOf(stop.toLowerCase());
+      if (stopIdx > 10 && stopIdx < end) end = stopIdx;
+    }
+    part = part.slice(0, end).split(/[.!?…]/)[0] ?? "";
+    const items = splitItems(part, limit);
+    if (items.length) return items;
+  }
+  return [];
+}
+
+function renderList(title: string, items: string[], tone: "blue" | "gold" | "green" | "red" = "blue") {
+  if (!items.length) return "";
+  return `
+    <div class="kb-smart-block kb-smart-block-${tone}">
+      <p class="kb-smart-label">${escapeHtml(title)}</p>
+      <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </div>
+  `;
+}
+
+function renderParagraphs(sentences: string[]) {
+  const result: string[] = [];
+  let buffer: string[] = [];
+  let length = 0;
+
+  const push = () => {
+    if (!buffer.length) return;
+    result.push(`<p>${escapeHtml(buffer.join(" "))}</p>`);
+    buffer = [];
+    length = 0;
+  };
+
+  for (const sentence of sentences) {
+    if (length + sentence.length > 360) push();
+    buffer.push(sentence);
+    length += sentence.length;
+  }
+  push();
+  return result.join("");
+}
+
+function enhanceLongCard(card: HTMLElement) {
+  if (card.dataset.kbEnhanced === "1") return;
+  if (card.closest(".kb-smart-card")) return;
+
+  const heading = directHeading(card);
+  if (!heading) return;
+
+  const title = normalizeText(heading.textContent ?? "");
+  const bodyText = normalizeText(
+    Array.from(card.children)
+      .filter((child) => child !== heading)
+      .map((child) => child.textContent ?? "")
+      .join(" "),
+  );
+
+  if (!title || bodyText.length < 520) return;
+
+  const sentences = splitSentences(bodyText);
+  if (sentences.length < 4) return;
+
+  const brief = sentences.slice(0, Math.min(2, sentences.length));
+  const who = pickSentences(sentences, ["подходит", "подойдут", "для семей", "семьям", "парам", "гостям", "дет", "шопинг", "культур", "спокой", "актив"], 3);
+  const notFor = pickSentences(sentences, ["не под", "кому не", "не стоит", "минус", "недостат"], 2);
+  const important = pickSentences(sentences, ["важно", "учитывать", "провер", "депозит", "сезон", "перел", "виза", "безвиз", "аэропорт", "трансфер"], 4);
+  const hotels = extractAfterMarker(
+    bodyText,
+    ["отели:", "отели 5*:", "городские и пляжные отели 5*:", "рекомендуемые отели:", "пляжные отели:", "шопинг:"],
+    ["подходит", "из презентации", "важно", "кому", "основные", "районы", "лето", "высокий сезон"],
+    7,
+  );
+  const areas = extractAfterMarker(
+    bodyText,
+    ["районы для проживания:", "основные пляжные районы —", "основные пляжные районы:"],
+    ["шопинг", "отели", "подходит", "из презентации"],
+    5,
+  );
+
+  const detailSentences = sentences.slice(brief.length);
+  const blocks = [
+    renderList("Кому предлагать", who, "green"),
+    renderList("Кому не предлагать / ограничения", notFor, "red"),
+    renderList("Что проверить перед продажей", important, "gold"),
+    renderList("Районы", areas, "blue"),
+    renderList("Отели / ориентиры", hotels, "blue"),
+  ].join("");
+
+  card.dataset.kbEnhanced = "1";
+  card.classList.add("kb-smart-card");
+  card.innerHTML = `
+    <div class="kb-smart-head">
+      <h3>${escapeHtml(title)}</h3>
+      <span>карточка направления</span>
+    </div>
+    <div class="kb-smart-brief">${renderParagraphs(brief)}</div>
+    ${blocks ? `<div class="kb-smart-grid">${blocks}</div>` : ""}
+    <details class="kb-smart-details">
+      <summary>Полное описание</summary>
+      <div>${renderParagraphs(detailSentences)}</div>
+    </details>
+  `;
+}
+
+function enhanceKnowledgeContent(container: HTMLElement) {
+  container.querySelectorAll<HTMLParagraphElement>("p").forEach(splitLongPlainParagraph);
+
+  container.querySelectorAll<HTMLElement>(".grid").forEach((grid) => {
+    grid.classList.add("kb-one-column-grid");
+  });
+
+  const candidates = Array.from(container.querySelectorAll<HTMLElement>("div, section, article"));
+  candidates.forEach(enhanceLongCard);
 }
 
 export default function CrmKnowledgeArticlePage() {
@@ -100,7 +283,7 @@ export default function CrmKnowledgeArticlePage() {
       const container = contentRef.current;
       if (!container) return;
 
-      container.querySelectorAll<HTMLParagraphElement>("p").forEach(splitLongPlainParagraph);
+      enhanceKnowledgeContent(container);
 
       const headings = Array.from(container.querySelectorAll<HTMLElement>("h2, h3"));
       const items = headings.map((heading, index) => {
@@ -165,6 +348,8 @@ export default function CrmKnowledgeArticlePage() {
     marks.forEach((m) => m.classList.remove("kb-highlight-active"));
     const target = marks[index];
     if (target) {
+      const details = target.closest("details");
+      if (details) details.setAttribute("open", "true");
       target.classList.add("kb-highlight-active");
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -380,11 +565,28 @@ export default function CrmKnowledgeArticlePage() {
               .kb-content th, .kb-content td { border: 1px solid rgba(0,0,0,.08); padding: 10px 12px; vertical-align: top; }
               .kb-content th { background: #f1f6ff; color: #092a5e; font-weight: 700; }
               .kb-content img { max-height: 420px; object-fit: cover; }
-              .kb-content .grid { display: flex !important; flex-direction: column !important; gap: 14px !important; }
+              .kb-content .grid, .kb-content .kb-one-column-grid { display: flex !important; flex-direction: column !important; gap: 16px !important; }
               .kb-content .grid > * { width: 100% !important; max-width: 100% !important; }
-              .kb-content .grid > div, .kb-content .grid > section, .kb-content .grid > article { border-left: 4px solid #f0c76a !important; padding: 18px 20px !important; }
-              .kb-content .grid > * p { max-width: 88ch; }
+              .kb-content .kb-smart-card { border: 1px solid rgba(9,42,94,.12) !important; border-left: 5px solid #f0c76a !important; border-radius: 18px !important; background: #fff !important; padding: 18px 20px !important; box-shadow: 0 6px 20px rgba(9,42,94,.05); }
+              .kb-content .kb-smart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(0,0,0,.06); padding-bottom: 10px; margin-bottom: 12px; }
+              .kb-content .kb-smart-head h3 { margin: 0; font-size: 20px; line-height: 1.25; }
+              .kb-content .kb-smart-head span { flex: none; border-radius: 999px; background: #f8ecd0; padding: 5px 10px; font-size: 11px; font-weight: 700; color: #9a6a00; text-transform: uppercase; letter-spacing: .04em; }
+              .kb-content .kb-smart-brief { border-radius: 14px; background: #f7fbff; padding: 10px 12px; color: rgba(15,23,42,.82); }
+              .kb-content .kb-smart-brief p { margin: 0; max-width: none; }
+              .kb-content .kb-smart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+              .kb-content .kb-smart-block { border-radius: 14px; padding: 12px 14px; border: 1px solid rgba(0,0,0,.06); }
+              .kb-content .kb-smart-block-blue { background: #f7fbff; }
+              .kb-content .kb-smart-block-gold { background: #fff8e8; }
+              .kb-content .kb-smart-block-green { background: #f1fbf5; }
+              .kb-content .kb-smart-block-red { background: #fff4f4; }
+              .kb-content .kb-smart-label { margin: 0 0 6px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: rgba(9,42,94,.65); }
+              .kb-content .kb-smart-block ul { margin: 0; padding-left: 18px; }
+              .kb-content .kb-smart-block li { margin: 4px 0; line-height: 1.5; }
+              .kb-content .kb-smart-details { margin-top: 12px; border-top: 1px dashed rgba(0,0,0,.12); padding-top: 10px; }
+              .kb-content .kb-smart-details summary { cursor: pointer; color: #1f64d1; font-weight: 700; font-size: 13px; }
+              .kb-content .kb-smart-details p { max-width: 88ch; }
               .kb-content :where(section, article, h2, h3) { scroll-margin-top: 90px; }
+              @media (max-width: 900px) { .kb-content .kb-smart-grid { grid-template-columns: 1fr; } }
             `}</style>
             <div
               ref={contentRef}
