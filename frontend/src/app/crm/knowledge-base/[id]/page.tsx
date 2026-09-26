@@ -13,6 +13,26 @@ import { fetchDirections, type Direction } from "@/lib/api";
 
 type TocItem = { id: string; label: string; level: number };
 
+const CARD_CONTEXT_RE = /эмират|регион|страны|страна|авиакомпан|перевозчик|airline/i;
+const AIRLINE_RE = /авиакомпан|перевозчик|airline|emirates|etihad|qatar|flydubai|air arabia|aeroflot|аэрофлот|победа|azur|red wings|turkish|oman air|gulf air/i;
+const COUNTRY_RE = /дубай|абу-даби|шардж|рас-эль-хайм|фуджейр|аджман|оаэ|оман|катар|бахрейн|сауд|иордан|мальдив|шри-ланк|таиланд|вьетнам|индонез|малайз/i;
+
+function cleanText(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function splitSentences(value: string) {
+  return cleanText(value)
+    .split(/(?<=[.!?…])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function cut(value: string, limit = 240) {
+  const text = cleanText(value);
+  return text.length > limit ? `${text.slice(0, limit).trim()}…` : text;
+}
+
 function slugify(value: string, index: number) {
   const slug = value
     .toLowerCase()
@@ -22,31 +42,210 @@ function slugify(value: string, index: number) {
   return slug || `section-${index}`;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function createEl<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text) element.textContent = text;
+  return element;
 }
 
-function normalizeText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
+function findPreviousHeadingText(root: HTMLElement, element: Element) {
+  const headings = Array.from(root.querySelectorAll<HTMLElement>("h1,h2,h3,h4"));
+  let result = "";
+  for (const heading of headings) {
+    if (heading === element) break;
+    if (heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      result = cleanText(heading.textContent);
+    }
+  }
+  return result;
 }
 
-function splitSentences(text: string) {
-  return normalizeText(text)
-    .split(/(?<=[.!?…])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+function extractByRegex(text: string, regex: RegExp, limit = 4) {
+  return splitSentences(text)
+    .filter((sentence) => regex.test(sentence))
+    .map((sentence) => cut(sentence, 220))
+    .filter((sentence, index, array) => array.indexOf(sentence) === index)
+    .slice(0, limit);
+}
+
+function chipsForCard(title: string, text: string, isAirline: boolean) {
+  const all = `${title} ${text}`.toLowerCase();
+  const chips: string[] = [];
+
+  if (isAirline) chips.push("Авиакомпания");
+  else chips.push("Страна / регион");
+
+  if (/безвиз|без виз/.test(all)) chips.push("Безвиз / простой въезд");
+  if (/прям/.test(all)) chips.push("Прямые рейсы");
+  if (/стыков/.test(all)) chips.push("Стыковки");
+  if (/багаж/.test(all)) chips.push("Багаж проверить");
+  if (/депозит/.test(all)) chips.push("Депозиты");
+  if (/семь|дет/.test(all)) chips.push("Семьи");
+  if (/пляж|море|остров/.test(all)) chips.push("Пляж");
+  if (/шопинг|торгов/.test(all)) chips.push("Шопинг");
+  if (/музе|культур|экскурс/.test(all)) chips.push("Экскурсии");
+  if (/парк|аквапарк|развлеч/.test(all)) chips.push("Развлечения");
+
+  return [...new Set(chips)].slice(0, 7);
+}
+
+function countrySeasonality(title: string, text: string) {
+  const all = `${title} ${text}`.toLowerCase();
+  const existing = extractByRegex(text, /сезон|октябр|ноябр|декабр|январ|феврал|март|апрел|май|июн|июл|август|сентябр|летом|зимой|жарко|дожд/i, 3);
+  if (existing.length >= 2) return existing;
+
+  if (/дубай|абу-даби|шардж|рас-эль-хайм|фуджейр|аджман|оаэ|оман|катар|бахрейн|сауд/.test(all)) {
+    return [
+      "Лучший период продаж: октябрь–апрель — комфортнее для прогулок, экскурсий, пляжа и семейного отдыха.",
+      "Май–сентябрь — жаркий низкий сезон: продавать через хорошие отели, бассейны, аквапарки, моллы, рестораны и выгодные цены.",
+      "Перед продажей проверить: депозит, пляж/трансфер до пляжа, закрытия бассейнов и ресторанов, фактическую авиапрограмму на даты клиента.",
+    ];
+  }
+
+  if (/мальдив/.test(all)) {
+    return [
+      "Ориентир по сезону: декабрь–апрель — высокий сезон, май–октябрь — больше риск дождей, но часто лучше цены.",
+      "Для продажи важно проверять не только погоду, но и трансфер, тип виллы, питание, риф, насекомых и условия для детей.",
+    ];
+  }
+
+  if (/таиланд|вьетнам|индонез|малайз|шри-ланк/.test(all)) {
+    return [
+      "Сезонность зависит от конкретного курорта: перед продажей проверять месяц поездки, побережье, дожди, волны и трансфер.",
+      "В карточке нужна привязка к датам клиента: где море спокойнее, где лучше экскурсии, где возможны ливни или волны.",
+    ];
+  }
+
+  return ["Сезонность в исходной карточке не выделена. Перед продажей проверить погоду, море, ограничения отеля и авиапрограмму на даты клиента."];
+}
+
+function airlineSeasonality(text: string) {
+  const found = extractByRegex(text, /сезон|летает|рейс|расписан|добавля|октябр|ноябр|декабр|чартер|регуляр/i, 3);
+  return [
+    ...(found.length ? found : []),
+    "Расписание, частота рейсов, багаж и стыковки проверять по датам заявки: авиасетка меняется по сезону и направлению.",
+  ].slice(0, 4);
+}
+
+function inferWho(title: string, text: string, isAirline: boolean) {
+  const found = extractByRegex(
+    text,
+    /подходит|для гостей|для турист|для семей|семь|дет|парам|молодеж|шопинг|музе|культур|пляж|экскурс|премиум|эконом|бюджет/i,
+    4,
+  );
+  if (found.length) return found;
+
+  const lower = title.toLowerCase();
+  if (isAirline) return ["Туристам, для которых важны удобная логистика, понятный багаж, время вылета и адекватная стыковка."];
+  if (/дубай/.test(lower)) return ["Тем, кому нужны шопинг, парки развлечений, городская инфраструктура, пляжи и активная программа."];
+  if (/абу-даби/.test(lower)) return ["Семьям и туристам, которым нужны культура, музеи, парки развлечений, спокойные отели и пляжный отдых."];
+  if (/шардж/.test(lower)) return ["Бюджетным туристам и семьям, если подходит более спокойный формат и трансферная логистика до Дубая."];
+  if (/рас-эль-хайм/.test(lower)) return ["Тем, кто хочет более спокойный пляжный отдых, отели с территорией и меньше городской суеты."];
+  return ["Туристам, которым подходит формат направления, описанный в карточке. Уточнить ожидания клиента перед подбором."];
+}
+
+function inferDoNotOffer(text: string, isAirline: boolean) {
+  const found = extractByRegex(text, /не подходит|не предлагать|не стоит|минус|дорого|далеко|долго|только|кроме|но |однако|важно учитывать|огранич/i, 3);
+  if (found.length) return found;
+  if (isAirline) return ["Не предлагать без проверки багажа, стыковки, аэропорта прилёта/вылета и правил тарифа."];
+  return ["Не предлагать без уточнения ожиданий: нужен ли пляж, город, экскурсии, all inclusive, детская инфраструктура и бюджет."];
+}
+
+function inferCheck(text: string, isAirline: boolean) {
+  const regex = isAirline
+    ? /багаж|стыков|терминал|аэропорт|питание|тариф|возврат|обмен|время вылета|пересад|лоукост|ручн/i
+    : /депозит|трансфер|пляж|аэропорт|район|реновац|закрыт|виза|правил|налог|сбор|питание|вход в море|парк|билет/i;
+  const found = extractByRegex(text, regex, 5);
+  if (found.length) return found;
+  return isAirline
+    ? ["Багаж и ручную кладь", "Время стыковки и аэропорт пересадки", "Условия тарифа: возврат, обмен, питание", "Ночную стыковку и удобство для детей"]
+    : ["Район проживания и трансфер", "Пляж и формат отдыха", "Депозит и обязательные сборы", "Реновации / закрытия бассейнов и ресторанов", "Авиапрограмму на даты клиента"];
+}
+
+function inferFocus(text: string, isAirline: boolean) {
+  const regex = isAirline
+    ? /рейс|маршрут|стыков|аэропорт|багаж|питание|терминал|класс|лоукост/i
+    : /район|пляж|остров|отел|аэропорт|шопинг|парк|музе|молл|марина|центр|курорт|остров/i;
+  return extractByRegex(text, regex, 5);
+}
+
+function appendSection(parent: HTMLElement, title: string, items: string[], className = "") {
+  const cleanItems = items.map(cleanText).filter(Boolean).slice(0, 6);
+  if (!cleanItems.length) return;
+  const section = createEl("div", `kb-smart-section ${className}`.trim());
+  section.appendChild(createEl("p", "kb-smart-section-title", title));
+  const ul = createEl("ul", "kb-smart-list");
+  for (const item of cleanItems) {
+    const li = createEl("li", "", item);
+    ul.appendChild(li);
+  }
+  section.appendChild(ul);
+  parent.appendChild(section);
+}
+
+function transformSmartCard(card: HTMLElement, contextText: string) {
+  if (card.dataset.kbSmartCard === "1") return;
+  const originalHtml = card.innerHTML;
+  const heading = card.querySelector<HTMLElement>("h1,h2,h3,h4,strong,b");
+  const title = cleanText(heading?.textContent);
+  const fullText = cleanText(card.innerText);
+  if (!title || fullText.length < 240) return;
+
+  const context = contextText.toLowerCase();
+  const isAirline = AIRLINE_RE.test(`${context} ${title} ${fullText}`) && !COUNTRY_RE.test(title);
+  const isCountry = !isAirline && (COUNTRY_RE.test(`${title} ${fullText}`) || /эмират|регион|страна/.test(context));
+  if (!isAirline && !isCountry) return;
+
+  const bodyText = cleanText(fullText.replace(title, ""));
+  const overview = cut(splitSentences(bodyText)[0] ?? bodyText, 260);
+  const chips = chipsForCard(title, bodyText, isAirline);
+
+  card.dataset.kbSmartCard = "1";
+  card.classList.add("kb-smart-card");
+  card.innerHTML = "";
+
+  const header = createEl("div", "kb-smart-header");
+  const titleWrap = createEl("div", "");
+  titleWrap.appendChild(createEl("p", "kb-smart-kicker", isAirline ? "Авиакомпания / логистика" : "Страна / регион"));
+  titleWrap.appendChild(createEl("h3", "kb-smart-title", title));
+  header.appendChild(titleWrap);
+  card.appendChild(header);
+
+  if (chips.length) {
+    const chipsWrap = createEl("div", "kb-smart-chips");
+    for (const chip of chips) chipsWrap.appendChild(createEl("span", "kb-smart-chip", chip));
+    card.appendChild(chipsWrap);
+  }
+
+  if (overview) card.appendChild(createEl("p", "kb-smart-summary", overview));
+
+  const grid = createEl("div", "kb-smart-body");
+  appendSection(grid, "Кому предлагать", inferWho(title, bodyText, isAirline), "kb-positive");
+  appendSection(grid, isAirline ? "Сезонность / расписание" : "Сезонность", isAirline ? airlineSeasonality(bodyText) : countrySeasonality(title, bodyText), "kb-season");
+  appendSection(grid, "Кому не предлагать / ограничения", inferDoNotOffer(bodyText, isAirline), "kb-warning");
+  appendSection(grid, isAirline ? "Маршрут и особенности" : "Районы / отели / ориентиры", inferFocus(bodyText, isAirline), "kb-focus");
+  appendSection(grid, "Проверить перед продажей", inferCheck(bodyText, isAirline), "kb-check");
+  card.appendChild(grid);
+
+  const details = createEl("details", "kb-smart-details") as HTMLDetailsElement;
+  const summary = createEl("summary", "kb-smart-details-title", "Полное описание из базы");
+  const detailsBody = createEl("div", "kb-smart-details-body");
+  detailsBody.innerHTML = originalHtml;
+  details.appendChild(summary);
+  details.appendChild(detailsBody);
+  card.appendChild(details);
 }
 
 function splitLongPlainParagraph(paragraph: HTMLParagraphElement) {
   if (paragraph.dataset.kbSplit === "1") return;
   if (paragraph.closest(".kb-smart-card")) return;
   if (paragraph.querySelector("a, img, table, ul, ol, br")) return;
-  const text = normalizeText(paragraph.textContent ?? "");
+  const text = cleanText(paragraph.textContent);
   if (text.length < 420) return;
 
   const sentences = splitSentences(text);
@@ -69,170 +268,35 @@ function splitLongPlainParagraph(paragraph: HTMLParagraphElement) {
     buffer = `${buffer} ${sentence}`.trim();
   }
   push();
-
   paragraph.replaceWith(fragment);
 }
 
-function directHeading(element: HTMLElement) {
-  return Array.from(element.children).find((child) => ["H3", "H4"].includes(child.tagName)) as HTMLElement | undefined;
-}
-
-function uniqueList(items: string[], limit = 5) {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of items) {
-    const clean = normalizeText(item).replace(/^[•\-–—\s]+/, "").replace(/[.;,\s]+$/, "");
-    if (!clean || clean.length < 6) continue;
-    const key = clean.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(clean);
-    if (result.length >= limit) break;
-  }
-  return result;
-}
-
-function pickSentences(sentences: string[], words: string[], limit = 3) {
-  return uniqueList(
-    sentences.filter((sentence) => {
-      const lower = sentence.toLowerCase();
-      return words.some((word) => lower.includes(word));
-    }),
-    limit,
-  );
-}
-
-function splitItems(value: string, limit = 7) {
-  return uniqueList(
-    value
-      .split(/[,;]\s*/)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    limit,
-  );
-}
-
-function extractAfterMarker(text: string, markers: string[], stopMarkers: string[], limit = 7) {
-  const lower = text.toLowerCase();
-  for (const marker of markers) {
-    const idx = lower.indexOf(marker.toLowerCase());
-    if (idx === -1) continue;
-    let part = text.slice(idx + marker.length);
-    let end = part.length;
-    const partLower = part.toLowerCase();
-    for (const stop of stopMarkers) {
-      const stopIdx = partLower.indexOf(stop.toLowerCase());
-      if (stopIdx > 10 && stopIdx < end) end = stopIdx;
-    }
-    part = part.slice(0, end).split(/[.!?…]/)[0] ?? "";
-    const items = splitItems(part, limit);
-    if (items.length) return items;
-  }
-  return [];
-}
-
-function renderList(title: string, items: string[], tone: "blue" | "gold" | "green" | "red" = "blue") {
-  if (!items.length) return "";
-  return `
-    <div class="kb-smart-block kb-smart-block-${tone}">
-      <p class="kb-smart-label">${escapeHtml(title)}</p>
-      <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-    </div>
-  `;
-}
-
-function renderParagraphs(sentences: string[]) {
-  const result: string[] = [];
-  let buffer: string[] = [];
-  let length = 0;
-
-  const push = () => {
-    if (!buffer.length) return;
-    result.push(`<p>${escapeHtml(buffer.join(" "))}</p>`);
-    buffer = [];
-    length = 0;
-  };
-
-  for (const sentence of sentences) {
-    if (length + sentence.length > 360) push();
-    buffer.push(sentence);
-    length += sentence.length;
-  }
-  push();
-  return result.join("");
-}
-
-function enhanceLongCard(card: HTMLElement) {
-  if (card.dataset.kbEnhanced === "1") return;
-  if (card.closest(".kb-smart-card")) return;
-
-  const heading = directHeading(card);
-  if (!heading) return;
-
-  const title = normalizeText(heading.textContent ?? "");
-  const bodyText = normalizeText(
-    Array.from(card.children)
-      .filter((child) => child !== heading)
-      .map((child) => child.textContent ?? "")
-      .join(" "),
-  );
-
-  if (!title || bodyText.length < 520) return;
-
-  const sentences = splitSentences(bodyText);
-  if (sentences.length < 4) return;
-
-  const brief = sentences.slice(0, Math.min(2, sentences.length));
-  const who = pickSentences(sentences, ["подходит", "подойдут", "для семей", "семьям", "парам", "гостям", "дет", "шопинг", "культур", "спокой", "актив"], 3);
-  const notFor = pickSentences(sentences, ["не под", "кому не", "не стоит", "минус", "недостат"], 2);
-  const important = pickSentences(sentences, ["важно", "учитывать", "провер", "депозит", "сезон", "перел", "виза", "безвиз", "аэропорт", "трансфер"], 4);
-  const hotels = extractAfterMarker(
-    bodyText,
-    ["отели:", "отели 5*:", "городские и пляжные отели 5*:", "рекомендуемые отели:", "пляжные отели:", "шопинг:"],
-    ["подходит", "из презентации", "важно", "кому", "основные", "районы", "лето", "высокий сезон"],
-    7,
-  );
-  const areas = extractAfterMarker(
-    bodyText,
-    ["районы для проживания:", "основные пляжные районы —", "основные пляжные районы:"],
-    ["шопинг", "отели", "подходит", "из презентации"],
-    5,
-  );
-
-  const detailSentences = sentences.slice(brief.length);
-  const blocks = [
-    renderList("Кому предлагать", who, "green"),
-    renderList("Кому не предлагать / ограничения", notFor, "red"),
-    renderList("Что проверить перед продажей", important, "gold"),
-    renderList("Районы", areas, "blue"),
-    renderList("Отели / ориентиры", hotels, "blue"),
-  ].join("");
-
-  card.dataset.kbEnhanced = "1";
-  card.classList.add("kb-smart-card");
-  card.innerHTML = `
-    <div class="kb-smart-head">
-      <h3>${escapeHtml(title)}</h3>
-      <span>карточка направления</span>
-    </div>
-    <div class="kb-smart-brief">${renderParagraphs(brief)}</div>
-    ${blocks ? `<div class="kb-smart-grid">${blocks}</div>` : ""}
-    <details class="kb-smart-details">
-      <summary>Полное описание</summary>
-      <div>${renderParagraphs(detailSentences)}</div>
-    </details>
-  `;
-}
-
-function enhanceKnowledgeContent(container: HTMLElement) {
-  container.querySelectorAll<HTMLParagraphElement>("p").forEach(splitLongPlainParagraph);
-
+function normalizeKnowledgeContent(container: HTMLElement): TocItem[] {
   container.querySelectorAll<HTMLElement>(".grid").forEach((grid) => {
-    grid.classList.add("kb-one-column-grid");
+    const context = findPreviousHeadingText(container, grid);
+    const text = cleanText(grid.innerText);
+    if (!CARD_CONTEXT_RE.test(`${context} ${text}`)) return;
+    const children = Array.from(grid.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+    const hasLongCards = children.some((child) => cleanText(child.innerText).length > 260 && child.querySelector("h1,h2,h3,h4,strong,b"));
+    if (!hasLongCards) return;
+    grid.classList.add("kb-smart-card-list");
+    children.forEach((child) => transformSmartCard(child, context));
   });
 
-  const candidates = Array.from(container.querySelectorAll<HTMLElement>("div, section, article"));
-  candidates.forEach(enhanceLongCard);
+  container.querySelectorAll<HTMLParagraphElement>("p").forEach(splitLongPlainParagraph);
+
+  const headings = Array.from(container.querySelectorAll<HTMLElement>("h2, h3")).filter((heading) => !heading.closest(".kb-smart-card"));
+  return headings
+    .map((heading, index) => {
+      if (!heading.id) heading.id = slugify(heading.textContent ?? "", index);
+      return {
+        id: heading.id,
+        label: cleanText(heading.textContent),
+        level: heading.tagName === "H3" ? 3 : 2,
+      };
+    })
+    .filter((item) => item.label)
+    .slice(0, 18);
 }
 
 export default function CrmKnowledgeArticlePage() {
@@ -282,19 +346,7 @@ export default function CrmKnowledgeArticlePage() {
     const timer = window.setTimeout(() => {
       const container = contentRef.current;
       if (!container) return;
-
-      enhanceKnowledgeContent(container);
-
-      const headings = Array.from(container.querySelectorAll<HTMLElement>("h2, h3"));
-      const items = headings.map((heading, index) => {
-        if (!heading.id) heading.id = slugify(heading.textContent ?? "", index);
-        return {
-          id: heading.id,
-          label: (heading.textContent ?? "").trim(),
-          level: heading.tagName === "H3" ? 3 : 2,
-        };
-      });
-      setToc(items.filter((item) => item.label).slice(0, 18));
+      setToc(normalizeKnowledgeContent(container));
     }, 0);
     return () => window.clearTimeout(timer);
   }, [article, editing]);
@@ -348,9 +400,9 @@ export default function CrmKnowledgeArticlePage() {
     marks.forEach((m) => m.classList.remove("kb-highlight-active"));
     const target = marks[index];
     if (target) {
-      const details = target.closest("details");
-      if (details) details.setAttribute("open", "true");
       target.classList.add("kb-highlight-active");
+      const details = target.closest("details") as HTMLDetailsElement | null;
+      if (details) details.open = true;
       target.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }
@@ -494,10 +546,18 @@ export default function CrmKnowledgeArticlePage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setEditing(true)} aria-label="Редактировать" className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy">
+                <button
+                  onClick={() => setEditing(true)}
+                  aria-label="Редактировать"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-blue-light hover:text-navy"
+                >
                   <Pencil size={16} />
                 </button>
-                <button onClick={handleDelete} aria-label="Удалить" className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-red-50 hover:text-red-600">
+                <button
+                  onClick={handleDelete}
+                  aria-label="Удалить"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-navy/50 hover:bg-red-50 hover:text-red-600"
+                >
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -511,7 +571,7 @@ export default function CrmKnowledgeArticlePage() {
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Например: депозит, семейным, Dubai Marina, трансфер, бонус…"
+                    placeholder="Например: сезон, багаж, депозит, Dubai Marina, стыковка, семейным…"
                     defaultValue=""
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-24 text-sm outline-none focus:border-blue"
@@ -565,28 +625,29 @@ export default function CrmKnowledgeArticlePage() {
               .kb-content th, .kb-content td { border: 1px solid rgba(0,0,0,.08); padding: 10px 12px; vertical-align: top; }
               .kb-content th { background: #f1f6ff; color: #092a5e; font-weight: 700; }
               .kb-content img { max-height: 420px; object-fit: cover; }
-              .kb-content .grid, .kb-content .kb-one-column-grid { display: flex !important; flex-direction: column !important; gap: 16px !important; }
-              .kb-content .grid > * { width: 100% !important; max-width: 100% !important; }
-              .kb-content .kb-smart-card { border: 1px solid rgba(9,42,94,.12) !important; border-left: 5px solid #f0c76a !important; border-radius: 18px !important; background: #fff !important; padding: 18px 20px !important; box-shadow: 0 6px 20px rgba(9,42,94,.05); }
-              .kb-content .kb-smart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(0,0,0,.06); padding-bottom: 10px; margin-bottom: 12px; }
-              .kb-content .kb-smart-head h3 { margin: 0; font-size: 20px; line-height: 1.25; }
-              .kb-content .kb-smart-head span { flex: none; border-radius: 999px; background: #f8ecd0; padding: 5px 10px; font-size: 11px; font-weight: 700; color: #9a6a00; text-transform: uppercase; letter-spacing: .04em; }
-              .kb-content .kb-smart-brief { border-radius: 14px; background: #f7fbff; padding: 10px 12px; color: rgba(15,23,42,.82); }
-              .kb-content .kb-smart-brief p { margin: 0; max-width: none; }
-              .kb-content .kb-smart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-              .kb-content .kb-smart-block { border-radius: 14px; padding: 12px 14px; border: 1px solid rgba(0,0,0,.06); }
-              .kb-content .kb-smart-block-blue { background: #f7fbff; }
-              .kb-content .kb-smart-block-gold { background: #fff8e8; }
-              .kb-content .kb-smart-block-green { background: #f1fbf5; }
-              .kb-content .kb-smart-block-red { background: #fff4f4; }
-              .kb-content .kb-smart-label { margin: 0 0 6px 0; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: rgba(9,42,94,.65); }
-              .kb-content .kb-smart-block ul { margin: 0; padding-left: 18px; }
-              .kb-content .kb-smart-block li { margin: 4px 0; line-height: 1.5; }
-              .kb-content .kb-smart-details { margin-top: 12px; border-top: 1px dashed rgba(0,0,0,.12); padding-top: 10px; }
-              .kb-content .kb-smart-details summary { cursor: pointer; color: #1f64d1; font-weight: 700; font-size: 13px; }
-              .kb-content .kb-smart-details p { max-width: 88ch; }
+              .kb-content .kb-smart-card-list { display: grid !important; grid-template-columns: 1fr !important; gap: 16px !important; }
+              .kb-content .kb-smart-card { border: 1px solid rgba(9,42,94,.10) !important; border-left: 5px solid #f0c76a !important; border-radius: 18px !important; background: #fff !important; padding: 18px !important; box-shadow: 0 10px 26px rgba(9,42,94,.05); }
+              .kb-smart-header { display: flex; justify-content: space-between; gap: 12px; }
+              .kb-smart-kicker { margin: 0 0 3px !important; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: rgba(9,42,94,.45); }
+              .kb-smart-title { margin: 0 !important; padding: 0 !important; border: 0 !important; font-size: 20px !important; line-height: 1.25 !important; color: #092a5e !important; }
+              .kb-smart-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+              .kb-smart-chip { display: inline-flex; align-items: center; border-radius: 999px; background: #eef5ff; color: #092a5e; padding: 5px 9px; font-size: 11px; font-weight: 700; }
+              .kb-smart-summary { max-width: 92ch !important; margin: 12px 0 0 !important; color: rgba(15,23,42,.72); }
+              .kb-smart-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+              .kb-smart-section { border-radius: 14px; border: 1px solid rgba(0,0,0,.06); background: #f8fafc; padding: 12px 14px; }
+              .kb-smart-section-title { margin: 0 0 6px !important; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: rgba(9,42,94,.55); }
+              .kb-smart-list { margin: 0 !important; padding-left: 18px !important; }
+              .kb-smart-list li { margin: 4px 0 !important; font-size: 13px; line-height: 1.55; color: rgba(15,23,42,.78); }
+              .kb-season { background: #fff8e6; border-color: rgba(240,199,106,.45); }
+              .kb-positive { background: #f0fdf4; border-color: rgba(34,197,94,.18); }
+              .kb-warning { background: #fff7ed; border-color: rgba(249,115,22,.20); }
+              .kb-check { background: #f8fafc; }
+              .kb-focus { background: #eff6ff; border-color: rgba(37,99,235,.14); }
+              .kb-smart-details { margin-top: 12px; border-top: 1px dashed rgba(0,0,0,.12); padding-top: 10px; }
+              .kb-smart-details-title { cursor: pointer; font-size: 12px; font-weight: 700; color: #1d4ed8; }
+              .kb-smart-details-body { margin-top: 8px; color: rgba(15,23,42,.65); }
               .kb-content :where(section, article, h2, h3) { scroll-margin-top: 90px; }
-              @media (max-width: 900px) { .kb-content .kb-smart-grid { grid-template-columns: 1fr; } }
+              @media (max-width: 920px) { .kb-smart-body { grid-template-columns: 1fr; } }
             `}</style>
             <div
               ref={contentRef}
