@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'telegrambot',
     'knowledgebase',
     'mideast',
+    'seakb',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

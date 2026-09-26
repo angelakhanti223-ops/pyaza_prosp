@@ -9,7 +9,8 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         // The CRM is an internal, login-gated tool — nothing there should be indexed.
-        disallow: ["/crm/"],
+        // /kb/ is reserved for internal knowledge bases (currently served under /crm/kb/).
+        disallow: ["/crm/", "/kb/"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

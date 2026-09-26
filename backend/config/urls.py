@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/', include('integrations.urls')),
     path('api/', include('knowledgebase.urls')),
     path('api/', include('mideast.urls')),
+    path('api/', include('seakb.urls')),
 ]
 
 if settings.DEBUG:
