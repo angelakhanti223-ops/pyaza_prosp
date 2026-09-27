@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Gift, Globe2, Hotel, Phone, Search, UserRoundCheck } from "lucide-react";
+import { BookOpen, Gift, Hotel, Phone, Search, UserRoundCheck } from "lucide-react";
 import { listKnowledgeArticles, type KnowledgeArticleListItem } from "@/lib/crmApi";
 
 type BaseCard = {
@@ -30,6 +30,19 @@ const FILTERS = [
 type FilterId = (typeof FILTERS)[number]["id"];
 
 const SPECIAL_BASES: BaseCard[] = [
+  {
+    id: "middle-east-structured",
+    href: "/crm/kb/middle-east",
+    title: "Ближний Восток: структурная база отелей",
+    subtitle: "Специализированная база",
+    description:
+      "Отдельная страница для быстрого подбора: страны, эмираты ОАЭ, all inclusive, хороший пляж, городские отели, пары, семьи, развлечения, фишки и минусы отелей.",
+    kind: "special",
+    sourceLabel: "Страны · эмираты · фильтры · отели",
+    tags: ["Отели", "Ближний Восток", "ОАЭ", "Кому предлагать", "Направления"],
+    keywords:
+      "ближний восток оаэ эмираты дубай абу-даби рас-эль-хайма отели all inclusive хороший пляж городские отели пары семьи развлечения фишки минусы",
+  },
   {
     id: "sea-special",
     href: "/crm/kb/sea",
@@ -81,7 +94,7 @@ function matchesFilter(card: BaseCard, filter: FilterId): boolean {
   if (filter === "clients") return haystack.includes("кому") || haystack.includes("предлаг");
   if (filter === "perks") return haystack.includes("плюш") || haystack.includes("бонус") || haystack.includes("комисс");
   if (filter === "contacts") return haystack.includes("контакт") || haystack.includes("представител");
-  if (filter === "directions") return haystack.includes("направлен") || haystack.includes("страны") || haystack.includes("курорт");
+  if (filter === "directions") return haystack.includes("направлен") || haystack.includes("страны") || haystack.includes("курорт") || haystack.includes("эмират");
   return true;
 }
 
@@ -152,22 +165,10 @@ export default function CrmKnowledgeBasePage() {
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-2xl border border-black/5 bg-white p-4">
-          <p className="text-xs text-foreground/40">Всего баз</p>
-          <p className="mt-1 text-2xl font-bold text-navy">{stats.total}</p>
-        </div>
-        <div className="rounded-2xl border border-black/5 bg-white p-4">
-          <p className="text-xs text-foreground/40">Есть отели</p>
-          <p className="mt-1 text-2xl font-bold text-navy">{stats.hotels}</p>
-        </div>
-        <div className="rounded-2xl border border-black/5 bg-white p-4">
-          <p className="text-xs text-foreground/40">Плюшки агентам</p>
-          <p className="mt-1 text-2xl font-bold text-navy">{stats.perks}</p>
-        </div>
-        <div className="rounded-2xl border border-black/5 bg-white p-4">
-          <p className="text-xs text-foreground/40">Контакты</p>
-          <p className="mt-1 text-2xl font-bold text-navy">{stats.contacts}</p>
-        </div>
+        <StatCard label="Всего баз" value={stats.total} />
+        <StatCard label="Есть отели" value={stats.hotels} />
+        <StatCard label="Плюшки агентам" value={stats.perks} />
+        <StatCard label="Контакты" value={stats.contacts} />
       </div>
 
       <div className="mb-5 rounded-2xl border border-black/5 bg-white p-4">
@@ -211,54 +212,58 @@ export default function CrmKnowledgeBasePage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((card) => (
-            <Link
-              key={card.id}
-              href={card.href}
-              className="flex min-h-[220px] flex-col rounded-2xl border border-black/5 bg-white p-5 transition-colors hover:border-blue/30 hover:bg-blue-light/20"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 text-blue">
-                  <BookOpen size={17} />
-                  <span className="text-xs font-semibold uppercase tracking-wide">{card.subtitle}</span>
-                </div>
-                {card.kind === "special" && (
-                  <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[11px] font-semibold text-gold-dark">
-                    спецбаза
-                  </span>
-                )}
-              </div>
-
-              <h2 className="mt-3 text-lg font-bold leading-snug text-navy">{card.title}</h2>
-              <p className="mt-2 line-clamp-4 text-sm leading-6 text-foreground/70">{card.description}</p>
-
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {card.tags.slice(0, 6).map((tag) => (
-                  <span key={tag} className="rounded-full bg-blue-light px-2.5 py-1 text-[11px] font-medium text-navy">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-auto grid grid-cols-2 gap-2 pt-4 text-[11px] font-semibold text-navy/70">
-                <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2">
-                  <Hotel size={13} /> отели
-                </span>
-                <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2">
-                  <UserRoundCheck size={13} /> кому
-                </span>
-                <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2">
-                  <Gift size={13} /> плюшки
-                </span>
-                <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2">
-                  <Phone size={13} /> контакты
-                </span>
-              </div>
-
-              {card.sourceLabel && <p className="mt-3 text-xs text-foreground/40">{card.sourceLabel}</p>}
-            </Link>
+            <KnowledgeCard key={card.id} card={card} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-black/5 bg-white p-4">
+      <p className="text-xs text-foreground/40">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-navy">{value}</p>
+    </div>
+  );
+}
+
+function KnowledgeCard({ card }: { card: BaseCard }) {
+  return (
+    <Link
+      href={card.href}
+      className="flex min-h-[220px] flex-col rounded-2xl border border-black/5 bg-white p-5 transition-colors hover:border-blue/30 hover:bg-blue-light/20"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 text-blue">
+          <BookOpen size={17} />
+          <span className="text-xs font-semibold uppercase tracking-wide">{card.subtitle}</span>
+        </div>
+        {card.kind === "special" && (
+          <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[11px] font-semibold text-gold-dark">спецбаза</span>
+        )}
+      </div>
+
+      <h2 className="mt-3 text-lg font-bold leading-snug text-navy">{card.title}</h2>
+      <p className="mt-2 line-clamp-4 text-sm leading-6 text-foreground/70">{card.description}</p>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {card.tags.slice(0, 6).map((tag) => (
+          <span key={tag} className="rounded-full bg-blue-light px-2.5 py-1 text-[11px] font-medium text-navy">
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-4 text-[11px] font-semibold text-navy/70">
+        <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2"><Hotel size={13} /> отели</span>
+        <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2"><UserRoundCheck size={13} /> кому</span>
+        <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2"><Gift size={13} /> плюшки</span>
+        <span className="flex items-center gap-1 rounded-xl bg-cream px-2.5 py-2"><Phone size={13} /> контакты</span>
+      </div>
+
+      {card.sourceLabel && <p className="mt-3 text-xs text-foreground/40">{card.sourceLabel}</p>}
+    </Link>
   );
 }
