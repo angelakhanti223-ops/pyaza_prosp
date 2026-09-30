@@ -16,6 +16,7 @@ import {
   Newspaper,
   Palmtree,
   RefreshCw,
+  Target,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import { useCrmAuth } from "./CrmAuthProvider";
 const NAV = [
   { href: "/crm/dashboard", label: "Дашборд", icon: LayoutDashboard },
   { href: "/crm/management-dashboard", label: "Управление", icon: BarChart3, management: true },
+  { href: "/crm/goals", label: "Цели", icon: Target, management: true },
   { href: "/crm/leads", label: "Заявки", icon: Inbox },
   { href: "/crm/appeals", label: "Обращения", icon: MessageSquare },
   { href: "/crm/uon-requests", label: "Заявки U-ON", icon: FileText },
