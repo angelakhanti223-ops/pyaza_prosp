@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-label="Подборка тёплых морских направлений">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#c9f1ff"/>
+      <stop offset="0.55" stop-color="#fdf1d4"/>
+      <stop offset="1" stop-color="#f8b36b"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" x2="1"><stop offset="0" stop-color="#0ea5e9"/><stop offset="1" stop-color="#14b8a6"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#0b1b3a" flood-opacity="0.18"/></filter>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <circle cx="1010" cy="125" r="74" fill="#fff4b5"/>
+  <path d="M0 435 C180 365 300 470 450 405 C630 328 760 430 930 378 C1070 335 1140 360 1200 340 L1200 675 L0 675Z" fill="url(#sea)" opacity="0.92"/>
+  <path d="M0 515 C200 458 330 560 520 492 C720 420 880 520 1200 455 L1200 675 L0 675Z" fill="#ffffff" opacity="0.32"/>
+  <g filter="url(#shadow)">
+    <rect x="88" y="72" width="455" height="454" rx="34" fill="#ffffff"/>
+    <rect x="118" y="104" width="395" height="190" rx="24" fill="#dbeafe"/>
+    <path d="M118 255 C205 198 305 290 385 230 C430 196 470 203 513 174 L513 294 L118 294Z" fill="#22c55e" opacity="0.45"/>
+    <path d="M118 238 C250 170 330 280 513 205 L513 294 L118 294Z" fill="#0ea5e9" opacity="0.55"/>
+    <text x="118" y="340" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#0b1b3a">Куда к морю зимой</text>
+    <text x="118" y="375" font-family="Arial, sans-serif" font-size="18" fill="#536179">Египет · ОАЭ · Таиланд · Вьетнам</text>
+    <g font-family="Arial, sans-serif" font-size="16" fill="#0b1b3a">
+      <rect x="118" y="406" width="128" height="40" rx="20" fill="#eaf6ff"/><text x="140" y="431">море</text>
+      <rect x="258" y="406" width="130" height="40" rx="20" fill="#fff7df"/><text x="281" y="431">семьи</text>
+      <rect x="400" y="406" width="113" height="40" rx="20" fill="#ecfdf5"/><text x="421" y="431">AI</text>
+    </g>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="612" y="102" width="420" height="118" rx="24" fill="#ffffff"/>
+    <text x="644" y="145" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#0b1b3a">Шарм-эль-Шейх</text>
+    <text x="644" y="176" font-family="Arial, sans-serif" font-size="15" fill="#536179">бухты, рифы, отели all inclusive</text>
+    <rect x="902" y="132" width="96" height="44" rx="22" fill="#0b1b3a"/><text x="925" y="160" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#fff">заявка</text>
+    <rect x="612" y="248" width="420" height="118" rx="24" fill="#ffffff"/>
+    <text x="644" y="291" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#0b1b3a">Дубай / Рас-эль-Хайма</text>
+    <text x="644" y="322" font-family="Arial, sans-serif" font-size="15" fill="#536179">пляж + город + семейные resort</text>
+    <rect x="902" y="278" width="96" height="44" rx="22" fill="#0b1b3a"/><text x="925" y="306" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#fff">заявка</text>
+    <rect x="612" y="394" width="420" height="118" rx="24" fill="#ffffff"/>
+    <text x="644" y="437" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#0b1b3a">Пхукет / Нячанг</text>
+    <text x="644" y="468" font-family="Arial, sans-serif" font-size="15" fill="#536179">дальняя Азия, экскурсии и море</text>
+    <rect x="902" y="424" width="96" height="44" rx="22" fill="#0b1b3a"/><text x="925" y="452" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#fff">заявка</text>
+  </g>
+</svg>
