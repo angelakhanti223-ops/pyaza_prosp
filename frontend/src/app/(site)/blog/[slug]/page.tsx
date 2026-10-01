@@ -13,28 +13,35 @@ import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const REALISTIC_SLIDE_VERSION = "real20261001";
+const REALISTIC_SLIDES = {
+  sea: `/blog/october/sea.svg?v=${REALISTIC_SLIDE_VERSION}`,
+  family: `/blog/october/family.svg?v=${REALISTIC_SLIDE_VERSION}`,
+  city: `/blog/october/excursions.svg?v=${REALISTIC_SLIDE_VERSION}`,
+  villa: `/blog/october/cruises.svg?v=${REALISTIC_SLIDE_VERSION}`,
+};
 
 const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/october/sea.svg",
+    src: REALISTIC_SLIDES.sea,
     alt: "Тёплое море и пляжный отдых в октябре",
     title: "Продлить лето у моря",
     description: "Пляжные направления подойдут тем, кто хочет солнце, купание и спокойный ритм без летней суеты.",
   },
   {
-    src: "/blog/october/family.svg",
+    src: REALISTIC_SLIDES.family,
     alt: "Семейный отдых с детьми в октябре",
     title: "Выбрать комфортный семейный формат",
     description: "Для поездки с детьми важны короткая логистика, питание в отеле и понятная инфраструктура рядом.",
   },
   {
-    src: "/blog/october/excursions.svg",
+    src: REALISTIC_SLIDES.city,
     alt: "Экскурсионная поездка и прогулки по городам осенью",
     title: "Уехать в экскурсионный маршрут",
     description: "Октябрь удобен для прогулок, древних городов и насыщенных программ без изнуряющей жары.",
   },
   {
-    src: "/blog/october/cruises.svg",
+    src: REALISTIC_SLIDES.villa,
     alt: "Круизный маршрут в октябре",
     title: "Посмотреть несколько городов за одну поездку",
     description: "Круиз подходит, когда хочется маршрута, но без постоянной смены отелей и лишней логистики.",
@@ -43,26 +50,26 @@ const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/seasonal/warm-sea-selection.svg",
-    alt: "Скрин подбора тёплых морских направлений",
+    src: REALISTIC_SLIDES.sea,
+    alt: "Тёплые морские направления",
     title: "Улететь из осени к тёплому морю",
     description: "Ноябрь хорошо подходит для направлений, где уже комфортнее после летней жары и можно планировать пляжный отдых.",
   },
   {
-    src: "/blog/seasonal/family-hotel-check.svg",
-    alt: "Скрин проверки семейного отеля",
+    src: REALISTIC_SLIDES.family,
+    alt: "Семейный отель у моря",
     title: "Подобрать спокойный семейный отдых",
     description: "Для поездки с детьми особенно важны перелёт, питание, пляж, тёплый бассейн и удобная территория отеля.",
   },
   {
-    src: "/blog/seasonal/city-route-screenshot.svg",
-    alt: "Скрин экскурсионного маршрута",
+    src: REALISTIC_SLIDES.city,
+    alt: "Экскурсионный городской маршрут",
     title: "Сменить серую погоду на новые впечатления",
     description: "В ноябре можно выбирать не только море, но и города, СПА, гастрономию, экскурсии и короткие перезагрузки.",
   },
   {
-    src: "/blog/seasonal/new-year-mountain-spa.svg",
-    alt: "Скрин зимнего SPA-отдыха",
+    src: REALISTIC_SLIDES.villa,
+    alt: "Премиальный островной отдых",
     title: "Посмотреть несколько мест за одну поездку",
     description: "Круизы и комбинированные маршруты подойдут тем, кто хочет больше впечатлений без постоянной смены отелей вручную.",
   },
@@ -70,26 +77,26 @@ const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/seasonal/warm-sea-selection.svg",
-    alt: "Скрин подбора пляжного тура в декабре",
+    src: REALISTIC_SLIDES.sea,
+    alt: "Пляжный тур в декабре",
     title: "Улететь к солнцу перед Новым годом",
     description: "Декабрь подходит для Египта, ОАЭ, Таиланда, Мальдив и других направлений, где можно сменить зиму на море.",
   },
   {
-    src: "/blog/seasonal/family-hotel-check.svg",
-    alt: "Скрин проверки семейного отеля в декабре",
+    src: REALISTIC_SLIDES.family,
+    alt: "Семейный отель в декабре",
     title: "Выбрать отдых для семьи",
     description: "Для поездки с детьми важны перелёт, питание, тёплый бассейн, пляж, трансфер и спокойная логистика.",
   },
   {
-    src: "/blog/seasonal/city-route-screenshot.svg",
-    alt: "Скрин новогоднего городского маршрута",
+    src: REALISTIC_SLIDES.city,
+    alt: "Новогодний городской маршрут",
     title: "Поймать новогоднюю атмосферу",
     description: "Стамбул, Россия, горы, СПА и городские поездки подойдут тем, кто хочет не только пляж.",
   },
   {
-    src: "/blog/seasonal/new-year-mountain-spa.svg",
-    alt: "Скрин зимнего отдыха в горах и SPA",
+    src: REALISTIC_SLIDES.villa,
+    alt: "Премиальный зимний отдых у океана",
     title: "Собрать маршрут с впечатлениями",
     description: "Круизы и комбинированные поездки хороши, когда хочется праздника, смены мест и удобной логистики.",
   },
@@ -97,26 +104,26 @@ const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const AUTUMN_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/seasonal/family-hotel-check.svg",
-    alt: "Скрин подбора семейного отеля на осенние каникулы",
+    src: REALISTIC_SLIDES.family,
+    alt: "Семейный отель на осенние каникулы",
     title: "Начать с формата семьи",
     description: "На каникулах важны возраст детей, перелёт, питание, бассейн, пляж и то, насколько легко будет отдыхать без лишней логистики.",
   },
   {
-    src: "/blog/seasonal/warm-sea-selection.svg",
-    alt: "Скрин подбора моря на осенние каникулы",
+    src: REALISTIC_SLIDES.sea,
+    alt: "Море на осенние каникулы",
     title: "Выбрать море без случайности",
     description: "Египет, ОАЭ и Турция отличаются погодой, пляжами, ветром, питанием и отельной инфраструктурой — сравниваем до брони.",
   },
   {
-    src: "/blog/seasonal/city-route-screenshot.svg",
-    alt: "Скрин экскурсионного маршрута на осенние каникулы",
+    src: REALISTIC_SLIDES.city,
+    alt: "Экскурсионный маршрут на осенние каникулы",
     title: "Собрать короткий маршрут",
     description: "Казань, Санкт-Петербург, Москва, Калининград, Кавказ и Сочи подходят, если хочется сменить обстановку без дальнего перелёта.",
   },
   {
-    src: "/blog/seasonal/new-year-mountain-spa.svg",
-    alt: "Скрин спокойного отдыха, SPA и гор на осенние каникулы",
+    src: REALISTIC_SLIDES.villa,
+    alt: "Спокойный отдых, SPA и премиальный отель на осенние каникулы",
     title: "Добавить отдых без суеты",
     description: "SPA-отели, санатории и горные курорты хорошо работают для перезагрузки, когда пляж не главная цель поездки.",
   },
@@ -124,26 +131,26 @@ const AUTUMN_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const NEW_YEAR_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/seasonal/new-year-mountain-spa.svg",
-    alt: "Скрин новогоднего отдыха в горах и SPA",
+    src: REALISTIC_SLIDES.city,
+    alt: "Новогодняя городская атмосфера",
     title: "Выбрать новогодний формат",
     description: "Новый год может быть у моря, в горах, в городе, в SPA-отеле или на острове — сначала выбираем сценарий, потом страну.",
   },
   {
-    src: "/blog/seasonal/warm-sea-selection.svg",
-    alt: "Скрин подбора тёплого моря на Новый год",
+    src: REALISTIC_SLIDES.sea,
+    alt: "Тёплое море на Новый год",
     title: "Уехать к тёплому морю",
     description: "Египет, ОАЭ, Таиланд, Вьетнам, Мальдивы и Шри-Ланка требуют разной логики выбора отеля и бюджета.",
   },
   {
-    src: "/blog/seasonal/family-hotel-check.svg",
-    alt: "Скрин проверки семейного отеля на Новый год",
+    src: REALISTIC_SLIDES.family,
+    alt: "Семейный отель на Новый год",
     title: "Проверить отель до бронирования",
     description: "На праздники важно заранее уточнить ужин, депозит, подогреваемый бассейн, детскую программу и правила отмены.",
   },
   {
-    src: "/blog/seasonal/city-route-screenshot.svg",
-    alt: "Скрин городского новогоднего маршрута",
+    src: REALISTIC_SLIDES.villa,
+    alt: "Островной новогодний отдых",
     title: "Сделать праздник с маршрутом",
     description: "Санкт-Петербург, Казань, Калининград, Москва и Кавказ подойдут тем, кто хочет атмосферу, прогулки и впечатления.",
   },
