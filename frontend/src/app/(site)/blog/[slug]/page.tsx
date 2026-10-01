@@ -43,26 +43,26 @@ const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/october/sea.svg",
-    alt: "Тёплое море и пляжный отдых в ноябре",
+    src: "/blog/seasonal/warm-sea-selection.svg",
+    alt: "Скрин подбора тёплых морских направлений",
     title: "Улететь из осени к тёплому морю",
     description: "Ноябрь хорошо подходит для направлений, где уже комфортнее после летней жары и можно планировать пляжный отдых.",
   },
   {
-    src: "/blog/october/family.svg",
-    alt: "Семейный отдых с детьми в ноябре",
+    src: "/blog/seasonal/family-hotel-check.svg",
+    alt: "Скрин проверки семейного отеля",
     title: "Подобрать спокойный семейный отдых",
     description: "Для поездки с детьми особенно важны перелёт, питание, пляж, тёплый бассейн и удобная территория отеля.",
   },
   {
-    src: "/blog/october/excursions.svg",
-    alt: "Экскурсионная поездка в ноябре",
+    src: "/blog/seasonal/city-route-screenshot.svg",
+    alt: "Скрин экскурсионного маршрута",
     title: "Сменить серую погоду на новые впечатления",
     description: "В ноябре можно выбирать не только море, но и города, СПА, гастрономию, экскурсии и короткие перезагрузки.",
   },
   {
-    src: "/blog/october/cruises.svg",
-    alt: "Круизный маршрут в ноябре",
+    src: "/blog/seasonal/new-year-mountain-spa.svg",
+    alt: "Скрин зимнего SPA-отдыха",
     title: "Посмотреть несколько мест за одну поездку",
     description: "Круизы и комбинированные маршруты подойдут тем, кто хочет больше впечатлений без постоянной смены отелей вручную.",
   },
@@ -70,28 +70,82 @@ const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
-    src: "/blog/october/sea.svg",
-    alt: "Тёплое море и пляжный отдых в декабре",
+    src: "/blog/seasonal/warm-sea-selection.svg",
+    alt: "Скрин подбора пляжного тура в декабре",
     title: "Улететь к солнцу перед Новым годом",
     description: "Декабрь подходит для Египта, ОАЭ, Таиланда, Мальдив и других направлений, где можно сменить зиму на море.",
   },
   {
-    src: "/blog/october/family.svg",
-    alt: "Семейный отдых с детьми в декабре",
+    src: "/blog/seasonal/family-hotel-check.svg",
+    alt: "Скрин проверки семейного отеля в декабре",
     title: "Выбрать отдых для семьи",
     description: "Для поездки с детьми важны перелёт, питание, тёплый бассейн, пляж, трансфер и спокойная логистика.",
   },
   {
-    src: "/blog/october/excursions.svg",
-    alt: "Новогодняя поездка и экскурсии в декабре",
+    src: "/blog/seasonal/city-route-screenshot.svg",
+    alt: "Скрин новогоднего городского маршрута",
     title: "Поймать новогоднюю атмосферу",
     description: "Стамбул, Россия, горы, СПА и городские поездки подойдут тем, кто хочет не только пляж.",
   },
   {
-    src: "/blog/october/cruises.svg",
-    alt: "Круизный маршрут и зимний отдых в декабре",
+    src: "/blog/seasonal/new-year-mountain-spa.svg",
+    alt: "Скрин зимнего отдыха в горах и SPA",
     title: "Собрать маршрут с впечатлениями",
     description: "Круизы и комбинированные поездки хороши, когда хочется праздника, смены мест и удобной логистики.",
+  },
+];
+
+const AUTUMN_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/seasonal/family-hotel-check.svg",
+    alt: "Скрин подбора семейного отеля на осенние каникулы",
+    title: "Начать с формата семьи",
+    description: "На каникулах важны возраст детей, перелёт, питание, бассейн, пляж и то, насколько легко будет отдыхать без лишней логистики.",
+  },
+  {
+    src: "/blog/seasonal/warm-sea-selection.svg",
+    alt: "Скрин подбора моря на осенние каникулы",
+    title: "Выбрать море без случайности",
+    description: "Египет, ОАЭ и Турция отличаются погодой, пляжами, ветром, питанием и отельной инфраструктурой — сравниваем до брони.",
+  },
+  {
+    src: "/blog/seasonal/city-route-screenshot.svg",
+    alt: "Скрин экскурсионного маршрута на осенние каникулы",
+    title: "Собрать короткий маршрут",
+    description: "Казань, Санкт-Петербург, Москва, Калининград, Кавказ и Сочи подходят, если хочется сменить обстановку без дальнего перелёта.",
+  },
+  {
+    src: "/blog/seasonal/new-year-mountain-spa.svg",
+    alt: "Скрин спокойного отдыха, SPA и гор на осенние каникулы",
+    title: "Добавить отдых без суеты",
+    description: "SPA-отели, санатории и горные курорты хорошо работают для перезагрузки, когда пляж не главная цель поездки.",
+  },
+];
+
+const NEW_YEAR_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/seasonal/new-year-mountain-spa.svg",
+    alt: "Скрин новогоднего отдыха в горах и SPA",
+    title: "Выбрать новогодний формат",
+    description: "Новый год может быть у моря, в горах, в городе, в SPA-отеле или на острове — сначала выбираем сценарий, потом страну.",
+  },
+  {
+    src: "/blog/seasonal/warm-sea-selection.svg",
+    alt: "Скрин подбора тёплого моря на Новый год",
+    title: "Уехать к тёплому морю",
+    description: "Египет, ОАЭ, Таиланд, Вьетнам, Мальдивы и Шри-Ланка требуют разной логики выбора отеля и бюджета.",
+  },
+  {
+    src: "/blog/seasonal/family-hotel-check.svg",
+    alt: "Скрин проверки семейного отеля на Новый год",
+    title: "Проверить отель до бронирования",
+    description: "На праздники важно заранее уточнить ужин, депозит, подогреваемый бассейн, детскую программу и правила отмены.",
+  },
+  {
+    src: "/blog/seasonal/city-route-screenshot.svg",
+    alt: "Скрин городского новогоднего маршрута",
+    title: "Сделать праздник с маршрутом",
+    description: "Санкт-Петербург, Казань, Калининград, Москва и Кавказ подойдут тем, кто хочет атмосферу, прогулки и впечатления.",
   },
 ];
 
@@ -126,12 +180,18 @@ export default async function ArticlePage({ params }: Props) {
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
   const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
-  const isSeasonalArticle = isOctoberArticle || isNovemberArticle || isDecemberArticle;
-  const heroSlides = isDecemberArticle
-    ? DECEMBER_ARTICLE_SLIDES
-    : isNovemberArticle
-      ? NOVEMBER_ARTICLE_SLIDES
-      : OCTOBER_ARTICLE_SLIDES;
+  const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
+  const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
+  const isSeasonalArticle = isOctoberArticle || isNovemberArticle || isDecemberArticle || isAutumnHolidaysArticle || isNewYearArticle;
+  const heroSlides = isNewYearArticle
+    ? NEW_YEAR_ARTICLE_SLIDES
+    : isAutumnHolidaysArticle
+      ? AUTUMN_HOLIDAYS_ARTICLE_SLIDES
+      : isDecemberArticle
+        ? DECEMBER_ARTICLE_SLIDES
+        : isNovemberArticle
+          ? NOVEMBER_ARTICLE_SLIDES
+          : OCTOBER_ARTICLE_SLIDES;
   const leadComment = `Заявка из статьи: ${article.title}`;
 
   const jsonLd = {
