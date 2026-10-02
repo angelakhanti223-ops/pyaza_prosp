@@ -13,7 +13,7 @@ import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-const REALISTIC_SLIDE_VERSION = "real20261001";
+const REALISTIC_SLIDE_VERSION = "real20261003";
 const REALISTIC_SLIDES = {
   sea: `/blog/october/sea.svg?v=${REALISTIC_SLIDE_VERSION}`,
   family: `/blog/october/family.svg?v=${REALISTIC_SLIDE_VERSION}`,
