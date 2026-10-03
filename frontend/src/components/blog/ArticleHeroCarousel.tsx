@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type ArticleHeroSlide = {
@@ -11,26 +10,40 @@ export type ArticleHeroSlide = {
   description: string;
 };
 
+const CLEAN_IMAGE_SOURCES = {
+  sea: "https://images.unsplash.com/photo-1676685309061-75cdbfd5f75f?auto=format&fit=crop&w=1600&q=85",
+  family: "https://images.unsplash.com/photo-1769149255670-aa0ad6428dd6?auto=format&fit=crop&w=1600&q=85",
+  city: "https://images.unsplash.com/photo-1665996977813-ee520a6608ea?auto=format&fit=crop&w=1600&q=85",
+  villa: "https://images.unsplash.com/photo-1769389352398-f7b694034eb5?auto=format&fit=crop&w=1600&q=85",
+};
+
+function resolveImageSource(src: string) {
+  if (src.includes("/blog/october/sea.")) return CLEAN_IMAGE_SOURCES.sea;
+  if (src.includes("/blog/october/family.")) return CLEAN_IMAGE_SOURCES.family;
+  if (src.includes("/blog/october/excursions.")) return CLEAN_IMAGE_SOURCES.city;
+  if (src.includes("/blog/october/cruises.")) return CLEAN_IMAGE_SOURCES.villa;
+  return src;
+}
+
 export default function ArticleHeroCarousel({ slides }: { slides: ArticleHeroSlide[] }) {
   const [index, setIndex] = useState(0);
 
   if (slides.length === 0) return null;
 
   const current = slides[index];
+  const imageSrc = resolveImageSource(current.src);
   const prev = () => setIndex((i) => (i - 1 + slides.length) % slides.length);
   const next = () => setIndex((i) => (i + 1) % slides.length);
 
   return (
     <section className="mt-6 overflow-hidden rounded-3xl border border-blue-light bg-white shadow-sm">
       <div className="relative aspect-[16/9] bg-blue-light/40">
-        <Image
-          src={current.src}
+        <img
+          src={imageSrc}
           alt={current.alt}
-          fill
-          sizes="(max-width: 768px) 100vw, 768px"
-          className="object-cover"
-          unoptimized
-          priority
+          className="h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
         />
 
         {slides.length > 1 && (
