@@ -384,20 +384,32 @@ export default function CrmDashboardPage() {
               : undefined;
 
             return (
-              <div className="rounded-2xl border border-black/5 bg-white p-5">
-                <h2 className="mb-1 text-sm font-semibold text-navy">
-                  Рабочий график — {MONTH_LABELS[schedule.month]} {schedule.year}
-                </h2>
-                {todayManager && (
-                  <p className="mb-4 text-xs text-foreground/60">
-                    Сегодня работает: <span className="font-semibold text-navy">{todayManager.manager_name}</span>
-                  </p>
-                )}
+              <div className="rounded-[28px] border border-black/5 bg-white p-6 shadow-sm sm:p-7">
+                <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-navy">
+                      Рабочий график — {MONTH_LABELS[schedule.month]} {schedule.year}
+                    </h2>
+                    {todayManager && (
+                      <p className="mt-1 text-sm text-foreground/60">
+                        Сегодня работает: <span className="font-semibold text-navy">{todayManager.manager_name}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-xs text-foreground/60 sm:pt-1">
+                    {managers.map((m, mi) => (
+                      <div key={m.manager_id} className="flex items-center gap-1.5">
+                        <span className={`h-3.5 w-3.5 rounded ${MANAGER_COLORS[mi % MANAGER_COLORS.length]}`} />
+                        {m.manager_name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto pb-2">
                   <div
-                    className="inline-grid items-center gap-y-1.5"
-                    style={{ gridTemplateColumns: `110px repeat(${daysInMonth}, minmax(26px, 1fr))` }}
+                    className="grid w-full min-w-[1320px] items-center gap-x-2 gap-y-2"
+                    style={{ gridTemplateColumns: `150px repeat(${daysInMonth}, minmax(30px, 1fr))` }}
                   >
                     <div />
                     {days.map((d) => {
@@ -405,7 +417,7 @@ export default function CrmDashboardPage() {
                       return (
                         <div
                           key={d}
-                          className={`text-center text-[11px] font-medium ${isToday ? "text-gold" : "text-foreground/40"}`}
+                          className={`text-center text-xs font-semibold ${isToday ? "text-red-500" : "text-foreground/40"}`}
                         >
                           {d}
                         </div>
@@ -414,7 +426,7 @@ export default function CrmDashboardPage() {
 
                     {managers.map((m, mi) => (
                       <Fragment key={m.manager_id}>
-                        <div className="pr-2 text-xs font-medium text-navy">{m.manager_name}</div>
+                        <div className="pr-4 text-sm font-semibold leading-5 text-navy">{m.manager_name}</div>
                         {days.map((d) => {
                           const dateStr = isoDate(schedule.year, schedule.month, d);
                           const working = workerByDate.get(dateStr) === m.manager_id;
@@ -423,8 +435,8 @@ export default function CrmDashboardPage() {
                             <div
                               key={d}
                               title={`${d} ${MONTH_GENITIVE[schedule.month]}: ${working ? m.manager_name : "не работает"}`}
-                              className={`h-7 rounded ${working ? MANAGER_COLORS[mi % MANAGER_COLORS.length] : "bg-black/5"} ${
-                                isToday ? "ring-2 ring-offset-1 ring-red-500" : ""
+                              className={`h-10 rounded-lg ${working ? MANAGER_COLORS[mi % MANAGER_COLORS.length] : "bg-black/5"} ${
+                                isToday ? "ring-2 ring-offset-2 ring-red-500" : ""
                               }`}
                             />
                           );
@@ -432,15 +444,6 @@ export default function CrmDashboardPage() {
                       </Fragment>
                     ))}
                   </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-4 text-xs text-foreground/60">
-                  {managers.map((m, mi) => (
-                    <div key={m.manager_id} className="flex items-center gap-1.5">
-                      <span className={`h-3 w-3 rounded ${MANAGER_COLORS[mi % MANAGER_COLORS.length]}`} />
-                      {m.manager_name}
-                    </div>
-                  ))}
                 </div>
               </div>
             );
