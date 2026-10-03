@@ -13,7 +13,7 @@ import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-const REALISTIC_SLIDE_VERSION = "real20261003";
+const REALISTIC_SLIDE_VERSION = "clean20261003";
 const REALISTIC_SLIDES = {
   sea: `/blog/october/sea.svg?v=${REALISTIC_SLIDE_VERSION}`,
   family: `/blog/october/family.svg?v=${REALISTIC_SLIDE_VERSION}`,
@@ -50,28 +50,55 @@ const OCTOBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
 
 const NOVEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
+    src: REALISTIC_SLIDES.city,
+    alt: "Осенний экскурсионный город",
+    title: "Сменить серую погоду на новые впечатления",
+    description: "В ноябре хорошо работают города, короткие маршруты, СПА, гастрономия и экскурсионные поездки.",
+  },
+  {
     src: REALISTIC_SLIDES.sea,
-    alt: "Тёплые морские направления",
+    alt: "Тёплые морские направления в ноябре",
     title: "Улететь из осени к тёплому морю",
-    description: "Ноябрь хорошо подходит для направлений, где уже комфортнее после летней жары и можно планировать пляжный отдых.",
+    description: "Ноябрь подходит для направлений, где уже комфортнее после летней жары и можно планировать пляжный отдых.",
   },
   {
     src: REALISTIC_SLIDES.family,
-    alt: "Семейный отель у моря",
+    alt: "Семейный отель у моря в ноябре",
     title: "Подобрать спокойный семейный отдых",
     description: "Для поездки с детьми особенно важны перелёт, питание, пляж, тёплый бассейн и удобная территория отеля.",
   },
   {
+    src: REALISTIC_SLIDES.villa,
+    alt: "Комбинированный маршрут в ноябре",
+    title: "Посмотреть несколько мест за одну поездку",
+    description: "Круизы и комбинированные маршруты подойдут тем, кто хочет больше впечатлений без постоянной смены отелей вручную.",
+  },
+];
+
+const JANUARY_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: REALISTIC_SLIDES.sea,
+    alt: "Тёплое море и пляжный отдых в январе",
+    title: "Улететь из зимы к морю",
+    description: "Январь подходит для направлений, где можно сменить морозы на солнце, пляж и спокойный ритм отдыха.",
+  },
+  {
+    src: REALISTIC_SLIDES.family,
+    alt: "Семейный отдых в январе",
+    title: "Выбрать комфортный формат для семьи",
+    description: "Для январского отпуска важны перелёт, питание, тёплый бассейн, пляж и понятная логистика до отеля.",
+  },
+  {
     src: REALISTIC_SLIDES.city,
-    alt: "Экскурсионный городской маршрут",
-    title: "Сменить серую погоду на новые впечатления",
-    description: "В ноябре можно выбирать не только море, но и города, СПА, гастрономию, экскурсии и короткие перезагрузки.",
+    alt: "Экскурсионный маршрут в январе",
+    title: "Добавить экскурсии и прогулки",
+    description: "Январь можно планировать не только как пляж: подойдут города, маршруты, гастрономия и мягкий климат.",
   },
   {
     src: REALISTIC_SLIDES.villa,
-    alt: "Премиальный островной отдых",
-    title: "Посмотреть несколько мест за одну поездку",
-    description: "Круизы и комбинированные маршруты подойдут тем, кто хочет больше впечатлений без постоянной смены отелей вручную.",
+    alt: "Премиальный островной отдых в январе",
+    title: "Собрать отпуск с впечатлениями",
+    description: "Острова, круизы и комбинированные поездки подходят, когда хочется не просто отеля, а полноценного сценария отдыха.",
   },
 ];
 
@@ -186,19 +213,28 @@ export default async function ArticlePage({ params }: Props) {
   const image = mediaUrl(article.featured_image);
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
   const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
+  const isJanuaryArticle = article.slug === "gde-otdohnut-v-yanvare";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
   const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
-  const isSeasonalArticle = isOctoberArticle || isNovemberArticle || isDecemberArticle || isAutumnHolidaysArticle || isNewYearArticle;
-  const heroSlides = isNewYearArticle
-    ? NEW_YEAR_ARTICLE_SLIDES
-    : isAutumnHolidaysArticle
-      ? AUTUMN_HOLIDAYS_ARTICLE_SLIDES
-      : isDecemberArticle
-        ? DECEMBER_ARTICLE_SLIDES
-        : isNovemberArticle
-          ? NOVEMBER_ARTICLE_SLIDES
-          : OCTOBER_ARTICLE_SLIDES;
+  const isSeasonalArticle =
+    isOctoberArticle ||
+    isNovemberArticle ||
+    isJanuaryArticle ||
+    isDecemberArticle ||
+    isAutumnHolidaysArticle ||
+    isNewYearArticle;
+  const heroSlides = isJanuaryArticle
+    ? JANUARY_ARTICLE_SLIDES
+    : isNewYearArticle
+      ? NEW_YEAR_ARTICLE_SLIDES
+      : isAutumnHolidaysArticle
+        ? AUTUMN_HOLIDAYS_ARTICLE_SLIDES
+        : isDecemberArticle
+          ? DECEMBER_ARTICLE_SLIDES
+          : isNovemberArticle
+            ? NOVEMBER_ARTICLE_SLIDES
+            : OCTOBER_ARTICLE_SLIDES;
   const leadComment = `Заявка из статьи: ${article.title}`;
 
   const jsonLd = {
