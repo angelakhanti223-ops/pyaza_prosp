@@ -119,98 +119,6 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
   );
 }
 
-type ScheduleItem = {
-  day: number;
-  weekday: string;
-  manager: "Елена" | "Катя";
-  marker?: "elena-fixed" | "katya-request" | "elena-request";
-};
-
-const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-
-const OCTOBER_SCHEDULE_WEEKS: (ScheduleItem | null)[][] = [
-  [
-    null,
-    null,
-    null,
-    { day: 1, weekday: "чт", manager: "Елена", marker: "elena-fixed" },
-    { day: 2, weekday: "пт", manager: "Елена", marker: "elena-fixed" },
-    { day: 3, weekday: "сб", manager: "Елена", marker: "elena-fixed" },
-    { day: 4, weekday: "вс", manager: "Катя" },
-  ],
-  [
-    { day: 5, weekday: "пн", manager: "Елена", marker: "katya-request" },
-    { day: 6, weekday: "вт", manager: "Катя" },
-    { day: 7, weekday: "ср", manager: "Елена", marker: "katya-request" },
-    { day: 8, weekday: "чт", manager: "Катя" },
-    { day: 9, weekday: "пт", manager: "Катя" },
-    { day: 10, weekday: "сб", manager: "Катя" },
-    { day: 11, weekday: "вс", manager: "Елена" },
-  ],
-  [
-    { day: 12, weekday: "пн", manager: "Катя", marker: "elena-request" },
-    { day: 13, weekday: "вт", manager: "Елена" },
-    { day: 14, weekday: "ср", manager: "Елена" },
-    { day: 15, weekday: "чт", manager: "Катя", marker: "elena-request" },
-    { day: 16, weekday: "пт", manager: "Катя" },
-    { day: 17, weekday: "сб", manager: "Елена" },
-    { day: 18, weekday: "вс", manager: "Елена", marker: "katya-request" },
-  ],
-  [
-    { day: 19, weekday: "пн", manager: "Катя", marker: "elena-request" },
-    { day: 20, weekday: "вт", manager: "Елена" },
-    { day: 21, weekday: "ср", manager: "Елена" },
-    { day: 22, weekday: "чт", manager: "Катя" },
-    { day: 23, weekday: "пт", manager: "Катя" },
-    { day: 24, weekday: "сб", manager: "Елена" },
-    { day: 25, weekday: "вс", manager: "Елена", marker: "katya-request" },
-  ],
-  [
-    { day: 26, weekday: "пн", manager: "Катя" },
-    { day: 27, weekday: "вт", manager: "Катя" },
-    { day: 28, weekday: "ср", manager: "Елена" },
-    { day: 29, weekday: "чт", manager: "Елена" },
-    { day: 30, weekday: "пт", manager: "Катя" },
-    { day: 31, weekday: "сб", manager: "Катя" },
-    null,
-  ],
-];
-
-const SCHEDULE_SUMMARY = [
-  { title: "Елена", value: "16 смен", note: "работает 1–3 октября и закрывает дни, которые нужны Кате" },
-  { title: "Катя", value: "15 смен", note: "закрывает 12, 15 и 19 октября" },
-  { title: "Баланс", value: "16 / 15", note: "максимальный непрерывный блок — 3 смены подряд" },
-];
-
-function markerLabel(marker?: ScheduleItem["marker"]) {
-  if (marker === "elena-fixed") return "фикс.";
-  if (marker === "katya-request") return "день Кати";
-  if (marker === "elena-request") return "день Елены";
-  return "";
-}
-
-function ScheduleCell({ item }: { item: ScheduleItem | null }) {
-  if (!item) return <div className="min-h-[82px] rounded-2xl border border-dashed border-black/5 bg-white/35" />;
-
-  const isElena = item.manager === "Елена";
-  return (
-    <div className={`min-h-[82px] rounded-2xl border p-3 ${isElena ? "border-blue/20 bg-blue-light/45" : "border-gold/30 bg-gold/10"}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-lg font-bold text-navy">{item.day}</p>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-foreground/40">{item.weekday}</p>
-        </div>
-        {item.marker && (
-          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-foreground/55">
-            {markerLabel(item.marker)}
-          </span>
-        )}
-      </div>
-      <p className={`mt-3 text-sm font-semibold ${isElena ? "text-blue" : "text-amber-700"}`}>{item.manager}</p>
-    </div>
-  );
-}
-
 const SOCIAL_GOALS = [
   {
     title: "Instagram",
@@ -313,7 +221,7 @@ export default function OfficeGoalsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Офис · октябрь</p>
             <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Цели офиса на октябрь</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/80">
-              Зафиксированы цели по продажам, лидам, рекламе, соцсетям, команде, сайту, витринам, мероприятиям и графику смен. Финансовые показатели и лиды подтягиваются из управленческого дашборда текущего месяца.
+              Зафиксированы цели по продажам, лидам, рекламе, соцсетям, команде, сайту, витринам и мероприятиям. Финансовые показатели и лиды подтягиваются из управленческого дашборда текущего месяца.
             </p>
           </div>
           <Link
@@ -364,42 +272,6 @@ export default function OfficeGoalsPage() {
           </div>
         </Section>
       )}
-
-      <Section title="График работы на октябрь" subtitle="Составлен с учётом договорённости: 1–3 октября работает Елена; Катина просьба закрыта на 1, 3, 5, 7, 18 и 25 октября; обязательные дни Елены 12, 15 и 19 октября закрывает Катя.">
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-          {SCHEDULE_SUMMARY.map((item) => (
-            <div key={item.title} className="rounded-2xl bg-white p-4 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/45">{item.title}</p>
-              <p className="mt-2 text-2xl font-bold text-navy">{item.value}</p>
-              <p className="mt-1 text-xs leading-5 text-foreground/55">{item.note}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="overflow-x-auto pb-1">
-          <div className="min-w-[760px]">
-            <div className="grid grid-cols-7 gap-2">
-              {WEEKDAY_LABELS.map((label) => (
-                <div key={label} className="px-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/40">
-                  {label}
-                </div>
-              ))}
-              {OCTOBER_SCHEDULE_WEEKS.flatMap((week, weekIndex) =>
-                week.map((item, dayIndex) => (
-                  <ScheduleCell key={`${weekIndex}-${dayIndex}-${item?.day ?? "empty"}`} item={item} />
-                )),
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-foreground/55">
-          <span className="rounded-full bg-blue-light/60 px-3 py-1 font-semibold text-blue">Елена</span>
-          <span className="rounded-full bg-gold/15 px-3 py-1 font-semibold text-amber-700">Катя</span>
-          <span className="rounded-full bg-white px-3 py-1">фикс. — уже согласованная смена</span>
-          <span className="rounded-full bg-white px-3 py-1">день Кати / день Елены — учтённая личная договорённость</span>
-        </div>
-      </Section>
 
       <Section title="Соцсети и входящий поток" subtitle="Цели по росту аудитории и ежедневному контенту.">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
