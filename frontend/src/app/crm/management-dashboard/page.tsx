@@ -29,6 +29,21 @@ const PERIODS: { value: ManagementPeriod; label: string; short: string }[] = [
   { value: "current_year", label: "Текущий год", short: "Год" },
 ];
 
+const OCTOBER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+
+const OCTOBER_WORK_SCHEDULE = [
+  {
+    manager: "Екатерина Макеева",
+    tone: "navy" as const,
+    days: [4, 6, 8, 9, 10, 12, 15, 16, 17, 19, 23, 24, 26, 27, 28],
+  },
+  {
+    manager: "Елена",
+    tone: "gold" as const,
+    days: [1, 2, 3, 5, 7, 11, 13, 14, 18, 20, 21, 22, 25, 29, 30, 31],
+  },
+];
+
 type TrendRow = {
   key: string;
   label: string;
@@ -164,6 +179,38 @@ function FinanceTrend({ rows }: { rows: TrendRow[] }) {
   return <div className="flex flex-col gap-3">{rows.map((row) => <div key={row.key} className="rounded-2xl bg-blue-light/25 px-4 py-3"><div className="mb-2 flex items-center justify-between gap-3"><p className="font-semibold text-navy">{row.label}</p><p className="text-xs text-foreground/45">продаж: {row.deals}</p></div><div className="grid gap-2 text-xs"><div><div className="flex justify-between gap-2"><span className="text-foreground/55">Сумма туров</span><span className="font-semibold text-navy">{formatMoney(row.deal_amount)}</span></div><ProgressBar value={percent(row.deal_amount, maxMoney)} tone="navy" /></div><div><div className="flex justify-between gap-2"><span className="text-foreground/55">Комиссия</span><span className="font-semibold text-gold">{formatMoney(row.commission)}</span></div><ProgressBar value={percent(row.commission, maxMoney)} tone="gold" /></div><div><div className="flex justify-between gap-2"><span className="text-foreground/55">Средняя комиссия</span><span className="font-semibold text-emerald-600">{formatMoney(row.avg_commission)}</span></div><ProgressBar value={percent(row.avg_commission, maxMoney)} tone="green" /></div></div></div>)}</div>;
 }
 
+function WorkSchedule() {
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="min-w-[980px]">
+        <div className="ml-[90px] grid grid-cols-31 gap-1">
+          {OCTOBER_DAYS.map((day) => (
+            <div key={day} className="text-center text-[10px] text-foreground/35">{day}</div>
+          ))}
+        </div>
+        <div className="mt-2 flex flex-col gap-2">
+          {OCTOBER_WORK_SCHEDULE.map((row) => (
+            <div key={row.manager} className="grid grid-cols-[86px_1fr] items-center gap-2">
+              <div className="text-[11px] font-semibold leading-4 text-navy">{row.manager}</div>
+              <div className="grid grid-cols-31 gap-1">
+                {OCTOBER_DAYS.map((day) => {
+                  const active = row.days.includes(day);
+                  const bgClass = active ? (row.tone === "navy" ? "bg-navy" : "bg-gold") : "bg-blue-light/40";
+                  return <div key={day} title={`${row.manager}: ${day} октября`} className={`h-6 rounded ${bgClass}`} />;
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-foreground/45">
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-navy" /> Екатерина Макеева — 15 смен</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-gold" /> Елена — 16 смен</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function csvValue(value: unknown) { return `"${String(value ?? "").replaceAll('"', '""')}"`; }
 
 function downloadCsv(data: ManagementDashboardData, trendRows: TrendRow[]) {
@@ -244,6 +291,7 @@ export default function ManagementDashboardPage() {
         <Section title="Финансовая динамика" subtitle={data.period.code === "current_year" ? "По месяцам: сумма туров, комиссия и средняя комиссия." : "По дням: сумма туров, комиссия и средняя комиссия."}><FinanceTrend rows={derived.trendRows} /></Section>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2"><Section title="Воронка за выбранный период" subtitle="Видно, где сейчас концентрируются заявки.">{data.status_rows.length === 0 ? <EmptyState>Нет заявок за выбранный период.</EmptyState> : <div className="flex flex-col gap-3">{data.status_rows.map((row) => <Link key={row.status} href={`/crm/leads?status=${row.status}`}><RowBar label={row.status_display} value={row.count} max={derived.funnelMax} /></Link>)}</div>}</Section><Section title="Причины потерь за период" subtitle="Что чаще всего мешает продаже или уводит клиента.">{data.reason_rows.length === 0 ? <EmptyState>Пока нет закрытых заявок с причинами потерь.</EmptyState> : <div className="flex flex-col gap-3">{data.reason_rows.map((row) => <RowBar key={row.reason} label={row.reason} value={row.count} max={derived.reasonMax} tone="red" />)}</div>}</Section></div>
         <Section title="Менеджеры: продажи и дисциплина" subtitle="Комиссия считается за выбранный период, просрочки — по текущему состоянию заявок."><div className="overflow-x-auto"><table className="w-full min-w-[980px] border-separate border-spacing-y-2 text-sm"><thead className="text-left text-xs uppercase tracking-wide text-foreground/45"><tr><th className="px-3 pb-2">Менеджер</th><th className="px-3 pb-2 text-right">Активные</th><th className="px-3 pb-2 text-right">Новые</th><th className="px-3 pb-2 text-right">Контакты</th><th className="px-3 pb-2 text-right">Оплаты</th><th className="px-3 pb-2 text-right">Продажи</th><th className="px-3 pb-2 text-right">Конверсия</th><th className="px-3 pb-2 text-right">Комиссия</th><th className="px-3 pb-2 text-right">Потери</th></tr></thead><tbody>{data.manager_rows.map((row) => <tr key={`${row.manager_id ?? "none"}-${row.manager_name}`} className="bg-blue-light/25"><td className="rounded-l-2xl px-3 py-3 font-semibold text-navy">{row.manager_name}</td><td className="px-3 py-3 text-right">{row.active}</td><td className="px-3 py-3 text-right">{row.new_leads}</td><td className={`px-3 py-3 text-right ${row.overdue_contacts > 0 ? "font-semibold text-red-600" : "text-foreground/65"}`}>{row.overdue_contacts}</td><td className={`px-3 py-3 text-right ${row.overdue_payments > 0 ? "font-semibold text-red-600" : "text-foreground/65"}`}>{row.overdue_payments}</td><td className="px-3 py-3 text-right">{row.sold}</td><td className="px-3 py-3 text-right">{row.conversion_percent}%</td><td className="px-3 py-3 text-right"><div className="ml-auto max-w-[170px]"><p className="font-semibold text-navy">{formatMoney(row.commission)}</p><ProgressBar value={percent(row.commission, derived.managerMaxCommission)} tone="gold" /></div></td><td className="rounded-r-2xl px-3 py-3 text-right">{row.lost} / {row.failed}</td></tr>)}{data.manager_rows.length === 0 && <tr><td colSpan={9}><EmptyState>Нет данных по менеджерам за выбранный период.</EmptyState></td></tr>}</tbody></table></div></Section>
+        <Section title="Рабочий график — октябрь 2026" subtitle="Визуальная раскладка смен по дням месяца в формате, как в сентябрьском дашборде."><WorkSchedule /></Section>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2"><Section title="Источники заявок" subtitle="Количество, продажи, комиссия и доля от общего потока.">{data.source_rows.length === 0 ? <EmptyState>Нет источников за выбранный период.</EmptyState> : <div className="flex flex-col gap-3">{data.source_rows.map((row) => <div key={row.source} className="rounded-2xl bg-blue-light/30 px-3 py-3"><div className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-navy">{row.source_display}</span><span className="text-foreground/60">{formatNumber(row.count)} заявок</span></div><div className="mt-1 flex items-center justify-between text-xs text-foreground/50"><span>Продаж: {row.sold} · доля {percent(row.count, derived.sourceTotal)}%</span><span className="font-semibold text-gold">{formatMoney(row.commission)}</span></div><ProgressBar value={percent(row.count, derived.sourceMax)} tone="blue" /></div>)}</div>}</Section><Section title="Качество источников" subtitle="Быстрая оценка: откуда приходят заявки и где есть деньги.">{data.source_rows.length === 0 ? <EmptyState>Нет данных по источникам.</EmptyState> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.source_rows.slice(0, 6).map((row) => <div key={row.source} className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-navy">{row.source_display}</p><p className="mt-1 text-xs text-foreground/45">Конверсия: {row.conversion_percent}%</p></div><Megaphone size={17} className="text-blue" /></div><p className="mt-3 text-lg font-bold text-gold">{formatMoney(row.commission)}</p><p className="mt-1 text-xs text-foreground/45">{row.sold} продаж из {row.count} заявок</p></div>)}</div>}</Section></div>
       </>}
     </div>
