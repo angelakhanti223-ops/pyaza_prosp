@@ -12,6 +12,7 @@ const PREVIEW_BY_SLUG: Record<string, string> = {
   "gde-otdohnut-v-sentyabre": imageUrl("photo-1524231757912-21f4fe3a7200"),
   "gde-otdohnut-na-novyj-god": imageUrl("photo-1488646953014-85cb44e25828"),
   "gde-otdohnut-na-osennih-kanikulah": imageUrl("photo-1510414842594-a61c69b5ae57"),
+  "kakie-gory-i-sklon-vam-podoydut": imageUrl("photo-1454496522488-7a8e488e8606"),
 };
 
 const FALLBACK_PREVIEW_BY_TOPIC = {
@@ -19,6 +20,7 @@ const FALLBACK_PREVIEW_BY_TOPIC = {
   island: imageUrl("photo-1573843981267-be1999ff37cd"),
   city: imageUrl("photo-1502602898657-3e91760cbb34"),
   warm: imageUrl("photo-1519046904884-53103b34b206"),
+  mountain: imageUrl("photo-1454496522488-7a8e488e8606"),
 };
 
 function fallbackPreview(article: ArticleListItem) {
@@ -33,6 +35,9 @@ function fallbackPreview(article: ArticleListItem) {
   if (title.includes("сентябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-sentyabre"];
   if (title.includes("новый год")) return PREVIEW_BY_SLUG["gde-otdohnut-na-novyj-god"];
   if (title.includes("каникул")) return PREVIEW_BY_SLUG["gde-otdohnut-na-osennih-kanikulah"];
+  if (title.includes("гор") || title.includes("склон") || title.includes("лыж") || title.includes("сноуборд")) {
+    return FALLBACK_PREVIEW_BY_TOPIC.mountain;
+  }
   if (title.includes("мальдив")) return FALLBACK_PREVIEW_BY_TOPIC.island;
   if (title.includes("море") || title.includes("пляж")) return FALLBACK_PREVIEW_BY_TOPIC.sea;
   if (title.includes("город") || title.includes("экскурс")) return FALLBACK_PREVIEW_BY_TOPIC.city;
