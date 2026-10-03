@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ShareButtons from "@/components/blog/ShareButtons";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
-import SkiSlopeQuiz from "@/components/blog/SkiSlopeQuiz";
+import SkiSlopeQuizLeadFirst from "@/components/blog/SkiSlopeQuizLeadFirst";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://flypenza.ru";
 const PAGE_URL = `${SITE_URL}/blog/kakie-gory-i-sklon-vam-podoydut`;
@@ -98,7 +98,7 @@ export default function SkiSlopeArticlePage() {
         </div>
       </section>
 
-      <SkiSlopeQuiz />
+      <SkiSlopeQuizLeadFirst />
 
       <div className="prose prose-sm mt-10 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue">
         <h2>Почему нельзя выбирать горы только по красивым фото</h2>
