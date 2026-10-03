@@ -11,7 +11,16 @@ def _norm(value):
     return (value or '').strip().lower()
 
 
-def _find_user(User, usernames, name_parts):
+def _full_name(user):
+    return ' '.join([
+        _norm(getattr(user, 'first_name', '')),
+        _norm(getattr(user, 'last_name', '')),
+        _norm(getattr(user, 'full_name', '')),
+        _norm(getattr(user, 'username', '')),
+    ])
+
+
+def _find_user(User, usernames, name_parts, fallback_usernames=None):
     users = list(User.objects.all())
     username_set = {_norm(item) for item in usernames}
     for user in users:
@@ -20,13 +29,13 @@ def _find_user(User, usernames, name_parts):
 
     name_parts = [_norm(item) for item in name_parts if item]
     for user in users:
-        full_name = ' '.join([
-            _norm(getattr(user, 'first_name', '')),
-            _norm(getattr(user, 'last_name', '')),
-            _norm(getattr(user, 'full_name', '')),
-            _norm(getattr(user, 'username', '')),
-        ])
+        full_name = _full_name(user)
         if all(part in full_name for part in name_parts):
+            return user
+
+    fallback_set = {_norm(item) for item in (fallback_usernames or [])}
+    for user in users:
+        if _norm(getattr(user, 'username', '')) in fallback_set:
             return user
 
     return None
@@ -36,7 +45,7 @@ def seed_october_schedule(apps, schema_editor):
     User = apps.get_model('accounts', 'User')
     WorkShift = apps.get_model('leads', 'WorkShift')
 
-    elena = _find_user(User, ['elena', 'admin'], ['елена'])
+    elena = _find_user(User, ['elena'], ['елена'], fallback_usernames=['admin'])
     ekaterina = _find_user(User, ['ekaterina'], ['екатерина'])
 
     if not elena or not ekaterina:
