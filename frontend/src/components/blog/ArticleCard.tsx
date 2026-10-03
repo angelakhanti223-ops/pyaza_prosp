@@ -1,49 +1,50 @@
 import Link from "next/link";
 import { mediaUrl, type ArticleListItem } from "@/lib/articlesApi";
 
-const CLEAN_IMAGE_SOURCES = {
-  sea: "https://images.unsplash.com/photo-1676685309061-75cdbfd5f75f?auto=format&fit=crop&w=1200&q=85",
-  family: "https://images.unsplash.com/photo-1769149255670-aa0ad6428dd6?auto=format&fit=crop&w=1200&q=85",
-  city: "https://images.unsplash.com/photo-1665996977813-ee520a6608ea?auto=format&fit=crop&w=1200&q=85",
-  villa: "https://images.unsplash.com/photo-1769389352398-f7b694034eb5?auto=format&fit=crop&w=1200&q=85",
-};
+const imageUrl = (photoId: string) =>
+  `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=1200&q=85`;
 
 const PREVIEW_BY_SLUG: Record<string, string> = {
-  "gde-otdohnut-v-oktyabre": "/blog/october/sea.svg",
-  "gde-otdohnut-v-noyabre": "/blog/october/excursions.svg",
-  "gde-otdohnut-v-dekabre": "/blog/october/cruises.svg",
-  "gde-otdohnut-v-yanvare": "/blog/october/sea.svg",
-  "gde-otdohnut-v-sentyabre": "/blog/october/excursions.svg",
-  "gde-otdohnut-na-novyj-god": "/blog/october/cruises.svg",
-  "gde-otdohnut-na-osennih-kanikulah": "/blog/october/family.svg",
+  "gde-otdohnut-v-yanvare": imageUrl("photo-1507525428034-b723cf961d3e"),
+  "gde-otdohnut-v-noyabre": imageUrl("photo-1502602898657-3e91760cbb34"),
+  "gde-otdohnut-v-dekabre": imageUrl("photo-1573843981267-be1999ff37cd"),
+  "gde-otdohnut-v-oktyabre": imageUrl("photo-1519046904884-53103b34b206"),
+  "gde-otdohnut-v-sentyabre": imageUrl("photo-1524231757912-21f4fe3a7200"),
+  "gde-otdohnut-na-novyj-god": imageUrl("photo-1488646953014-85cb44e25828"),
+  "gde-otdohnut-na-osennih-kanikulah": imageUrl("photo-1510414842594-a61c69b5ae57"),
 };
 
-function resolvePreviewSource(src: string) {
-  if (src.includes("/blog/october/sea.")) return CLEAN_IMAGE_SOURCES.sea;
-  if (src.includes("/blog/october/family.")) return CLEAN_IMAGE_SOURCES.family;
-  if (src.includes("/blog/october/excursions.")) return CLEAN_IMAGE_SOURCES.city;
-  if (src.includes("/blog/october/cruises.")) return CLEAN_IMAGE_SOURCES.villa;
-  return src;
-}
+const FALLBACK_PREVIEW_BY_TOPIC = {
+  sea: imageUrl("photo-1507525428034-b723cf961d3e"),
+  island: imageUrl("photo-1573843981267-be1999ff37cd"),
+  city: imageUrl("photo-1502602898657-3e91760cbb34"),
+  warm: imageUrl("photo-1519046904884-53103b34b206"),
+};
 
 function fallbackPreview(article: ArticleListItem) {
   const bySlug = PREVIEW_BY_SLUG[article.slug];
   if (bySlug) return bySlug;
 
   const title = article.title.toLowerCase();
-  if (title.includes("январ")) return "/blog/october/sea.svg";
-  if (title.includes("мальдив")) return "/blog/october/sea.svg";
-  if (title.includes("декабр")) return "/blog/october/cruises.svg";
-  if (title.includes("ноябр")) return "/blog/october/excursions.svg";
-  if (title.includes("сентябр")) return "/blog/october/excursions.svg";
-  if (title.includes("октябр")) return "/blog/october/sea.svg";
+  if (title.includes("январ")) return PREVIEW_BY_SLUG["gde-otdohnut-v-yanvare"];
+  if (title.includes("ноябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-noyabre"];
+  if (title.includes("декабр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-dekabre"];
+  if (title.includes("октябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-oktyabre"];
+  if (title.includes("сентябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-sentyabre"];
+  if (title.includes("новый год")) return PREVIEW_BY_SLUG["gde-otdohnut-na-novyj-god"];
+  if (title.includes("каникул")) return PREVIEW_BY_SLUG["gde-otdohnut-na-osennih-kanikulah"];
+  if (title.includes("мальдив")) return FALLBACK_PREVIEW_BY_TOPIC.island;
+  if (title.includes("море") || title.includes("пляж")) return FALLBACK_PREVIEW_BY_TOPIC.sea;
+  if (title.includes("город") || title.includes("экскурс")) return FALLBACK_PREVIEW_BY_TOPIC.city;
+  if (title.includes("тепл")) return FALLBACK_PREVIEW_BY_TOPIC.warm;
 
   return null;
 }
 
 export default function ArticleCard({ article }: { article: ArticleListItem }) {
+  const seasonalPreview = PREVIEW_BY_SLUG[article.slug];
   const backendImage = mediaUrl(article.featured_image);
-  const image = resolvePreviewSource(backendImage ?? fallbackPreview(article) ?? "/placeholders/article.svg");
+  const image = seasonalPreview ?? backendImage ?? fallbackPreview(article) ?? "/placeholders/article.svg";
 
   return (
     <Link
