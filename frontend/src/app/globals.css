@@ -25,3 +25,7 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+.grid-cols-31 {
+  grid-template-columns: repeat(31, minmax(0, 1fr));
+}
