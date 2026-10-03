@@ -1,11 +1,24 @@
-// Client components always run in the browser, where API_BASE_URL must be the
-// public-facing host. Server components (e.g. fetchDirections called from a
-// page.tsx) run inside the frontend container and need the Docker-internal
-// host instead — see articlesApi.ts for the same split.
+// Client components normally call the public API host from NEXT_PUBLIC_API_BASE_URL.
+// In production, if this variable is missing or accidentally points to localhost,
+// use same-origin /api/* instead: Caddy proxies /api/* to the backend.
+function browserApiBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+  if (typeof window === "undefined") return configured;
+
+  const isLocalPage = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const pointsToLocalhost = configured.includes("localhost") || configured.includes("127.0.0.1");
+
+  if (!configured) return isLocalPage ? "http://localhost:8000" : "";
+  if (!isLocalPage && pointsToLocalhost) return "";
+
+  return configured.replace(/\/$/, "");
+}
+
 const API_BASE_URL =
   typeof window === "undefined"
     ? process.env.INTERNAL_API_BASE_URL ?? "http://backend:8000"
-    : process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+    : browserApiBaseUrl();
 
 export type Direction = {
   id: number;
