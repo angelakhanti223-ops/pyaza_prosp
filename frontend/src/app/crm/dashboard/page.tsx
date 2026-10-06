@@ -70,14 +70,14 @@ export default function CrmDashboardPage() {
   }, [isHead]);
 
   useEffect(() => {
-    fetchPlan().then(setPlan);
     fetchWorkSummary().then(setSummary);
   }, []);
 
   useEffect(() => {
     if (!data) return;
-    fetchWorkSchedule({ year: data.period.year, month: data.period.month }).then(setSchedule);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const monthParams = { year: data.period.year, month: data.period.month };
+    fetchPlan(monthParams).then(setPlan);
+    fetchWorkSchedule(monthParams).then(setSchedule);
   }, [data?.period.year, data?.period.month]);
 
   useEffect(() => {
