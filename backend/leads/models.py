@@ -286,7 +286,11 @@ class MonthlyPlan(models.Model):
     year = models.PositiveSmallIntegerField('Год')
     month = models.PositiveSmallIntegerField('Месяц')
     base_salary = models.DecimalField('Оклад', max_digits=10, decimal_places=2, default=Decimal('30000'))
-    bonus_percent = models.DecimalField('% от комиссии остальных (SLA/ежедневные задачи)', max_digits=5, decimal_places=2, default=Decimal('3'))
+    bonus_percent = models.DecimalField(
+        '% от комиссии руководителя (SLA/ежедневные задачи)',
+        max_digits=5, decimal_places=2, default=Decimal('3'),
+        help_text='По умолчанию 3% в новом месяце. Руководитель может вручную снизить процент; сохранённое значение, включая 0%, не сбрасывается при расчёте.',
+    )
 
     class Meta:
         ordering = ['-year', '-month']

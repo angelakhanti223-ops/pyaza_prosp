@@ -502,11 +502,11 @@ class PlanProgressTests(TestCase):
         self.assertIsNone(rows[0]['tier_name'])
         self.assertEqual(rows[0]['next_tier_name'], 'Минимум')
 
-    def test_salary_is_base_plus_own_commission_plus_bonus_from_others(self):
+    def test_salary_is_base_plus_own_commission_plus_bonus_from_head(self):
         # 25.08.2026: оклад 30000 + % своей комиссии (по уровню CommissionTier,
         # ниже 60 000 действует % уровня «Минимум» — 15%) + bonus_percent % от
-        # суммарной комиссии остальных держателей плана в этом месяце.
-        other = User.objects.create_user(username='other_manager3', password='x')
+        # комиссии руководителя в этом месяце.
+        other = User.objects.create_user(username='other_manager3', password='x', role=User.Role.HEAD)
         today = timezone.now().date()
         MonthlyPlan.objects.create(
             manager=self.manager, year=today.year, month=today.month, base_salary=30000, bonus_percent=3,

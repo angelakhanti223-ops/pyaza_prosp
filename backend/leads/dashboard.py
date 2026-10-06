@@ -2,6 +2,7 @@ from calendar import monthrange
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -251,15 +252,21 @@ def _tier_lookup(actual, tiers):
 
 
 def plan_progress_rows(year, month, managers=None):
-    """Строки план/факт по комиссии за месяц + зарплата (оклад + % от своей
-    комиссии по достигнутому уровню CommissionTier + % от суммарной комиссии
-    остальных держателей плана в этом месяце — см. MonthlyPlan/CommissionTier).
-    `managers=None` — по всем, у кого есть план; «остальные» считаются от
-    полного набора за месяц независимо от фильтра, чтобы личная строка
-    менеджера не искажала долю чужой комиссии."""
+    """Оклад + процент своей комиссии + SLA-бонус с комиссии руководителей.
+
+    Руководитель учитывается независимо от наличия у него MonthlyPlan.
+    Сохранённый bonus_percent (включая вручную сниженный до нуля) не меняется
+    при расчёте. Комиссии других менеджеров в базу SLA-бонуса не входят.
+    """
     all_plans = list(MonthlyPlan.objects.filter(year=year, month=month).select_related('manager'))
     commissions = {plan.manager_id: actual_commission_for_month(plan.manager, year, month) for plan in all_plans}
-    total_commission = sum(commissions.values(), Decimal('0'))
+    User = get_user_model()
+    heads = User.objects.filter(Q(role=User.Role.HEAD) | Q(is_superuser=True))
+    head_commission = sum(
+        (commissions[head.pk] if head.pk in commissions else actual_commission_for_month(head, year, month)
+         for head in heads),
+        Decimal('0'),
+    )
     tiers = list(CommissionTier.objects.order_by('threshold'))
 
     plans = all_plans if managers is None else [p for p in all_plans if p.manager in managers]
@@ -267,14 +274,14 @@ def plan_progress_rows(year, month, managers=None):
     rows = []
     for plan in plans:
         actual = commissions[plan.manager_id]
-        other_commission = total_commission - actual
+        bonus_base = Decimal('0') if is_head(plan.manager) else head_commission
         reached_tier, next_tier, commission_percent = _tier_lookup(Decimal(actual), tiers)
         target = next_tier.threshold if next_tier else (reached_tier.threshold if reached_tier else Decimal('0'))
 
         salary = (
             plan.base_salary
             + (commission_percent / Decimal('100')) * Decimal(actual)
-            + (plan.bonus_percent / Decimal('100')) * Decimal(other_commission)
+            + (plan.bonus_percent / Decimal('100')) * Decimal(bonus_base)
         )
         rows.append({
             'manager_id': plan.manager_id,
