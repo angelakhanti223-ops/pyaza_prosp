@@ -10,6 +10,7 @@ const PREVIEW_BY_SLUG: Record<string, string> = {
   "gde-otdohnut-v-marte": "/blog/march/island.jpg",
   "gde-otdohnut-v-aprele": "/blog/april/egypt.jpg",
   "gde-otdohnut-v-iyune": "/blog/june/altai.jpg",
+  "gde-otdohnut-v-iyule": "/blog/july/bodrum.jpg",
   "gde-otdohnut-v-noyabre": imageUrl("photo-1502602898657-3e91760cbb34"),
   "gde-otdohnut-v-dekabre": imageUrl("photo-1573843981267-be1999ff37cd"),
   "gde-otdohnut-v-oktyabre": imageUrl("photo-1519046904884-53103b34b206"),
@@ -39,6 +40,7 @@ function fallbackPreview(article: ArticleListItem) {
   if (title.includes("март")) return PREVIEW_BY_SLUG["gde-otdohnut-v-marte"];
   if (title.includes("апрел")) return PREVIEW_BY_SLUG["gde-otdohnut-v-aprele"];
   if (title.includes("июн")) return PREVIEW_BY_SLUG["gde-otdohnut-v-iyune"];
+  if (title.includes("июл")) return PREVIEW_BY_SLUG["gde-otdohnut-v-iyule"];
   if (title.includes("ноябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-noyabre"];
   if (title.includes("декабр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-dekabre"];
   if (title.includes("октябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-oktyabre"];
