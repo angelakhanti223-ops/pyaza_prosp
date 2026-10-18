@@ -183,6 +183,33 @@ const APRIL_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const SPRING_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/spring-holidays/family.jpg",
+    alt: "Взрослые и дети держатся за руки на морском берегу на закате",
+    title: "Провести каникулы вместе у моря",
+    description: "Начнём с интересов всей семьи: спокойный пляж, удобная дорога и время друг для друга без плотного расписания.",
+  },
+  {
+    src: "/blog/spring-holidays/resort.jpg",
+    alt: "Территория курортного отеля и освещённый бассейн вечером",
+    title: "Выбрать отель для семейного отдыха",
+    description: "Проверим питание, бассейны, подогрев и работу детских программ именно на ваши весенние даты.",
+  },
+  {
+    src: "/blog/spring-holidays/turkey.jpg",
+    alt: "Историческая мечеть с куполами и минаретами в Стамбуле",
+    title: "Добавить к каникулам историю и открытия",
+    description: "Городские прогулки и семейные экскурсии помогут увидеть новое. Маршрут подберём под возраст ребёнка и удобство переездов.",
+  },
+  {
+    src: "/blog/spring-holidays/russia.jpg",
+    alt: "Разноцветные купола собора Василия Блаженного в Москве",
+    title: "Открыть интересные места в России",
+    description: "Музеи, квесты, театры и прогулки подходят для короткой поездки. Оставим время и для впечатлений, и для отдыха.",
+  },
+];
+
 const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
     src: REALISTIC_SLIDES.sea,
@@ -300,6 +327,7 @@ export default async function ArticlePage({ params }: Props) {
   const isAprilArticle = article.slug === "gde-otdohnut-v-aprele";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
+  const isSpringHolidaysArticle = article.slug === "gde-otdohnut-na-vesennih-kanikulah";
   const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
   const isSeasonalArticle =
     isOctoberArticle ||
@@ -310,9 +338,12 @@ export default async function ArticlePage({ params }: Props) {
     isAprilArticle ||
     isDecemberArticle ||
     isAutumnHolidaysArticle ||
+    isSpringHolidaysArticle ||
     isNewYearArticle;
-  const heroSlides = isAprilArticle
-    ? APRIL_ARTICLE_SLIDES
+  const heroSlides = isSpringHolidaysArticle
+    ? SPRING_HOLIDAYS_ARTICLE_SLIDES
+    : isAprilArticle
+      ? APRIL_ARTICLE_SLIDES
     : isMarchArticle
       ? MARCH_ARTICLE_SLIDES
     : isFebruaryArticle
