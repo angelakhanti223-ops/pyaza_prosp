@@ -156,6 +156,33 @@ const MARCH_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const APRIL_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/april/egypt.jpg",
+    alt: "Пирамида в Гизе среди песков под голубым небом",
+    title: "Соединить Красное море и историю Египта",
+    description: "Апрельский отпуск можно дополнить экскурсиями к древним памятникам. Подберём отель и маршрут с удобной дорогой.",
+  },
+  {
+    src: "/blog/april/reef.jpg",
+    alt: "Дайвер рядом с коралловым рифом и стаей тропических рыб",
+    title: "Открыть подводный мир",
+    description: "Для отдыха у рифов сравним пляж, вход в воду и условия морских выездов. Подходящую программу выберем с учётом вашего опыта.",
+  },
+  {
+    src: "/blog/april/vietnam.jpg",
+    alt: "Золотой мост на гигантских каменных ладонях возле Дананга во Вьетнаме",
+    title: "Добавить к пляжу впечатления Вьетнама",
+    description: "Побережье можно совместить с культурой и необычными достопримечательностями. Учтём расположение отеля и длительность выездов.",
+  },
+  {
+    src: "/blog/april/thailand.jpg",
+    alt: "Тайский храм с золотыми башнями и резными крышами",
+    title: "Познакомиться с традициями Таиланда",
+    description: "В апреле отмечают Сонгкран — тайский Новый год. Для поездки учтём жару, праздничные даты и ваши планы на отдых.",
+  },
+];
+
 const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
     src: REALISTIC_SLIDES.sea,
@@ -270,6 +297,7 @@ export default async function ArticlePage({ params }: Props) {
   const isJanuaryArticle = article.slug === "gde-otdohnut-v-yanvare";
   const isFebruaryArticle = article.slug === "gde-otdohnut-v-fevrale";
   const isMarchArticle = article.slug === "gde-otdohnut-v-marte";
+  const isAprilArticle = article.slug === "gde-otdohnut-v-aprele";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
   const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
@@ -279,11 +307,14 @@ export default async function ArticlePage({ params }: Props) {
     isJanuaryArticle ||
     isFebruaryArticle ||
     isMarchArticle ||
+    isAprilArticle ||
     isDecemberArticle ||
     isAutumnHolidaysArticle ||
     isNewYearArticle;
-  const heroSlides = isMarchArticle
-    ? MARCH_ARTICLE_SLIDES
+  const heroSlides = isAprilArticle
+    ? APRIL_ARTICLE_SLIDES
+    : isMarchArticle
+      ? MARCH_ARTICLE_SLIDES
     : isFebruaryArticle
       ? FEBRUARY_ARTICLE_SLIDES
     : isJanuaryArticle
