@@ -53,6 +53,9 @@ const LEGACY_IMAGE_SOURCES = {
 };
 
 function resolveImageSource(slide: ArticleHeroSlide) {
+  // Title-based replacements apply only to the legacy placeholder assets.
+  if (!slide.src.includes("/blog/october/")) return slide.src;
+
   const key = `${slide.title} ${slide.alt}`.toLowerCase();
 
   if (key.includes("октябр") && key.includes("море")) return SLIDE_IMAGE_SOURCES.octoberSea;
