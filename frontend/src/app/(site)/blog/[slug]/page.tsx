@@ -183,6 +183,33 @@ const APRIL_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const MAY_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/may-holidays/coast.jpg",
+    alt: "Пляж и бирюзовая лагуна Олюдениза на турецком побережье",
+    title: "Встретить май у моря",
+    description: "Выберем побережье под ваши ожидания: тёплое купание или отдых с прогулками. Для начала мая особенно важны сезонность и пляж конкретного отеля.",
+  },
+  {
+    src: "/blog/may-holidays/georgia.jpg",
+    alt: "Панорама Тбилиси с рекой, мостом и городскими кварталами",
+    title: "Открыть для себя Грузию",
+    description: "Прогулки по Тбилиси, история и местная кухня — маршрут для тех, кто хочет новых впечатлений. Оставим время и на экскурсии, и на неспешный отдых.",
+  },
+  {
+    src: "/blog/may-holidays/uzbekistan.jpg",
+    alt: "Площадь Регистан с историческими медресе в Самарканде",
+    title: "Увидеть архитектуру Самарканда",
+    description: "Майские можно посвятить истории и красивым городам Узбекистана. Продолжительность маршрута подберём так, чтобы переезды не забрали весь отпуск.",
+  },
+  {
+    src: "/blog/may-holidays/russia.jpg",
+    alt: "Купола и минареты мечети Кул-Шариф в Казани",
+    title: "Устроить маленький отпуск в России",
+    description: "Казань, другие исторические города и короткие маршруты подойдут для нескольких свободных дней. Выберем удобную базу рядом с интересными местами.",
+  },
+];
+
 const SPRING_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
     src: "/blog/spring-holidays/family.jpg",
@@ -328,6 +355,7 @@ export default async function ArticlePage({ params }: Props) {
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
   const isSpringHolidaysArticle = article.slug === "gde-otdohnut-na-vesennih-kanikulah";
+  const isMayHolidaysArticle = article.slug === "gde-otdohnut-na-mayskih-prazdnikah";
   const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
   const isSeasonalArticle =
     isOctoberArticle ||
@@ -339,9 +367,12 @@ export default async function ArticlePage({ params }: Props) {
     isDecemberArticle ||
     isAutumnHolidaysArticle ||
     isSpringHolidaysArticle ||
+    isMayHolidaysArticle ||
     isNewYearArticle;
-  const heroSlides = isSpringHolidaysArticle
-    ? SPRING_HOLIDAYS_ARTICLE_SLIDES
+  const heroSlides = isMayHolidaysArticle
+    ? MAY_HOLIDAYS_ARTICLE_SLIDES
+    : isSpringHolidaysArticle
+      ? SPRING_HOLIDAYS_ARTICLE_SLIDES
     : isAprilArticle
       ? APRIL_ARTICLE_SLIDES
     : isMarchArticle

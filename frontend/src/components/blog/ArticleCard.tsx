@@ -16,6 +16,7 @@ const PREVIEW_BY_SLUG: Record<string, string> = {
   "gde-otdohnut-na-novyj-god": imageUrl("photo-1488646953014-85cb44e25828"),
   "gde-otdohnut-na-osennih-kanikulah": imageUrl("photo-1510414842594-a61c69b5ae57"),
   "gde-otdohnut-na-vesennih-kanikulah": "/blog/spring-holidays/family.jpg",
+  "gde-otdohnut-na-mayskih-prazdnikah": "/blog/may-holidays/coast.jpg",
   "kakie-gory-i-sklon-vam-podoydut": imageUrl("photo-1454496522488-7a8e488e8606"),
 };
 
@@ -42,6 +43,7 @@ function fallbackPreview(article: ArticleListItem) {
   if (title.includes("сентябр")) return PREVIEW_BY_SLUG["gde-otdohnut-v-sentyabre"];
   if (title.includes("новый год")) return PREVIEW_BY_SLUG["gde-otdohnut-na-novyj-god"];
   if (title.includes("весенн") && title.includes("каникул")) return PREVIEW_BY_SLUG["gde-otdohnut-na-vesennih-kanikulah"];
+  if (title.includes("майск") && title.includes("праздник")) return PREVIEW_BY_SLUG["gde-otdohnut-na-mayskih-prazdnikah"];
   if (title.includes("каникул")) return PREVIEW_BY_SLUG["gde-otdohnut-na-osennih-kanikulah"];
   if (title.includes("гор") || title.includes("склон") || title.includes("лыж") || title.includes("сноуборд")) {
     return FALLBACK_PREVIEW_BY_TOPIC.mountain;
