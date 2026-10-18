@@ -102,6 +102,33 @@ const JANUARY_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const FEBRUARY_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/february/thailand.jpg",
+    alt: "Лодки у тропического пляжа и скал в Таиланде",
+    title: "Сменить февраль на тропики",
+    description: "Таиланд подойдёт для тёплого моря, островных прогулок и пляжного отпуска. Выберем побережье и пляж под ваши планы.",
+  },
+  {
+    src: "/blog/february/dubai.jpg",
+    alt: "Панорама Дубая с небоскрёбами на закате",
+    title: "Увидеть Дубай без летней жары",
+    description: "Февраль удобен для прогулок, музеев и развлечений в ОАЭ. Для купания проверим пляж и бассейн с подогревом.",
+  },
+  {
+    src: "/blog/february/maldives.jpg",
+    alt: "Виллы над бирюзовой лагуной на Мальдивах",
+    title: "Замедлиться на Мальдивах",
+    description: "Островной отпуск — это море, лагуна и спокойный ритм. Сравним пляж, риф, питание и трансфер до отеля.",
+  },
+  {
+    src: "/blog/february/mountains.jpg",
+    alt: "Заснеженные горные вершины под голубым небом",
+    title: "Провести отпуск среди снежных гор",
+    description: "Если хочется зимы, выбирайте горный отдых. Для катания учтём уровень трасс, обучение, подъёмники и дорогу до курорта.",
+  },
+];
+
 const DECEMBER_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
     src: REALISTIC_SLIDES.sea,
@@ -214,6 +241,7 @@ export default async function ArticlePage({ params }: Props) {
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
   const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
   const isJanuaryArticle = article.slug === "gde-otdohnut-v-yanvare";
+  const isFebruaryArticle = article.slug === "gde-otdohnut-v-fevrale";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
   const isNewYearArticle = article.slug === "gde-otdohnut-na-novyj-god";
@@ -221,11 +249,14 @@ export default async function ArticlePage({ params }: Props) {
     isOctoberArticle ||
     isNovemberArticle ||
     isJanuaryArticle ||
+    isFebruaryArticle ||
     isDecemberArticle ||
     isAutumnHolidaysArticle ||
     isNewYearArticle;
-  const heroSlides = isJanuaryArticle
-    ? JANUARY_ARTICLE_SLIDES
+  const heroSlides = isFebruaryArticle
+    ? FEBRUARY_ARTICLE_SLIDES
+    : isJanuaryArticle
+      ? JANUARY_ARTICLE_SLIDES
     : isNewYearArticle
       ? NEW_YEAR_ARTICLE_SLIDES
       : isAutumnHolidaysArticle
