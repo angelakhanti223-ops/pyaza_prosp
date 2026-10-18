@@ -183,6 +183,33 @@ const APRIL_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   },
 ];
 
+const JUNE_ARTICLE_SLIDES: ArticleHeroSlide[] = [
+  {
+    src: "/blog/june/turkey.jpg",
+    alt: "Бирюзовая вода и светлый пляж Капуташ на турецком побережье",
+    title: "Начать лето у Средиземного моря",
+    description: "В Турции можно совместить пляж, удобный отель и исторические места. Подберём побережье и расположение под ваши июньские планы.",
+  },
+  {
+    src: "/blog/june/vietnam.jpg",
+    alt: "Река, набережная и цветные фонарики в Хойане во Вьетнаме",
+    title: "Добавить к пляжу атмосферу Хойана",
+    description: "Центральный Вьетнам интересен сочетанием моря, прогулок и местной культуры. Выберем удобную базу для отдыха и выездов.",
+  },
+  {
+    src: "/blog/june/petersburg.jpg",
+    alt: "Освещённый Литейный мост и отражения в Неве в Санкт-Петербурге",
+    title: "Посвятить поездку Петербургу",
+    description: "Музеи, дворцовые маршруты и прогулки у воды создадут свой сценарий начала лета. Насыщенность программы подберём под ваш ритм.",
+  },
+  {
+    src: "/blog/june/altai.jpg",
+    alt: "Озеро с отражением неба между лесистыми склонами на Алтае",
+    title: "Сменить суету на природные пейзажи",
+    description: "Алтай и другие природные маршруты подойдут тем, кому хочется простора и новых впечатлений. Учтём дорогу, условия размещения и сложность программы.",
+  },
+];
+
 const MAY_HOLIDAYS_ARTICLE_SLIDES: ArticleHeroSlide[] = [
   {
     src: "/blog/may-holidays/coast.jpg",
@@ -352,6 +379,7 @@ export default async function ArticlePage({ params }: Props) {
   const isFebruaryArticle = article.slug === "gde-otdohnut-v-fevrale";
   const isMarchArticle = article.slug === "gde-otdohnut-v-marte";
   const isAprilArticle = article.slug === "gde-otdohnut-v-aprele";
+  const isJuneArticle = article.slug === "gde-otdohnut-v-iyune";
   const isDecemberArticle = article.slug === "gde-otdohnut-v-dekabre";
   const isAutumnHolidaysArticle = article.slug === "gde-otdohnut-na-osennih-kanikulah";
   const isSpringHolidaysArticle = article.slug === "gde-otdohnut-na-vesennih-kanikulah";
@@ -364,13 +392,16 @@ export default async function ArticlePage({ params }: Props) {
     isFebruaryArticle ||
     isMarchArticle ||
     isAprilArticle ||
+    isJuneArticle ||
     isDecemberArticle ||
     isAutumnHolidaysArticle ||
     isSpringHolidaysArticle ||
     isMayHolidaysArticle ||
     isNewYearArticle;
-  const heroSlides = isMayHolidaysArticle
-    ? MAY_HOLIDAYS_ARTICLE_SLIDES
+  const heroSlides = isJuneArticle
+    ? JUNE_ARTICLE_SLIDES
+    : isMayHolidaysArticle
+      ? MAY_HOLIDAYS_ARTICLE_SLIDES
     : isSpringHolidaysArticle
       ? SPRING_HOLIDAYS_ARTICLE_SLIDES
     : isAprilArticle
