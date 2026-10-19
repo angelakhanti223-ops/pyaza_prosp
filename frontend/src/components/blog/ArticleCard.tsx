@@ -5,6 +5,7 @@ const imageUrl = (photoId: string) =>
   `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=1200&q=85`;
 
 const PREVIEW_BY_SLUG: Record<string, string> = {
+  "5-plyazhey-phuketa-dlya-spokoynogo-otdyha": "/blog/phuket-beaches/beach-mai-khao-1.jpg",
   "gde-otdohnut-v-yanvare": imageUrl("photo-1507525428034-b723cf961d3e"),
   "gde-otdohnut-v-fevrale": "/blog/february/thailand.jpg",
   "gde-otdohnut-v-marte": "/blog/march/island.jpg",
