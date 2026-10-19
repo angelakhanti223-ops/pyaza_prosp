@@ -1,0 +1,247 @@
+{
+  "created": "2026-10-19",
+  "asset_count": 30,
+  "note": "Generated editorial illustrations, not documentary photographs or guarantees of room/view. All assets are labelled in the article. The Mantra reference is from Trip.com; the official site was inaccessible.",
+  "images": [
+    {
+      "id": "beach-mai-khao-1",
+      "output": "frontend/public/blog/phuket-beaches/beach-mai-khao-1.jpg",
+      "reference_image_url": "https://cache.marriott.com/content/dam/marriott-renditions/HKTJW/hktjw-beach-0125-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=856px:*",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one wide 16:9 landscape travel editorial image for a Russian travel agency article, image 1 of a beach carousel. Reference image role: verified photograph of Mai Khao Beach, Phuket, from the official JW Marriott Phuket website. Depict the real character of this beach: long straight open golden sand shoreline, Andaman Sea, gentle shorebreak, flat horizon, no rocky islands or cliffs. Use the reference only for authentic beach and sea color and texture. New composition: peaceful broad shoreline viewed along the coast from standing height, casuarina trees in the distance, bright natural morning light, a few very distant walkers only. Remove the close foreground family and toys. No hotel buildings, no invented structures, no airplanes, no lettering, no watermark. Realistic photographic editorial quality, natural turquoise sea, no exaggerated blue. This will be presented as a generated beach illustration, do not imply it documents conditions on a particular day."
+    },
+    {
+      "id": "beach-mai-khao-2",
+      "output": "frontend/public/blog/phuket-beaches/beach-mai-khao-2.jpg",
+      "reference_image_url": "https://cache.marriott.com/content/dam/marriott-renditions/HKTJW/hktjw-beach-0125-hor-clsc.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=856px:*",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one landscape 16:9 travel editorial image for a beach carousel. Mai Khao Beach. Open straight long sandy coast, shoreline and distant casuarina trees, with the Andaman Sea on the left, warm late-afternoon light. Reference establishes the real beach character; no close foreground family or toys, no planes, no cliffs or islands. Photorealistic natural style, realistic sea colors, honest coastal character based on the reference. No lettering, no logos, no watermark. This is a generated illustration of the beach area, not a documentary photo or promise of daily conditions."
+    },
+    {
+      "id": "beach-kata-noi-1",
+      "output": "frontend/public/blog/phuket-beaches/beach-kata-noi-1.jpg",
+      "reference_image_url": "https://www.katathani.com/assets/images/gallery/overview/img-1.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Generate one landscape 16:9 image for a travel article beach carousel. Kata Noi Beach, Phuket. Keep the exact compact crescent-shaped bay, wooded headland, sand and existing buildings shown in the official reference. Wide elevated editorial view in clear natural daylight. Reference role: geographic and visual source from the official resort website. Photorealistic natural editorial style, realistic sand and sea, balanced exposure. Maintain truthful coastal character. No text, no logos, no watermarks. This will be labeled as a generated beach illustration, not a real-time photo or guarantee of empty beaches."
+    },
+    {
+      "id": "beach-kata-noi-2",
+      "output": "frontend/public/blog/phuket-beaches/beach-kata-noi-2.jpg",
+      "reference_image_url": "https://www.katathani.com/assets/images/gallery/overview/img-1.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Generate one landscape 16:9 image for a travel article beach carousel. Kata Noi Beach, Phuket. A closer composition of the real sandy shoreline and its wooded rocky headland from this same reference. A few distant beachgoers, natural bright afternoon. No invented coast or islands. Reference role: geographic and visual source from the official resort website. Photorealistic natural editorial style, realistic sand and sea, balanced exposure. Maintain truthful coastal character. No text, no logos, no watermarks. This will be labeled as a generated beach illustration, not a real-time photo or guarantee of empty beaches."
+    },
+    {
+      "id": "beach-bang-tao-1",
+      "output": "frontend/public/blog/phuket-beaches/beach-bang-tao-1.jpg",
+      "reference_image_url": "https://www.saiihotels.com/wp-content/uploads/2025/05/02-SAii-Laguna-Phuket-Lagoon-Meets-the-Ocean.webp",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Generate one landscape 16:9 image for a travel article beach carousel. Bang Tao Beach, Phuket. Use the official reference to preserve the real long sandy coast, low trees and open Andaman Sea. Show the beach and coast beyond the lagoon, with the shoreline as the main subject. Do not turn the inland lagoon into the sea. Reference role: geographic and visual source from the official resort website. Photorealistic natural editorial style, realistic sand and sea, balanced exposure. Maintain truthful coastal character. No text, no logos, no watermarks. This will be labeled as a generated beach illustration, not a real-time photo or guarantee of empty beaches."
+    },
+    {
+      "id": "beach-bang-tao-2",
+      "output": "frontend/public/blog/phuket-beaches/beach-bang-tao-2.jpg",
+      "reference_image_url": "https://www.saiihotels.com/wp-content/uploads/2025/05/02-SAii-Laguna-Phuket-Lagoon-Meets-the-Ocean.webp",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Generate one landscape 16:9 image for a travel article beach carousel. Bang Tao Beach, Phuket. A photographic view along the wide sand shoreline with casuarina shade and a few distant walkers, using the real coast from the reference. Calm natural morning atmosphere. No cliffs, imaginary islands, or invented hotel facilities. Reference role: geographic and visual source from the official resort website. Photorealistic natural editorial style, realistic sand and sea, balanced exposure. Maintain truthful coastal character. No text, no logos, no watermarks. This will be labeled as a generated beach illustration, not a real-time photo or guarantee of empty beaches."
+    },
+    {
+      "id": "beach-nai-harn-1",
+      "output": "frontend/public/blog/phuket-beaches/beach-nai-harn-1.jpg",
+      "reference_image_url": "https://www.thenaiharn.com/wp-content/uploads/2024/06/resort-overview1.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one landscape 16:9 travel editorial image for a beach carousel. Nai Harn Beach, Phuket. Preserve the exact visible curving sand shoreline and green rocky headland from the official photograph. Show this same beautiful section of beach and bay from an elevated view. Keep the white terraced hotel correctly on the headland, not on the sand. Photorealistic natural style, realistic sea colors, honest coastal character based on the reference. No lettering, no logos, no watermark. This is a generated illustration of the beach area, not a documentary photo or promise of daily conditions."
+    },
+    {
+      "id": "beach-nai-harn-2",
+      "output": "frontend/public/blog/phuket-beaches/beach-nai-harn-2.jpg",
+      "reference_image_url": "https://www.thenaiharn.com/wp-content/uploads/2024/06/resort-overview1.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one landscape 16:9 travel editorial image for a beach carousel. Nai Harn Beach, Phuket. A closer travel composition of the visible sand beach and turquoise shoreline from this same real bay, with a few tiny distant beachgoers and the wooded rocky headland at the edge of the composition. Preserve coastal shape; do not invent islands or new development. Photorealistic natural style, realistic sea colors, honest coastal character based on the reference. No lettering, no logos, no watermark. This is a generated illustration of the beach area, not a documentary photo or promise of daily conditions."
+    },
+    {
+      "id": "beach-ao-yon-1",
+      "output": "frontend/public/blog/phuket-beaches/beach-ao-yon-1.jpg",
+      "reference_image_url": "https://www.themooringresort.com/wp-content/uploads/2020/07/tmr-23-1024x683.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one landscape 16:9 travel editorial image for a beach carousel. Ao Yon Beach, Phuket. Preserve this exact top-down photographic view of the real narrow sandy shoreline and clear water, with the same natural patches below the surface. Frame as a wide 16:9 aerial beach detail, natural light, no new facilities or invented piers. Photorealistic natural style, realistic sea colors, honest coastal character based on the reference. No lettering, no logos, no watermark. This is a generated illustration of the beach area, not a documentary photo or promise of daily conditions."
+    },
+    {
+      "id": "beach-ao-yon-2",
+      "output": "frontend/public/blog/phuket-beaches/beach-ao-yon-2.jpg",
+      "reference_image_url": "https://d2e5ushqwiltxm.cloudfront.net/wp-content/uploads/sites/246/2025/03/25085317/DJI_0837-1500x1023.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one landscape 16:9 travel editorial image for a beach carousel. Ao Yon Bay, Phuket, as seen in the official view from the hillside above the bay. Focus the wide composition on the real water, small anchored sailing boats, distant low islands and headland, retaining their shapes and positions; omit the close foreground rooftop furniture and bar. Soft natural sunset light. Do not invent limestone cliffs or beaches. Photorealistic natural style, realistic sea colors, honest coastal character based on the reference. No lettering, no logos, no watermark. This is a generated illustration of the beach area, not a documentary photo or promise of daily conditions."
+    },
+    {
+      "id": "hotel-splash",
+      "output": "frontend/public/blog/phuket-beaches/hotels/splash.jpg",
+      "reference_image_url": "https://www.splashbeachresort.com/asset-template/images/slider/slide.jpg?=v1",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape editorial hotel-card image. Reference role: official photograph of this exact hotel; preserve its visible architecture, building count, pool shape, layout, furnishings, landscaping and camera viewpoint. Splash Beach Resort, Mai Khao. A tropical family resort and waterpark entrance, as in the reference. Re-render as an elegant realistic travel editorial illustration with gentle painterly texture and natural colors, still clearly recognizable from the original. Do not add beaches, sea views, facilities, room amenities or buildings absent from the reference. Keep original time of day. No people, no text, no labels, no watermark. The image will be explicitly labeled as an illustration based on hotel photography, not a documentary hotel photo."
+    },
+    {
+      "id": "hotel-jw-marriott",
+      "output": "frontend/public/blog/phuket-beaches/hotels/jw-marriott.jpg",
+      "reference_image_url": "https://cache.marriott.com/content/dam/marriott-renditions/HKTJW/hktjw-reflection-0003-hor-wide.jpg?output-quality=70&interpolation=progressive-bilinear&downsize=1336px:*",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape editorial hotel-card image. Reference role: official photograph of this exact hotel; preserve its visible architecture, building count, pool shape, layout, furnishings, landscaping and camera viewpoint. JW Marriott Phuket Resort & Spa, Mai Khao. Reflection pond between the low Thai-roofed buildings at sunset, as in the reference. Re-render as an elegant realistic travel editorial illustration with gentle painterly texture and natural colors, still clearly recognizable from the original. Do not add beaches, sea views, facilities, room amenities or buildings absent from the reference. Keep original time of day. No people, no text, no labels, no watermark. The image will be explicitly labeled as an illustration based on hotel photography, not a documentary hotel photo."
+    },
+    {
+      "id": "hotel-radisson",
+      "output": "frontend/public/blog/phuket-beaches/hotels/radisson.jpg",
+      "reference_image_url": "https://media.radissonhotels.net/image/radisson-blu-resort-phuket-mai-khao-beach/exterior/16256-168987-f93597581_4K.jpg?impolicy=HomeHero",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape editorial hotel-card image. Reference role: official photograph of this exact hotel; preserve its visible architecture, building count, pool shape, layout, furnishings, landscaping and camera viewpoint. Radisson Blu Resort Phuket Mai Khao Beach. Modern angular white balconies beside the long pool, as in the reference. Re-render as an elegant realistic travel editorial illustration with gentle painterly texture and natural colors, still clearly recognizable from the original. Do not add beaches, sea views, facilities, room amenities or buildings absent from the reference. Keep original time of day. No people, no text, no labels, no watermark. The image will be explicitly labeled as an illustration based on hotel photography, not a documentary hotel photo."
+    },
+    {
+      "id": "hotel-melia",
+      "output": "frontend/public/blog/phuket-beaches/hotels/melia.jpg",
+      "reference_image_url": "https://dam.melia.com/melia/accounts/f8/4000018/projects/127/assets/9f/98105/1d9e14ec4dee2a167acc6573f5b0f535-1652959250.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape editorial hotel-card image. Reference role: official photograph of this exact hotel; preserve its visible architecture, building count, pool shape, layout, furnishings, landscaping and camera viewpoint. Meliá Phuket Mai Khao. Rectangular garden pool, white timber cabanas, trees and ocean beyond, as in the reference. Re-render as an elegant realistic travel editorial illustration with gentle painterly texture and natural colors, still clearly recognizable from the original. Do not add beaches, sea views, facilities, room amenities or buildings absent from the reference. Keep original time of day. No people, no text, no labels, no watermark. The image will be explicitly labeled as an illustration based on hotel photography, not a documentary hotel photo."
+    },
+    {
+      "id": "hotel-katathani",
+      "output": "frontend/public/blog/phuket-beaches/hotels/katathani.jpg",
+      "reference_image_url": "https://www.katathani.com/assets/images/gallery/overview/img-14.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 editorial hotel-card illustration from the supplied hotel photograph. Katathani Phuket Beach Resort. Bright guest room with carved wood headboard and balcony as shown. Preserve all visible architecture, room dimensions, furniture, pool geometry, view and layout. Elegant realistic travel illustration with subtle painterly texture and faithful natural colors. Preserve original lighting. No added facilities, no people. Do not add a pool, beach or sea view if it is absent. No lettering, no logos, no watermark; any small visible signs should be blank. This is an illustration, not documentation of a booked room."
+    },
+    {
+      "id": "hotel-shore",
+      "output": "frontend/public/blog/phuket-beaches/hotels/shore.jpg",
+      "reference_image_url": "https://www.theshorephuket.com/asset/images/home/gallery/Home-Gallery-02.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 editorial hotel-card illustration from the supplied hotel photograph. The Shore at Katathani. Terrace and infinity pool above Kata Noi Beach, preserve the exact bay, shoreline and resort buildings. Preserve all visible architecture, room dimensions, furniture, pool geometry, view and layout. Elegant realistic travel illustration with subtle painterly texture and faithful natural colors. Preserve original lighting. No added facilities, no people. Do not add a pool, beach or sea view if it is absent. No lettering, no logos, no watermark; any small visible signs should be blank. This is an illustration, not documentation of a booked room."
+    },
+    {
+      "id": "hotel-mantra",
+      "output": "frontend/public/blog/phuket-beaches/hotels/mantra.jpg",
+      "reference_image_url": "https://ak-d.tripcdn.com/images/1mc1212000sna1iloC3FB_R_500_400_R5.webp",
+      "reference_type": "hotel gallery on Trip.com",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 editorial hotel-card illustration from the supplied hotel photograph. The Mantra Kata Noi. Simple guest bedroom from its hotel gallery on Trip.com. Keep the same compact bed, headboard, bedside shelves and blinds. Crop the existing composition to 16:9; do not invent more space, windows, views or amenities. Preserve all visible architecture, room dimensions, furniture, pool geometry, view and layout. Elegant realistic travel illustration with subtle painterly texture and faithful natural colors. Preserve original lighting. No added facilities, no people. Do not add a pool, beach or sea view if it is absent. No lettering, no logos, no watermark; any small visible signs should be blank. This is an illustration, not documentation of a booked room."
+    },
+    {
+      "id": "hotel-mom-tri",
+      "output": "frontend/public/blog/phuket-beaches/hotels/mom-tri.jpg",
+      "reference_image_url": "https://www.villaroyalephuket.com/wp-content/uploads/2025/05/royale-wing-suite-01.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 editorial hotel-card illustration from the supplied hotel photograph. Mom Tri's Villa Royale. Guest suite with warm timber, seating, artwork and bed exactly as in the reference. Preserve all visible architecture, room dimensions, furniture, pool geometry, view and layout. Elegant realistic travel illustration with subtle painterly texture and faithful natural colors. Preserve original lighting. No added facilities, no people. Do not add a pool, beach or sea view if it is absent. No lettering, no logos, no watermark; any small visible signs should be blank. This is an illustration, not documentation of a booked room."
+    },
+    {
+      "id": "hotel-saii",
+      "output": "frontend/public/blog/phuket-beaches/hotels/saii.jpg",
+      "reference_image_url": "https://www.saiihotels.com/wp-content/uploads/2025/05/SLP-Arial-Shot-1.webp",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one wide 16:9 hotel-card illustration from this exact official hotel photo. SAii Laguna Phuket, aerial view of the beach and curved resort pool; retain the exact beach line, buildings and waterslide. Keep recognizable property identity, all architecture, pool shapes, furniture and original camera viewpoint. Style: polished realistic travel editorial illustration, subtle painterly texture, natural colors. No fantasy facilities, no extra buildings, no invented sea views. No people, no text, no watermark. Preserve the original photographic facts; label is added separately by the website."
+    },
+    {
+      "id": "hotel-sunwing",
+      "output": "frontend/public/blog/phuket-beaches/hotels/sunwing.jpg",
+      "reference_image_url": "https://webbox.imgix.net/images/wzpopdvvglpwnlzj/52b2022a-7c7e-481c-9df3-8167b2172545.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one wide 16:9 hotel-card illustration from this exact official hotel photo. Sunwing Bangtao Beach, the supplied aerial view. Preserve the resort blocks, existing pools, sand and stream; do not add attractions. Keep recognizable property identity, all architecture, pool shapes, furniture and original camera viewpoint. Style: polished realistic travel editorial illustration, subtle painterly texture, natural colors. No fantasy facilities, no extra buildings, no invented sea views. No people, no text, no watermark. Preserve the original photographic facts; label is added separately by the website."
+    },
+    {
+      "id": "hotel-movenpick",
+      "output": "frontend/public/blog/phuket-beaches/hotels/movenpick.jpg",
+      "reference_image_url": "https://m.ahstatic.com/is/image/accorhotels/Bangtao_Phuket_xxx_i125664",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one wide 16:9 hotel-card illustration from this exact official hotel photo. Mövenpick Phuket Bangtao, the supplied courtyard pool and Thai-style rooflines; preserve the exact buildings, beach and sea beyond. Keep recognizable property identity, all architecture, pool shapes, furniture and original camera viewpoint. Style: polished realistic travel editorial illustration, subtle painterly texture, natural colors. No fantasy facilities, no extra buildings, no invented sea views. No people, no text, no watermark. Preserve the original photographic facts; label is added separately by the website."
+    },
+    {
+      "id": "hotel-dusit",
+      "output": "frontend/public/blog/phuket-beaches/hotels/dusit.jpg",
+      "reference_image_url": "https://www.dusit.com/dusitthani-lagunaphuket/wp-content/uploads/sites/37/2020/02/premier-ocean-front-king.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one wide 16:9 hotel-card illustration from this exact official hotel photo. Dusit Thani Laguna Phuket, the supplied guest bedroom with lotus artwork, bed and terrace. Keep this room layout exactly; do not add any view or feature. Keep recognizable property identity, all architecture, pool shapes, furniture and original camera viewpoint. Style: polished realistic travel editorial illustration, subtle painterly texture, natural colors. No fantasy facilities, no extra buildings, no invented sea views. No people, no text, no watermark. Preserve the original photographic facts; label is added separately by the website."
+    },
+    {
+      "id": "hotel-naiharn",
+      "output": "frontend/public/blog/phuket-beaches/hotels/naiharn.jpg",
+      "reference_image_url": "https://www.thenaiharn.com/wp-content/uploads/2026/07/TNH-Resort-Overview10-scaled.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create a single wide 16:9 landscape hotel-card illustration based closely on this official photo. The Nai Harn, aerial view of its distinctive white terraced building on the rocky edge of the bay. Preserve the architecture, wooded headland and visible shoreline exactly. Realistic polished travel editorial illustration, subtle painterly texture, faithful natural colors and original lighting. Keep visible facilities and geography exactly as referenced; no invented details, buildings, pools or beaches. No people, no text, no watermark. This is an illustration based on a hotel photograph."
+    },
+    {
+      "id": "hotel-sunsuri",
+      "output": "frontend/public/blog/phuket-beaches/hotels/sunsuri.jpg",
+      "reference_image_url": "https://www.sunsuri-phuket.com/wp-content/uploads/2019/08/slide-home-01-1.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create a single wide 16:9 landscape hotel-card illustration based closely on this official photo. Sunsuri Phuket, aerial sunset image of the hillside resort beside the lake. Preserve the real lake, road, buildings, hillside and distant bay; do not move the hotel onto the beach. Realistic polished travel editorial illustration, subtle painterly texture, faithful natural colors and original lighting. Keep visible facilities and geography exactly as referenced; no invented details, buildings, pools or beaches. No people, no text, no watermark. This is an illustration based on a hotel photograph."
+    },
+    {
+      "id": "hotel-wyndham",
+      "output": "frontend/public/blog/phuket-beaches/hotels/wyndham.jpg",
+      "reference_image_url": "https://image-tc.galaxy.tf/wijpeg-9f5k3bzr7rtl7kdoue7hhtkgu/01-29_standard.jpg?crop=112%2C0%2C1777%2C1333",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create a single wide 16:9 landscape hotel-card illustration based closely on this official photo. Wyndham Grand Nai Harn Beach Phuket, guest room with twin beds and grey wall panels. Preserve room dimensions, furniture, doors and camera viewpoint. No invented views or amenities. Realistic polished travel editorial illustration, subtle painterly texture, faithful natural colors and original lighting. Keep visible facilities and geography exactly as referenced; no invented details, buildings, pools or beaches. No people, no text, no watermark. This is an illustration based on a hotel photograph."
+    },
+    {
+      "id": "hotel-gallery",
+      "output": "frontend/public/blog/phuket-beaches/hotels/gallery.jpg",
+      "reference_image_url": "https://www.galleryhotelphuket.com/naiharn/wp-content/uploads/sites/3/2019/05/slide-home-naiharn05.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create a single wide 16:9 landscape hotel-card illustration based closely on this official photo. The Gallery Hotel Nai Harn, lobby with wicker chair and white reception counter. Preserve the entire real layout and architecture. Remove people and omit all lettering/signage. Realistic polished travel editorial illustration, subtle painterly texture, faithful natural colors and original lighting. Keep visible facilities and geography exactly as referenced; no invented details, buildings, pools or beaches. No people, no text, no watermark. This is an illustration based on a hotel photograph."
+    },
+    {
+      "id": "hotel-my-beach",
+      "output": "frontend/public/blog/phuket-beaches/hotels/my-beach.jpg",
+      "reference_image_url": "https://www.mybeachphuket.com/wp-content/uploads/2020/07/Aerial-Shot.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape hotel-card illustration based closely on the reference photograph. My Beach Resort, the supplied aerial photograph of its building at Khao Khad Beach on Cape Panwa. Preserve the real hotel, sandy shore and wooded hill exactly. Do not label or recreate it as Ao Yon. Polished realistic travel editorial illustration with a gentle painterly texture, faithful colors and original lighting. Keep all visible architecture, geography and facilities. No invented amenities or views. No people, no lettering, no logos, no watermark. It will be labeled as an illustration based on hotel photography."
+    },
+    {
+      "id": "hotel-bandara",
+      "output": "frontend/public/blog/phuket-beaches/hotels/bandara.jpg",
+      "reference_image_url": "https://www.bandaragroup.com/bandara-beach-phuket/wp-content/uploads/2023/05/Bandaraphuket-Accommodation-Premier-Sea-View01s.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape hotel-card illustration based closely on the reference photograph. Bandara Beach Resort Phuket, the supplied sea-view guest room with coral-pattern wall, wicker balcony seating and striped bed. Keep the same exact view, furnishings and room arrangement. Use a crop of the photo to 16:9; do not invent additional space. Polished realistic travel editorial illustration with a gentle painterly texture, faithful colors and original lighting. Keep all visible architecture, geography and facilities. No invented amenities or views. No people, no lettering, no logos, no watermark. It will be labeled as an illustration based on hotel photography."
+    },
+    {
+      "id": "hotel-v-villas",
+      "output": "frontend/public/blog/phuket-beaches/hotels/v-villas.jpg",
+      "reference_image_url": "https://d2e5ushqwiltxm.cloudfront.net/wp-content/uploads/sites/246/2025/03/25085317/DJI_0837-1500x1023.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape hotel-card illustration based closely on the reference photograph. V Villas Phuket MGallery Collection, the supplied rooftop bar and Ao Yon Bay at sunset. Preserve the arrangement of low lounge seating and bar, boats, islands, headland and view. Polished realistic travel editorial illustration with a gentle painterly texture, faithful colors and original lighting. Keep all visible architecture, geography and facilities. No invented amenities or views. No people, no lettering, no logos, no watermark. It will be labeled as an illustration based on hotel photography."
+    },
+    {
+      "id": "hotel-mooring",
+      "output": "frontend/public/blog/phuket-beaches/hotels/mooring.jpg",
+      "reference_image_url": "https://www.themooringresort.com/wp-content/uploads/2020/07/accommodation-03.jpg",
+      "reference_type": "official hotel website/CDN",
+      "generation": "built-in imagegen; reference image supplied",
+      "prompt": "Create one 16:9 landscape hotel-card illustration based closely on the reference photograph. The Mooring Resort, the supplied compact bungalow guest bedroom with wooden bed and shutters. Preserve its simple real room layout, furnishings and window view. Do not add a pool or sea view. Polished realistic travel editorial illustration with a gentle painterly texture, faithful colors and original lighting. Keep all visible architecture, geography and facilities. No invented amenities or views. No people, no lettering, no logos, no watermark. It will be labeled as an illustration based on hotel photography."
+    }
+  ]
+}

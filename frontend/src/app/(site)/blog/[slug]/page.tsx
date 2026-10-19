@@ -11,6 +11,8 @@ import OctoberQuickGuide from "@/components/blog/OctoberQuickGuide";
 import NovemberQuickGuide from "@/components/blog/NovemberQuickGuide";
 import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
+import PhuketBeachesArticle from "@/components/blog/PhuketBeachesArticle";
+import phuketBeachGuide from "@/content/phuket-beaches.json";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const REALISTIC_SLIDE_VERSION = "clean20261003";
@@ -410,7 +412,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = article.seo_title || article.title;
   const description = article.seo_description || article.excerpt || undefined;
-  const image = mediaUrl(article.og_image) ?? mediaUrl(article.featured_image) ?? undefined;
+  const image = mediaUrl(article.og_image) ?? mediaUrl(article.featured_image) ?? (article.slug === phuketBeachGuide.slug ? "/blog/phuket-beaches/beach-mai-khao-1.jpg" : undefined);
 
   return {
     title: `${title} — Слетать.ру`,
@@ -426,7 +428,8 @@ export default async function ArticlePage({ params }: Props) {
   if (!article) notFound();
 
   const url = `${SITE_URL}/blog/${article.slug}`;
-  const image = mediaUrl(article.featured_image);
+  const isPhuketBeachesArticle = article.slug === phuketBeachGuide.slug;
+  const image = mediaUrl(article.featured_image) ?? (isPhuketBeachesArticle ? "/blog/phuket-beaches/beach-mai-khao-1.jpg" : null);
   const isOctoberArticle = article.slug === "gde-otdohnut-v-oktyabre";
   const isNovemberArticle = article.slug === "gde-otdohnut-v-noyabre";
   const isJanuaryArticle = article.slug === "gde-otdohnut-v-yanvare";
@@ -539,7 +542,7 @@ export default async function ArticlePage({ params }: Props) {
       {isSeasonalArticle ? (
         <ArticleHeroCarousel slides={heroSlides} />
       ) : (
-        image && (
+        image && !isPhuketBeachesArticle && (
           <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-2xl">
             <Image src={image} alt={article.title} fill sizes="768px" className="object-cover" unoptimized priority />
           </div>
@@ -549,7 +552,7 @@ export default async function ArticlePage({ params }: Props) {
       {isOctoberArticle && <OctoberQuickGuide />}
       {isNovemberArticle && <NovemberQuickGuide />}
       {isDecemberArticle && <DecemberQuickGuide />}
-      {isSeasonalArticle && (
+      {(isSeasonalArticle || isPhuketBeachesArticle) && (
         <ArticleLeadButtons
           compact
           comment={leadComment}
@@ -558,14 +561,18 @@ export default async function ArticlePage({ params }: Props) {
         />
       )}
 
-      <div
-        className="prose prose-sm mt-8 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue"
-        dangerouslySetInnerHTML={{ __html: article.content }}
-      />
+      {isPhuketBeachesArticle ? (
+        <PhuketBeachesArticle content={article.content} />
+      ) : (
+        <div
+          className="prose prose-sm mt-8 max-w-none text-foreground/80 prose-headings:text-navy prose-a:text-blue"
+          dangerouslySetInnerHTML={{ __html: article.content }}
+        />
+      )}
 
       <ImageCarousel images={article.gallery_images} />
 
-      {isSeasonalArticle && (
+      {(isSeasonalArticle || isPhuketBeachesArticle) && (
         <ArticleLeadButtons
           comment={leadComment}
           title="Оставить заявку на подбор тура"

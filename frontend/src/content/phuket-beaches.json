@@ -1,0 +1,396 @@
+{
+  "slug": "5-plyazhey-phuketa-dlya-spokoynogo-otdyha",
+  "title": "5 красивых пляжей Пхукета для спокойного отдыха: где жить и какой отель выбрать",
+  "seoTitle": "5 пляжей Пхукета для спокойного отдыха: пляжи и отели",
+  "seoDescription": "Май Кхао, Ката Ной, Банг Тао, Най Харн и Ао Йон: чем отличаются пляжи, кому подойдут и какие отели выбрать. Подборка 20 отелей с удобной заявкой.",
+  "excerpt": "Пять пляжей с разным настроением и 20 отелей рядом: от семейных курортов до камерных бунгало и вилл. Поможем выбрать свой уголок Пхукета.",
+  "beaches": [
+    {
+      "id": "mai-khao",
+      "name": "Май Кхао",
+      "subtitle": "Простор и длинные прогулки",
+      "hotels": [
+        "splash",
+        "jw-marriott",
+        "radisson",
+        "melia"
+      ],
+      "images": [
+        {
+          "src": "/blog/phuket-beaches/beach-mai-khao-1.jpg",
+          "alt": "Май Кхао: сгенерированная иллюстрация пляжа, ракурс 1"
+        },
+        {
+          "src": "/blog/phuket-beaches/beach-mai-khao-2.jpg",
+          "alt": "Май Кхао: сгенерированная иллюстрация пляжа, ракурс 2"
+        }
+      ]
+    },
+    {
+      "id": "kata-noi",
+      "name": "Ката Ной",
+      "subtitle": "Красивая бухта для пляжного отпуска",
+      "hotels": [
+        "katathani",
+        "shore",
+        "mantra",
+        "mom-tri"
+      ],
+      "images": [
+        {
+          "src": "/blog/phuket-beaches/beach-kata-noi-1.jpg",
+          "alt": "Ката Ной: сгенерированная иллюстрация пляжа, ракурс 1"
+        },
+        {
+          "src": "/blog/phuket-beaches/beach-kata-noi-2.jpg",
+          "alt": "Ката Ной: сгенерированная иллюстрация пляжа, ракурс 2"
+        }
+      ]
+    },
+    {
+      "id": "bang-tao",
+      "name": "Банг Тао",
+      "subtitle": "Пляж, у которого можно выбрать свой ритм",
+      "hotels": [
+        "saii",
+        "sunwing",
+        "movenpick",
+        "dusit"
+      ],
+      "images": [
+        {
+          "src": "/blog/phuket-beaches/beach-bang-tao-1.jpg",
+          "alt": "Банг Тао: сгенерированная иллюстрация пляжа, ракурс 1"
+        },
+        {
+          "src": "/blog/phuket-beaches/beach-bang-tao-2.jpg",
+          "alt": "Банг Тао: сгенерированная иллюстрация пляжа, ракурс 2"
+        }
+      ]
+    },
+    {
+      "id": "nai-harn",
+      "name": "Най Харн",
+      "subtitle": "Бухта, озеро и зелёные холмы",
+      "hotels": [
+        "naiharn",
+        "sunsuri",
+        "wyndham",
+        "gallery"
+      ],
+      "images": [
+        {
+          "src": "/blog/phuket-beaches/beach-nai-harn-1.jpg",
+          "alt": "Най Харн: сгенерированная иллюстрация пляжа, ракурс 1"
+        },
+        {
+          "src": "/blog/phuket-beaches/beach-nai-harn-2.jpg",
+          "alt": "Най Харн: сгенерированная иллюстрация пляжа, ракурс 2"
+        }
+      ]
+    },
+    {
+      "id": "ao-yon",
+      "name": "Ао Йон",
+      "subtitle": "Небольшая бухта на Панве",
+      "hotels": [
+        "my-beach",
+        "bandara",
+        "v-villas",
+        "mooring"
+      ],
+      "images": [
+        {
+          "src": "/blog/phuket-beaches/beach-ao-yon-1.jpg",
+          "alt": "Ао Йон: сгенерированная иллюстрация пляжа, ракурс 1"
+        },
+        {
+          "src": "/blog/phuket-beaches/beach-ao-yon-2.jpg",
+          "alt": "Ао Йон: сгенерированная иллюстрация пляжа, ракурс 2"
+        }
+      ]
+    }
+  ],
+  "hotels": [
+    {
+      "id": "splash",
+      "name": "Splash Beach Resort",
+      "beach": "mai-khao",
+      "tagline": "Семейный отдых с аквапарком",
+      "fit": "Семьям, которым хочется чередовать море и водные развлечения.",
+      "description": "Курорт у Май Кхао с размещением разных форматов и аквапарком Splash Jungle рядом. Подойдёт для отпуска, в котором детям нужны занятия, а взрослым — возможность проводить время у моря.",
+      "beachAccess": "На побережье Май Кхао.",
+      "note": "Уточним, входит ли аквапарк в выбранный тариф, расположение корпуса и возможный шум самолётов.",
+      "source": "https://www.splashbeachresort.com/",
+      "image": "/blog/phuket-beaches/hotels/splash.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Splash Beach Resort",
+      "added": false
+    },
+    {
+      "id": "jw-marriott",
+      "name": "JW Marriott Phuket Resort & Spa",
+      "beach": "mai-khao",
+      "tagline": "Сад, море и тайская архитектура",
+      "fit": "Парам и семьям, которые ценят территорию, сервис и размеренный ритм.",
+      "description": "Курорт в тропическом саду непосредственно у Май Кхао. Тайская архитектура и разные пространства для отдыха позволяют сделать сам отель заметной частью путешествия.",
+      "beachAccess": "На пляже Май Кхао.",
+      "note": "Для прогулок по Старому городу и поездок на юг острова потребуется транспорт; вид из номера зависит от категории.",
+      "source": "https://www.marriott.com/en-us/hotels/hktjw-jw-marriott-phuket-resort-and-spa/overview/",
+      "image": "/blog/phuket-beaches/hotels/jw-marriott.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля JW Marriott Phuket Resort & Spa",
+      "added": false
+    },
+    {
+      "id": "radisson",
+      "name": "Radisson Blu Resort, Phuket Mai Khao Beach",
+      "beach": "mai-khao",
+      "tagline": "Современный курорт у моря",
+      "fit": "Парам и семьям, которым близки современный дизайн и пляжный формат.",
+      "description": "Курорт у Май Кхао с современными номерами и сьютами, бассейном и детским клубом. Можно сравнить обычное размещение и категории с особым доступом к воде.",
+      "beachAccess": "Прямой выход к Май Кхао.",
+      "note": "Не каждый номер выходит к бассейну или смотрит на море: нужную категорию проверим в предложении.",
+      "source": "https://www.radissonhotels.com/en-us/hotels/radisson-blu-phuket-mai-khao",
+      "image": "/blog/phuket-beaches/hotels/radisson.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Radisson Blu Resort, Phuket Mai Khao Beach",
+      "added": false
+    },
+    {
+      "id": "melia",
+      "name": "Meliá Phuket Mai Khao",
+      "beach": "mai-khao",
+      "tagline": "Виллы и спокойный ритм",
+      "fit": "Парам и путешественникам, которые выбирают приватность и отдых в отеле.",
+      "description": "Курорт в северной части острова с виллами, сьютами, тропическими садами и пространствами у бассейна. Рассмотрите его, если в отпуске важнее спокойные дни, чем ежедневная смена районов.",
+      "beachAccess": "На побережье Май Кхао.",
+      "note": "Частный бассейн предусмотрен не во всех категориях. Проверим тип размещения и маршрут к морю.",
+      "source": "https://www.melia.com/en/hotels/thailand/phuket/melia-phuket-mai-khao",
+      "image": "/blog/phuket-beaches/hotels/melia.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Meliá Phuket Mai Khao",
+      "added": true
+    },
+    {
+      "id": "katathani",
+      "name": "Katathani Phuket Beach Resort",
+      "beach": "kata-noi",
+      "tagline": "Большой курорт в красивой бухте",
+      "fit": "Семьям и парам, которым важны инфраструктура и близость Ката Ной.",
+      "description": "Курорт занимает значительную часть берега Ката Ной и предлагает разные корпуса и категории размещения. Его удобно рассматривать для отпуска с пляжем, бассейнами и отдыхом на территории.",
+      "beachAccess": "У Ката Ной; положение относительно пляжа зависит от крыла.",
+      "note": "Заранее сравним Thani, Bhuri и другие варианты: близость к морю и особенности размещения различаются.",
+      "source": "https://www.katathani.com/",
+      "image": "/blog/phuket-beaches/hotels/katathani.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Katathani Phuket Beach Resort",
+      "added": false
+    },
+    {
+      "id": "shore",
+      "name": "The Shore at Katathani",
+      "beach": "kata-noi",
+      "tagline": "Виллы для отдыха вдвоём",
+      "fit": "Взрослым парам, которые планируют романтическое путешествие.",
+      "description": "Камерный курорт с виллами и частными бассейнами над бухтой Ката Ной. Основной акцент — приватность, виды и отдых вдвоём.",
+      "beachAccess": "На склоне над Ката Ной.",
+      "note": "Отель работает в формате adults only. Уточним возрастные правила и перепады высот до бронирования.",
+      "source": "https://www.theshorephuket.com/",
+      "image": "/blog/phuket-beaches/hotels/shore.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля The Shore at Katathani",
+      "added": false
+    },
+    {
+      "id": "mantra",
+      "name": "The Mantra Kata Noi",
+      "beach": "kata-noi",
+      "tagline": "Небольшой отель рядом с пляжем",
+      "fit": "Самостоятельным путешественникам, для которых главное — Ката Ной и прогулки.",
+      "description": "Компактный вариант размещения в районе Ката Ной, который можно сравнить с крупными пляжными курортами. Подойдёт тем, кто собирается проводить большую часть дня у моря и в поездках по острову.",
+      "beachAccess": "Пешком к общественному пляжу Ката Ной.",
+      "note": "Уточним актуальные категории, наличие балкона и лестниц. Иллюстрация подготовлена по галерее карточки отеля на Trip.com.",
+      "source": "https://ca.trip.com/hotels/phuket-hotel-detail-1709623/katanoi-pavilion-by-amorn/photo.html",
+      "image": "/blog/phuket-beaches/hotels/mantra.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля The Mantra Kata Noi",
+      "added": false
+    },
+    {
+      "id": "mom-tri",
+      "name": "Mom Tri’s Villa Royale",
+      "beach": "kata-noi",
+      "tagline": "Камерный отель с тайским характером",
+      "fit": "Парам и любителям необычной архитектуры, красивых видов и ресторанов.",
+      "description": "Бутик-отель на мысе между Ката и Ката Ной, созданный архитектором Mom Tri. Интересен атмосферой, тайскими деталями и видами на побережье.",
+      "beachAccess": "На возвышенности у северного края Ката Ной.",
+      "note": "Важно учитывать лестницы и рельеф. Подберём корпус по тому, как вам удобнее выходить к пляжу.",
+      "source": "https://www.villaroyalephuket.com/",
+      "image": "/blog/phuket-beaches/hotels/mom-tri.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Mom Tri’s Villa Royale",
+      "added": true
+    },
+    {
+      "id": "saii",
+      "name": "SAii Laguna Phuket",
+      "beach": "bang-tao",
+      "tagline": "Море с одной стороны, лагуна с другой",
+      "fit": "Парам и семьям, которым нравится сочетание пляжа и инфраструктуры Laguna.",
+      "description": "Курорт расположен между пляжем Банг Тао и лагуной. Подойдёт для отпуска, где хочется и проводить время у воды, и пользоваться инфраструктурой большого курортного района.",
+      "beachAccess": "Непосредственно у Банг Тао.",
+      "note": "Вид на лагуну и вид на море — разные категории. Проверим размещение и расположение номера.",
+      "source": "https://www.saiihotels.com/laguna-phuket/",
+      "image": "/blog/phuket-beaches/hotels/saii.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля SAii Laguna Phuket",
+      "added": false
+    },
+    {
+      "id": "sunwing",
+      "name": "Sunwing Bangtao Beach",
+      "beach": "bang-tao",
+      "tagline": "Отпуск с детьми у моря",
+      "fit": "Семьям, которым нужны детские занятия и удобное размещение.",
+      "description": "Семейный курорт на Банг Тао с бассейнами, детскими программами и студиями. Рассмотрите его, если хочется проводить отпуск в понятном ритме между пляжем, номером и занятиями для ребёнка.",
+      "beachAccess": "Прямо у песчаного пляжа Банг Тао.",
+      "note": "Проверим состав семьи, возрастные правила pool access и конкретную студию; атмосфера здесь семейная и активная.",
+      "source": "https://www.sunwingphuket.com/",
+      "image": "/blog/phuket-beaches/hotels/sunwing.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Sunwing Bangtao Beach",
+      "added": false
+    },
+    {
+      "id": "movenpick",
+      "name": "Mövenpick Phuket Bangtao",
+      "beach": "bang-tao",
+      "tagline": "Простор для семьи или компании",
+      "fit": "Путешественникам, которым важны просторные сьюты и более домашний формат.",
+      "description": "Курорт на Банг Тао с разными вариантами размещения, включая просторные сьюты и резиденции. Интересен для длительного отдыха и поездок большой семьёй.",
+      "beachAccess": "В районе пляжа Банг Тао; проверим путь от выбранного корпуса.",
+      "note": "Кухня, отдельные спальни и частный бассейн зависят от категории. Не будем переносить оснащение одного сьюта на все номера.",
+      "source": "https://movenpick.accor.com/en/asia/thailand/phuket/resort-phuket-bangtao.html",
+      "image": "/blog/phuket-beaches/hotels/movenpick.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Mövenpick Phuket Bangtao",
+      "added": false
+    },
+    {
+      "id": "dusit",
+      "name": "Dusit Thani Laguna Phuket",
+      "beach": "bang-tao",
+      "tagline": "Классический курорт в тропическом саду",
+      "fit": "Парам и семьям, которые ценят зелёную территорию и тайский стиль.",
+      "description": "Курорт комплекса Laguna Phuket непосредственно у Банг Тао. Подойдёт тем, кто выбирает пляжный отдых с садом, ресторанами и возможностями выезжать на прогулки по району.",
+      "beachAccess": "Непосредственно у Банг Тао.",
+      "note": "Сравним номера и виллы отдельно: у них различаются планировка, приватность и удобство для семьи.",
+      "source": "https://www.dusit.com/dusitthani-lagunaphuket/",
+      "image": "/blog/phuket-beaches/hotels/dusit.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Dusit Thani Laguna Phuket",
+      "added": true
+    },
+    {
+      "id": "naiharn",
+      "name": "The Nai Harn",
+      "beach": "nai-harn",
+      "tagline": "Панорама бухты и отдых со вкусом",
+      "fit": "Парам и путешественникам, которым важны виды, рестораны и близость моря.",
+      "description": "Белые террасы отеля расположены на склоне у края Най Харна. Это вариант для тех, кто хочет соединить пляж, красивые виды и неспешные вечера за ужином.",
+      "beachAccess": "У края пляжа Най Харн, на склоне.",
+      "note": "Не все номера имеют вид на море. Проверим категорию, расположение и удобство перемещений по отелю.",
+      "source": "https://www.thenaiharn.com/",
+      "image": "/blog/phuket-beaches/hotels/naiharn.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля The Nai Harn",
+      "added": false
+    },
+    {
+      "id": "sunsuri",
+      "name": "Sunsuri Phuket",
+      "beach": "nai-harn",
+      "tagline": "Зелёный склон и бассейны",
+      "fit": "Парам и семьям, которым нравится курортный отдых с видом на зелень.",
+      "description": "Курорт на холме неподалёку от озера Най Харн. Рассмотрите его, если хочется чередовать пляж с бассейнами и отдыхом на территории.",
+      "beachAccess": "До Най Харна нужно пройти или доехать; это не первая линия.",
+      "note": "Официальный сайт предупреждает о внешнем строительстве рядом с отелем до конца 2027 года. Перед бронированием уточним шум и расположение номера.",
+      "source": "https://www.sunsuri-phuket.com/",
+      "image": "/blog/phuket-beaches/hotels/sunsuri.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Sunsuri Phuket",
+      "added": false
+    },
+    {
+      "id": "wyndham",
+      "name": "Wyndham Grand Nai Harn Beach Phuket",
+      "beach": "nai-harn",
+      "tagline": "Современный отель рядом с озером",
+      "fit": "Парам и семьям, которым важны современное размещение и бассейны.",
+      "description": "Курорт расположен в районе Най Харна среди зелёных холмов. Можно сравнить обычные номера и размещение с доступом к бассейну, сочетая дни в отеле с прогулками к пляжу.",
+      "beachAccess": "До Най Харна около 800 метров по информации отеля.",
+      "note": "Несмотря на слово Beach в названии, отель не стоит прямо на песке. Проверим удобство дороги для вашей семьи.",
+      "source": "https://www.wyndhamgrandnaiharnphuket.com/",
+      "image": "/blog/phuket-beaches/hotels/wyndham.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Wyndham Grand Nai Harn Beach Phuket",
+      "added": false
+    },
+    {
+      "id": "gallery",
+      "name": "The Gallery Hotel Nai Harn",
+      "beach": "nai-harn",
+      "tagline": "Лаконичный формат у озера",
+      "fit": "Путешественникам, которые хотят жить у Най Харна и готовы ходить к морю.",
+      "description": "Отель рядом с озером Най Харн с просторными балконами и бассейнами. Подойдёт для сочетания пляжных дней, прогулок и поездок по югу Пхукета.",
+      "beachAccess": "Около 800 метров от пляжа по информации отеля.",
+      "note": "Это не первая линия. Учтём реальный путь пешком, жару и состав семьи, а не только расстояние на карте.",
+      "source": "https://www.galleryhotelphuket.com/naiharn/",
+      "image": "/blog/phuket-beaches/hotels/gallery.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля The Gallery Hotel Nai Harn",
+      "added": true
+    },
+    {
+      "id": "my-beach",
+      "name": "My Beach Resort",
+      "beach": "ao-yon",
+      "tagline": "Отдельный спокойный пляж Панвы",
+      "fit": "Парам и тем, кто выбирает камерный пляжный отдых в районе Панвы.",
+      "description": "Курорт на пляже Кхао Кхад в районе Панвы, по соседству с Ао Йон. Его стоит сравнить, если вам интересен этот уголок острова, но не требуется жить именно на песке Ао Йон.",
+      "beachAccess": "Собственный выход к Кхао Кхад; это соседний пляж, а не Ао Йон.",
+      "note": "Проверим вход в воду, приливы и рельеф территории. Для поездки именно на Ао Йон понадобится отдельный маршрут.",
+      "source": "https://www.mybeachphuket.com/",
+      "image": "/blog/phuket-beaches/hotels/my-beach.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля My Beach Resort",
+      "added": false
+    },
+    {
+      "id": "bandara",
+      "name": "Bandara Beach Resort, Phuket",
+      "beach": "ao-yon",
+      "tagline": "Компактный курорт у Ао Йон",
+      "fit": "Парам и путешественникам, которым достаточно небольшого отеля у бухты.",
+      "description": "Курорт в районе пляжа Ао Йон с размещением разных категорий и бассейном. Удобен как база для размеренного отпуска на Панве и поездок в Старый город.",
+      "beachAccess": "В районе Ао Йон; уточним выход от корпуса к песку.",
+      "note": "Проверим вид из выбранного номера и особенности спуска к пляжу. Не путаем с отдельным отелем Bandara Pool Villas.",
+      "source": "https://www.bandaragroup.com/bandara-beach-phuket/",
+      "image": "/blog/phuket-beaches/hotels/bandara.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля Bandara Beach Resort, Phuket",
+      "added": false
+    },
+    {
+      "id": "v-villas",
+      "name": "V Villas Phuket — MGallery Collection",
+      "beach": "ao-yon",
+      "tagline": "Приватные виллы над бухтой",
+      "fit": "Парам и семьям, которые выбирают приватность и высокий уровень сервиса.",
+      "description": "Курорт с виллами и частными бассейнами на холме над Ао Йон. Подойдёт для особенного путешествия, где заметную часть времени хочется проводить в самой вилле.",
+      "beachAccess": "На холме над бухтой, а не непосредственно на песке.",
+      "note": "Уточним перемещения к пляжу, рельеф и планировку виллы. Красивый вид не означает прямой выход к морю.",
+      "source": "https://www.vvillasphuket.com/",
+      "image": "/blog/phuket-beaches/hotels/v-villas.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля V Villas Phuket — MGallery Collection",
+      "added": false
+    },
+    {
+      "id": "mooring",
+      "name": "The Mooring Resort",
+      "beach": "ao-yon",
+      "tagline": "Бунгало у песчаного берега",
+      "fit": "Парам и семьям, которым нравится небольшой отель и близость пляжа.",
+      "description": "Камерный курорт с бунгало непосредственно у восточной части Ао Йон. Рассмотрите его, если хочется начинать день с прогулки у воды и проводить отпуск в спокойном темпе.",
+      "beachAccess": "Непосредственно на пляже Ао Йон.",
+      "note": "Категории у берега и с видом на море различаются. Уточним размещение и возможности питания на ваши даты.",
+      "source": "https://www.themooringresort.com/",
+      "image": "/blog/phuket-beaches/hotels/mooring.jpg",
+      "imageAlt": "Иллюстрация по фотографии отеля The Mooring Resort",
+      "added": true
+    }
+  ]
+}
