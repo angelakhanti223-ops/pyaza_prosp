@@ -7,10 +7,11 @@ from .permissions import is_head
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     is_head = serializers.SerializerMethodField()
+    is_admin = serializers.BooleanField(source="is_superuser", read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'is_head']
+        fields = ['id', 'username', 'full_name', 'role', 'is_head', 'is_admin']
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username

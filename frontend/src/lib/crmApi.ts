@@ -9,6 +9,7 @@ export type CrmUser = {
   full_name: string;
   role: "manager" | "head";
   is_head: boolean;
+  is_admin?: boolean;
 };
 
 export type LeadStatus =

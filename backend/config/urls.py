@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/', include('leads.urls')),
     path('api/', include('emailing.urls')),
     path('api/', include('accounts.urls')),
+    path('api/', include('candidates.urls')),
     path('api/', include('articles.urls')),
     path('api/', include('kanban.urls')),
     path('api/', include('sitecontent.urls')),

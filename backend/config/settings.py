@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'django_ckeditor_5',
 
     'accounts',
+    'candidates',
     'leads',
     'articles',
     'kanban',

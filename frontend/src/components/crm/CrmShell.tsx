@@ -31,6 +31,7 @@ const NAV = [
   { href: "/crm/leads", label: "Заявки", icon: Inbox },
   { href: "/crm/appeals", label: "Обращения", icon: MessageSquare },
   { href: "/crm/uon-requests", label: "Заявки U-ON", icon: FileText },
+  { href: "/crm/candidates", label: "Кандидаты", icon: Users, adminOnly: true },
   { href: "/crm/clients", label: "Клиенты", icon: Users },
   { href: "/crm/kanban", label: "Канбан", icon: Columns3 },
   { href: "/crm/knowledge-base", label: "База знаний", icon: BookOpen },
@@ -83,7 +84,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <p className="text-[11px] text-foreground/50">мини-CRM</p>
         </div>
         <nav className="flex flex-col gap-1 px-3">
-          {NAV.filter((item) => !item.management || showManagementDashboard).map(({ href, label, icon: Icon }) => {
+          {NAV.filter((item) => (!item.management || showManagementDashboard) && (!item.adminOnly || user?.is_admin)).map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
               <Link
