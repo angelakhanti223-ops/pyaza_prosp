@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   // runtime get copied) — see frontend/Dockerfile.prod.
   output: "standalone",
   async rewrites() {
-    return [{ source: "/candidates", destination: "/candidate-form.html" }];
+    return [
+      { source: "/candidates", destination: "/candidate-form.html" },
+      { source: "/tours/china-constructor", destination: "/china-tour-builder.html" },
+    ];
   },
   async headers() {
     return ["/candidates", "/candidate-form.html"].map(source => ({

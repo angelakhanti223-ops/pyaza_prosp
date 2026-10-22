@@ -6,6 +6,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const STATIC_PATHS = [
   "",
   "/tours",
+  "/tours/china-constructor",
   "/directions",
   "/cruises",
   "/promotions",
