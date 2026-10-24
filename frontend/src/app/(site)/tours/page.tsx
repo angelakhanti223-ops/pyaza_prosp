@@ -46,6 +46,21 @@ export default async function ToursPage() {
         />
 
         <a
+          href="/tours/russia-january-2027"
+          className="mt-10 block rounded-3xl border border-navy/10 bg-blue-light p-6 transition hover:shadow-md sm:p-8"
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue">Россия · Январь 2027</p>
+          <h2 className="mt-3 text-2xl font-bold text-navy">Откройте Россию этой зимой</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70">
+            30 программ в Санкт-Петербург, Карелию, на Байкал и в Калининград.
+            Сравните даты, цены на двоих и программы экскурсий.
+          </p>
+          <span className="mt-5 inline-block rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white">
+            Выбрать путешествие →
+          </span>
+        </a>
+
+        <a
           href="/tours/china-constructor"
           className="mt-10 block rounded-3xl border border-[#ded2c4] bg-[#f7f3ed] p-6 transition hover:shadow-md sm:p-8"
         >
