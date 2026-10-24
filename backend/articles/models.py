@@ -109,3 +109,21 @@ class ArticleReadSession(models.Model):
             models.Index(fields=['started_at'], name='article_read_started_idx'),
             models.Index(fields=['article', 'started_at'], name='article_read_article_idx'),
         ]
+
+
+class PageReadSession(models.Model):
+    """Anonymous opening of an allowed public page; no query string or visitor identity."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    path = models.CharField(max_length=512)
+    title = models.CharField(max_length=255)
+    started_at = models.DateTimeField(default=timezone.now, editable=False)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    active_ms = models.PositiveIntegerField(default=0)
+    duration_reported = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['started_at'], name='page_read_started_idx'),
+            models.Index(fields=['path', 'started_at'], name='page_read_path_idx'),
+        ]

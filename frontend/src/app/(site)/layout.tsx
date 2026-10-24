@@ -3,6 +3,7 @@ import Footer from "@/components/layout/Footer";
 import { LeadFormProvider } from "@/components/lead-form/LeadFormContext";
 import LeadFormModal from "@/components/lead-form/LeadFormModal";
 import ChatWidget from "@/components/chat-widget/ChatWidget";
+import PublicPageTracker from "@/components/analytics/PublicPageTracker";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -24,6 +25,7 @@ const organizationJsonLd = {
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <LeadFormProvider>
+      <PublicPageTracker />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}

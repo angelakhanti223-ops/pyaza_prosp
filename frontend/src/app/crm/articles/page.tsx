@@ -16,6 +16,7 @@ export default function CrmArticlesPage() {
   const [articles, setArticles] = useState<ArticleCrmListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [analyticsScope, setAnalyticsScope] = useState<"pages" | "articles">("pages");
 
   useEffect(() => {
     listCrmArticles().then((data) => {
@@ -44,7 +45,11 @@ export default function CrmArticlesPage() {
         </Link>
       </div>
 
-      <ArticleAnalytics />
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Раздел статистики">
+        <button type="button" aria-pressed={analyticsScope === "pages"} onClick={() => setAnalyticsScope("pages")} className={`rounded-full px-5 py-2.5 text-sm font-semibold ${analyticsScope === "pages" ? "bg-navy text-white" : "bg-white text-navy"}`}>Все страницы сайта</button>
+        <button type="button" aria-pressed={analyticsScope === "articles"} onClick={() => setAnalyticsScope("articles")} className={`rounded-full px-5 py-2.5 text-sm font-semibold ${analyticsScope === "articles" ? "bg-navy text-white" : "bg-white text-navy"}`}>Статьи</button>
+      </div>
+      <ArticleAnalytics key={analyticsScope} scope={analyticsScope} />
 
       <div className="relative mb-5 max-w-md">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
