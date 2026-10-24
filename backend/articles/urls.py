@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from . import views
 from .analytics import ArticleAnalyticsView, ArticleReadEventView
+from .page_analytics import PageAnalyticsView, PageReadEventView
 
 # SimpleRouter, не DefaultRouter — второй DefaultRouter() в процессе падает на
 # register_converter с "Converter 'drf_format_suffix' is already registered"
@@ -11,6 +12,8 @@ router = SimpleRouter()
 router.register('crm/articles', views.ArticleCrmViewSet, basename='crm-article')
 
 urlpatterns = [
+    path('pages/read-event/', PageReadEventView.as_view(), name='page-read-event'),
+    path('crm/pages/analytics/', PageAnalyticsView.as_view(), name='crm-page-analytics'),
     path('articles/', views.ArticleListView.as_view(), name='article-list'),
     path('articles/categories/', views.CategoryListView.as_view(), name='article-category-list'),
     path('crm/articles/categories/', views.CategoryCrmCreateView.as_view(), name='crm-article-category-create'),

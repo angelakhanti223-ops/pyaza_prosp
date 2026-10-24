@@ -473,6 +473,16 @@ export async function getArticleAnalytics(params: { start: string; end: string; 
   return apiJson<ArticleAnalyticsReport>(`/api/crm/articles/analytics/?${query}`, { cache: "no-store" });
 }
 
+export type PageAnalyticsReport = Omit<ArticleAnalyticsReport, "articles"> & {
+  pages: (ArticleAnalyticsNumbers & { path: string; title: string })[];
+};
+
+export async function getPageAnalytics(params: { start: string; end: string; path?: string }): Promise<PageAnalyticsReport> {
+  const query = new URLSearchParams({ start: params.start, end: params.end });
+  if (params.path) query.set("path", params.path);
+  return apiJson<PageAnalyticsReport>(`/api/crm/pages/analytics/?${query}`, { cache: "no-store" });
+}
+
 export async function getCrmArticle(id: number): Promise<ArticleCrmDetail> {
   return apiJson<ArticleCrmDetail>(`/api/crm/articles/${id}/`);
 }
