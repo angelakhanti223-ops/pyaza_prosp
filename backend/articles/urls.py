@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import SimpleRouter
 
 from . import views
+from .analytics import ArticleAnalyticsView, ArticleReadEventView
 
 # SimpleRouter, не DefaultRouter — второй DefaultRouter() в процессе падает на
 # register_converter с "Converter 'drf_format_suffix' is already registered"
@@ -13,6 +14,8 @@ urlpatterns = [
     path('articles/', views.ArticleListView.as_view(), name='article-list'),
     path('articles/categories/', views.CategoryListView.as_view(), name='article-category-list'),
     path('crm/articles/categories/', views.CategoryCrmCreateView.as_view(), name='crm-article-category-create'),
+    path('crm/articles/analytics/', ArticleAnalyticsView.as_view(), name='crm-article-analytics'),
+    path('articles/<slug:slug>/read-event/', ArticleReadEventView.as_view(), name='article-read-event'),
     path('articles/<slug:slug>/', views.ArticleDetailView.as_view(), name='article-detail'),
     path('', include(router.urls)),
 ]

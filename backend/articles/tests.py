@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
+from uuid import uuid4
 
 from .models import Article, Category, Tag
 from .utils import transliterate, unique_slug
@@ -168,16 +169,16 @@ class ArticleViewCounterTests(TestCase):
             title='Статья', slug='statya', status=Article.Status.PUBLISHED, published_at=timezone.now(),
         )
 
-    def test_public_detail_view_increments_views(self):
+    def test_public_api_fetches_do_not_count_as_browser_views(self):
         self.assertEqual(self.article.views, 0)
 
         self.client.get(f'/api/articles/{self.article.slug}/')
         self.article.refresh_from_db()
-        self.assertEqual(self.article.views, 1)
+        self.assertEqual(self.article.views, 0)
 
         self.client.get(f'/api/articles/{self.article.slug}/')
         self.article.refresh_from_db()
-        self.assertEqual(self.article.views, 2)
+        self.assertEqual(self.article.views, 0)
 
     def test_public_list_view_does_not_increment_views(self):
         self.client.get('/api/articles/')
@@ -196,7 +197,9 @@ class ArticleViewCounterTests(TestCase):
     def test_views_field_visible_in_crm_list_and_detail(self):
         manager = User.objects.create_user(username='viewslistmanager', password='x', role=User.Role.MANAGER)
         self.client.force_login(manager)
-        self.client.get(f'/api/articles/{self.article.slug}/')  # 1 просмотр
+        self.client.post(f'/api/articles/{self.article.slug}/read-event/', {
+            'view_id': str(uuid4()), 'active_ms': 0, 'kind': 'start',
+        }, content_type='application/json')
 
         list_response = self.client.get('/api/crm/articles/')
         list_data = list_response.json()

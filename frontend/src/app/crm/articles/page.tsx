@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, Newspaper, Search } from "lucide-react";
 import { listCrmArticles, type ArticleCrmListItem, type ArticleStatus } from "@/lib/crmApi";
+import ArticleAnalytics from "@/components/crm/ArticleAnalytics";
 
 const STATUS_STYLES: Record<ArticleStatus, string> = {
   draft: "bg-black/5 text-foreground/60",
@@ -43,6 +44,8 @@ export default function CrmArticlesPage() {
         </Link>
       </div>
 
+      <ArticleAnalytics />
+
       <div className="relative mb-5 max-w-md">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
         <input
@@ -61,14 +64,14 @@ export default function CrmArticlesPage() {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-foreground/40">Ничего не найдено по «{search}»</p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-black/5 bg-white">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-2xl border border-black/5 bg-white">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-black/5 bg-blue-light/40 text-xs text-foreground/50">
               <tr>
                 <th className="px-4 py-3 font-medium">Заголовок</th>
                 <th className="px-4 py-3 font-medium">Категория</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
-                <th className="px-4 py-3 font-medium">Просмотры</th>
+                <th className="px-4 py-3 font-medium">Просмотры за всё время</th>
                 <th className="px-4 py-3 font-medium">Автор</th>
                 <th className="px-4 py-3 font-medium">Обновлено</th>
               </tr>

@@ -1,4 +1,3 @@
-from django.db.models import F
 from django.utils import timezone
 from rest_framework import generics, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -57,13 +56,8 @@ class ArticleDetailView(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         article = self.get_object()
 
-        # F()-инкремент (не article.save()) — атомарно на уровне БД и не задевает
-        # остальные поля/save()-хук со статусом публикации. Next.js вызывает
-        # fetchArticle() дважды на один реальный визит (generateMetadata + сама
-        # страница), но обе идут в рамках одного request-рендера, и встроенная
-        # request-мемоизация fetch() схлопывает их в один сетевой запрос — здесь
-        # это не удваивает счётчик (проверено вживую при разработке).
-        Article.objects.filter(pk=article.pk).update(views=F('views') + 1)
+        # Reading the API (including Next.js metadata/prefetch) is not a page view.
+        # The browser records one idempotent event after the article becomes visible.
 
         data = self.get_serializer(article).data
 

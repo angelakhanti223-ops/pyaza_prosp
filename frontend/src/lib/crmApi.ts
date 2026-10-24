@@ -449,6 +449,30 @@ export async function listCrmArticles(): Promise<ArticleCrmListItem[]> {
   return Array.isArray(data) ? data : data.results;
 }
 
+export type ArticleAnalyticsNumbers = {
+  views: number;
+  previous_views: number;
+  change_percent: number | null;
+  avg_seconds: number | null;
+  measured_views: number;
+  all_time_views: number;
+};
+
+export type ArticleAnalyticsReport = {
+  period: { start: string; end: string; previous_start: string; previous_end: string; timezone: string };
+  generated_at: string;
+  first_recorded_at: string | null;
+  totals: ArticleAnalyticsNumbers;
+  daily: { date: string; views: number; avg_seconds: number | null; measured_views: number }[];
+  articles: (ArticleAnalyticsNumbers & { id: number; title: string; slug: string; status: ArticleStatus })[];
+};
+
+export async function getArticleAnalytics(params: { start: string; end: string; article_id?: number }): Promise<ArticleAnalyticsReport> {
+  const query = new URLSearchParams({ start: params.start, end: params.end });
+  if (params.article_id) query.set("article_id", String(params.article_id));
+  return apiJson<ArticleAnalyticsReport>(`/api/crm/articles/analytics/?${query}`, { cache: "no-store" });
+}
+
 export async function getCrmArticle(id: number): Promise<ArticleCrmDetail> {
   return apiJson<ArticleCrmDetail>(`/api/crm/articles/${id}/`);
 }

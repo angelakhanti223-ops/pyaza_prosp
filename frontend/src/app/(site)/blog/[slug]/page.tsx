@@ -13,6 +13,7 @@ import DecemberQuickGuide from "@/components/blog/DecemberQuickGuide";
 import ArticleLeadButtons from "@/components/blog/ArticleLeadButtons";
 import PhuketBeachesArticle from "@/components/blog/PhuketBeachesArticle";
 import phuketBeachGuide from "@/content/phuket-beaches.json";
+import ArticleReadTracker from "@/components/blog/ArticleReadTracker";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const REALISTIC_SLIDE_VERSION = "clean20261003";
@@ -512,6 +513,7 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <ArticleReadTracker slug={article.slug} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
