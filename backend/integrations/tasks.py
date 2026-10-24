@@ -3,6 +3,7 @@ from datetime import datetime as dt
 from datetime import timedelta
 
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 from .adapters import UonAdapterError, build_ticket_payload, get_uon_adapter
@@ -144,6 +145,9 @@ def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, 
     telegrambot.services.build_uon_record_url), а не просто на доску. При
     новом назначении ответственного отправляется Telegram-уведомление
     (notify_task_assignment) — так же, как при ручном назначении в CRM."""
+    if not getattr(settings, 'UON_IMPORT_TASKS', False):
+        return
+
     from kanban.models import Task
     from kanban.services import next_order_in_column, reposition_task
     from telegrambot.services import get_first_column, get_last_column
@@ -183,10 +187,12 @@ def _sync_tasks_from_reminders(uon_id: str, record_kind: str, client_name: str, 
         is_done = bool(reminder.get('is_done'))
         target_column = last_column if (is_done and last_column) else first_column
 
-        task = Task.objects.filter(uon_reminder_id=reminder_id).first()
+        task = Task.all_objects.filter(uon_reminder_id=reminder_id).first()
+        if task is not None and task.archived_at:
+            continue
         if task is None:
             task = Task.objects.create(
-                uon_reminder_id=reminder_id, title=_titled(text, bool(assignee)), description=contact,
+                origin=Task.Origin.UON, uon_reminder_id=reminder_id, title=_titled(text, bool(assignee)), description=contact,
                 deadline=deadline, column=target_column, assignee=assignee,
                 order=next_order_in_column(target_column), uon_record_kind=record_kind, uon_record_id=uon_id,
             )
@@ -286,6 +292,9 @@ def pull_uon_reminders_for_lead(self, lead_id: int):
     трогает title/deadline существующей позиции, только переносит между
     первой/последней при смене статуса выполнения в U-ON).
     """
+    if not getattr(settings, 'UON_IMPORT_TASKS', False):
+        return
+
     from kanban.models import Task
     from kanban.services import next_order_in_column, reposition_task
     from leads.models import Lead
@@ -316,10 +325,12 @@ def pull_uon_reminders_for_lead(self, lead_id: int):
         is_done = bool(reminder.get('is_done'))
         target_column = last_column if (is_done and last_column) else first_column
 
-        task = Task.objects.filter(uon_reminder_id=reminder_id).first()
+        task = Task.all_objects.filter(uon_reminder_id=reminder_id).first()
+        if task is not None and task.archived_at:
+            continue
         if task is None:
             Task.objects.create(
-                uon_reminder_id=reminder_id, title=title[:255], lead=lead, deadline=deadline,
+                origin=Task.Origin.UON, uon_reminder_id=reminder_id, title=title[:255], lead=lead, deadline=deadline,
                 column=target_column, assignee=lead.assigned_manager,
                 order=next_order_in_column(target_column),
             )
@@ -337,6 +348,9 @@ def pull_uon_reminders_for_lead(self, lead_id: int):
 def sync_all_uon_reminders():
     """Периодическая задача (Celery Beat) — обходит все заявки с привязкой к U-ON
     и подтягивает по каждой свежие напоминания."""
+    if not getattr(settings, 'UON_IMPORT_TASKS', False):
+        return
+
     from leads.models import Lead
 
     lead_ids = list(Lead.objects.exclude(uon_ticket_id='').values_list('id', flat=True))
@@ -823,6 +837,9 @@ def handle_uon_task_added(payload: dict):
         },
     )
 
+    if not getattr(settings, 'UON_IMPORT_TASKS', False):
+        return False  # Preserve lead import above; only stop mirroring reminders.
+
     column = get_first_column()
     if column is None:
         logger.warning('U-ON task: на доске не настроено ни одной колонки, пропускаем')
@@ -831,10 +848,12 @@ def handle_uon_task_added(payload: dict):
     title = (g('text') or 'Напоминание U-ON #%s' % reminder_id)[:255]
     deadline = _parse_uon_datetime(g('date_from_msk', 'date_from'))
 
-    task = Task.objects.filter(uon_reminder_id=reminder_id).first()
+    task = Task.all_objects.filter(uon_reminder_id=reminder_id).first()
+    if task is not None and task.archived_at:
+        return False
     if task is None:
         task = Task.objects.create(
-            uon_reminder_id=reminder_id,
+            origin=Task.Origin.UON, uon_reminder_id=reminder_id,
             title=title,
             lead=lead,
             column=column,

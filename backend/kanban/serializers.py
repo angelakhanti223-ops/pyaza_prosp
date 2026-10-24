@@ -51,10 +51,12 @@ class TaskSerializer(serializers.ModelSerializer):
             'preferred_contact_channel', 'preferred_contact_channel_display',
             'uon_record_kind', 'uon_record_id', 'uon_status_name', 'attachments', 'order', 'created_at',
             'updated_at',
+            'origin',
         ]
         read_only_fields = [
             'id', 'status_display', 'preferred_contact_channel_display', 'order', 'created_at', 'updated_at',
             'kind', 'priority', 'uon_record_kind', 'uon_record_id', 'attachments',
+            'origin',
         ]
 
     def get_uon_status_name(self, obj):

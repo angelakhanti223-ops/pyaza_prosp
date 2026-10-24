@@ -34,6 +34,11 @@ def create_new_lead_task(lead_id: int):
         logger.warning('Лид #%s не найден, задачу на контакт не создаём', lead_id)
         return
 
+    if Task.objects.filter(lead=lead, origin=Task.Origin.NEXT_CONTACT).exclude(status__in=['done', 'cancelled']).exists():
+        return  # A scheduled contact already represents this action.
+    if Task.objects.filter(lead=lead, title__startswith=_NEW_LEAD_TITLE_PREFIX).exists():
+        return  # Re-delivery of the Celery job must not duplicate the initial-contact task.
+
     column = get_first_column()
     if column is None:
         logger.warning('На доске не настроено ни одной колонки, задача на контакт не создана')

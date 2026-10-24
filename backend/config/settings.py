@@ -212,6 +212,10 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # Периодические задачи (Celery Beat). CELERY_TIMEZONE = TIME_ZONE (Europe/Moscow,
 # см. выше) — время в crontab() ниже уже московское, дополнительно пересчитывать не нужно.
 CELERY_BEAT_SCHEDULE = {
+    'send-browser-task-reminders': {
+        'task': 'kanban.tasks.send_due_task_pushes',
+        'schedule': 60.0,
+    },
     'sync-uon-reminders': {
         'task': 'integrations.tasks.sync_all_uon_reminders',
         'schedule': 600.0,  # каждые 10 минут
@@ -271,6 +275,8 @@ BACKEND_URL = env('BACKEND_URL', default='http://localhost:8000')
 # U-ON CRM integration — see integrations/adapters.py. Mock mode is used until
 # a real API key is issued by the client.
 UON_MOCK_MODE = env.bool('UON_MOCK_MODE', default=True)
+UON_IMPORT_TASKS = env.bool('UON_IMPORT_TASKS', default=False)
+WEB_PUSH_SUBJECT = env('WEB_PUSH_SUBJECT', default='mailto:pnztour@mail.ru')
 UON_API_BASE_URL = env('UON_API_BASE_URL', default='https://api.u-on.ru')
 UON_API_KEY = env('UON_API_KEY', default='')
 # Optional shared secret checked against ?token= on the webhook receiver (integrations.views.UonWebhookView).
