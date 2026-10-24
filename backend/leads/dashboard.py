@@ -332,22 +332,17 @@ OPEN_LEAD_STATUSES = [
 
 
 def task_counts_data(user, head):
-    """Число открытых задач с дедлайном сегодня и просроченных — не заходит в
-    последнюю колонку доски («Готово»), как и утренняя сводка в боте
-    (telegrambot.tasks.notify_daily_deadlines)."""
-    from kanban.models import KanbanColumn, Task
+    """Число активных задач на сегодня и просроченных к текущему моменту."""
+    from kanban.models import Task
 
     today = timezone.localdate()
-    qs = Task.objects.filter(deadline__isnull=False, deadline__date__lte=today)
-    last_column = KanbanColumn.objects.order_by('-order').first()
-    if last_column is not None:
-        qs = qs.exclude(column_id=last_column.pk)
+    qs = Task.objects.filter(deadline__isnull=False, deadline__date__lte=today).exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
     if not head:
         qs = qs.filter(assignee=user)
 
     return {
         'today': qs.filter(deadline__date=today).count(),
-        'overdue': qs.filter(deadline__date__lt=today).count(),
+        'overdue': qs.filter(deadline__lt=timezone.now()).count(),
     }
 
 

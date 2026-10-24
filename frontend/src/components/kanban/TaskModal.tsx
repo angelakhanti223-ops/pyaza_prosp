@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
+import { taskDeadlinePatch, toLocalTaskTime } from "@/lib/taskForm";
 import { ExternalLink, Paperclip, X } from "lucide-react";
 import { listLeads, listManagers, type CrmUser, type LeadListItem } from "@/lib/crmApi";
 import {
@@ -31,13 +33,6 @@ type Props = {
   presetUonRecord?: { kind: "request" | "lead"; id: string; label: string } | null;
 };
 
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 export default function TaskModal({
   columns,
   defaultColumnId,
@@ -48,18 +43,18 @@ export default function TaskModal({
   presetUonRecord,
 }: Props) {
   const isEdit = Boolean(task);
+  const { user } = useCrmAuth();
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [columnId, setColumnId] = useState(task?.column ?? defaultColumnId ?? columns[0]?.id ?? 0);
-  const [assigneeId, setAssigneeId] = useState<string>(task?.assignee ? String(task.assignee.id) : "");
-  const [deadline, setDeadline] = useState(toLocalInputValue(task?.deadline ?? null));
+  const [assigneeId, setAssigneeId] = useState<string>(task?.assignee ? String(task.assignee.id) : task ? "" : String(user?.id ?? ""));
+  const [deadline, setDeadline] = useState(toLocalTaskTime(task?.deadline ?? null));
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [leadQuery, setLeadQuery] = useState(task?.lead_name ?? presetLead?.name ?? "");
   const [leadResults, setLeadResults] = useState<LeadListItem[]>([]);
   const [leadId, setLeadId] = useState<number | null>(task?.lead ?? presetLead?.id ?? null);
   const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? "new");
+  const [status, setStatus] = useState<TaskStatus>(task?.status ?? columns.find(column => column.id === defaultColumnId)?.status ?? "new");
   const [contactChannel, setContactChannel] = useState<ContactChannel>(task?.preferred_contact_channel ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +64,12 @@ export default function TaskModal({
   useEffect(() => {
     listManagers().then(setManagers);
   }, []);
+
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [onClose]);
 
   useEffect(() => {
     let active = true;
@@ -98,18 +99,22 @@ export default function TaskModal({
         await updateTask(task.id, {
           title,
           description,
+          expected_updated_at: task.updated_at,
           status,
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
-          deadline: deadlineIso,
+          ...taskDeadlinePatch(task.deadline, deadline),
           is_recurring: isRecurring,
           preferred_contact_channel: contactChannel,
         });
       } else {
+        const column = columns.find(column => column.status === status);
+        if (!column) throw new Error("Статусы задач ещё не загружены. Обновите страницу.");
         await createTask({
           title,
           description,
-          column: columnId,
+          column: column.id,
+          status,
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           deadline: deadlineIso,
@@ -120,8 +125,8 @@ export default function TaskModal({
         });
       }
       onSaved();
-    } catch {
-      setError("Не удалось сохранить задачу");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Не удалось сохранить задачу");
     } finally {
       setSaving(false);
     }
@@ -155,11 +160,12 @@ export default function TaskModal({
   const hasSubheader = Boolean(linkedStatus || recordUrl);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={event => { event.stopPropagation(); onClose(); }}>
       <form
+        role="dialog" aria-modal="true" aria-label={isEdit ? "Редактировать задачу" : "Новая задача"}
         onSubmit={handleSave}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-xl"
+        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl"
       >
         <button
           type="button"
@@ -175,7 +181,7 @@ export default function TaskModal({
         </h3>
         {linkedStatus && (
           <p className={recordUrl ? "mb-1 text-xs text-foreground/50" : "mb-4 text-xs text-foreground/50"}>
-            Статус {task?.uon_record_kind === "request" ? "заявки" : "обращения"}:{" "}
+            Этап {task?.lead || task?.uon_record_kind === "request" ? "заявки" : "обращения"}:{" "}
             <span className="font-medium text-navy">{linkedStatus}</span>
           </p>
         )}
@@ -208,38 +214,13 @@ export default function TaskModal({
             className="resize-none rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
           />
 
-          {!isEdit && (
-            <select
-              value={columnId}
-              onChange={(e) => setColumnId(Number(e.target.value))}
-              className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
-            >
-              {columns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+          <label className="text-xs text-foreground/60">Статус задачи
+            <select aria-label="Статус задачи" value={status} onChange={event => setStatus(event.target.value as TaskStatus)} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-navy outline-none focus:border-blue">
+              {TASK_STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-          )}
-
-          {isEdit && (
-            <div>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
-              >
-                {TASK_STATUS_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              {status === "postponed" && task?.status !== "postponed" && (
-                <p className="mt-1 text-xs text-foreground/40">Срок автоматически сдвинется на +3 дня</p>
-              )}
-            </div>
-          )}
+            <p className="mt-1 text-xs leading-5 text-foreground/45">Этот же статус определяет колонку на доске.</p>
+            {status === "postponed" && task?.status !== "postponed" && <p className="mt-1 text-xs text-foreground/55">Если оставить прежний срок, он сдвинется на 3 дня. Можно выбрать другую дату ниже.</p>}
+          </label>
 
           <select
             value={assigneeId}
@@ -277,16 +258,17 @@ export default function TaskModal({
           <label className="flex items-center gap-2 text-sm text-foreground/70">
             <input
               type="checkbox"
+              disabled={task?.origin === "next_contact"}
               checked={isRecurring}
               onChange={(e) => setIsRecurring(e.target.checked)}
               className="h-4 w-4 rounded border-black/20"
             />
-            Ежедневная задача (при переносе в последнюю колонку создаётся копия на завтра)
+            Ежедневная задача: после выполнения создаётся следующая
           </label>
 
-          {presetLead ? (
+          {presetLead || task?.origin === "next_contact" ? (
             <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">
-              Привязана к обращению: <strong>{presetLead.name}</strong>
+              Заявка: <strong>{presetLead?.name ?? task?.lead_name}</strong>
             </p>
           ) : presetUonRecord ? (
             <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">

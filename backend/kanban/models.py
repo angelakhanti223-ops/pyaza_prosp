@@ -7,17 +7,35 @@ class ActiveTaskManager(models.Manager):
         return super().get_queryset().filter(archived_at__isnull=True)
 
 
+class TaskStatus(models.TextChoices):
+    NEW = 'new', 'Новая'
+    IN_PROGRESS = 'in_progress', 'В работе'
+    WAITING_CLIENT = 'waiting_client', 'Ждём клиента'
+    POSTPONED = 'postponed', 'Отложено'
+    DONE = 'done', 'Выполнено'
+    CANCELLED = 'cancelled', 'Отменено'
+
+
 class KanbanColumn(models.Model):
-    """Настраиваемая колонка доски (ТЗ 6): например Новая → В работе → Ждём клиента → Готово."""
+    """A column represents exactly one task status; inactive legacy columns are retained."""
 
     name = models.CharField(max_length=100)
     order = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=TaskStatus.choices, unique=True, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['order']
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self.status:
+            self.name = TaskStatus(self.status).label
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = set(kwargs['update_fields']) | {'name'}
+        return super().save(*args, **kwargs)
 
 
 class Task(models.Model):
@@ -28,12 +46,7 @@ class Task(models.Model):
 
     objects = ActiveTaskManager()
     all_objects = models.Manager()
-    class Status(models.TextChoices):
-        NEW = 'new', 'Новая'
-        IN_PROGRESS = 'in_progress', 'В работе'
-        POSTPONED = 'postponed', 'Отложено'
-        DONE = 'done', 'Выполнено'
-        CANCELLED = 'cancelled', 'Отменено'
+    Status = TaskStatus
 
     class ContactChannel(models.TextChoices):
         PHONE = 'phone', 'Телефон'
@@ -50,9 +63,7 @@ class Task(models.Model):
     description = models.TextField(blank=True)
     status = models.CharField(
         'Статус задачи', max_length=20, choices=Status.choices, default=Status.NEW,
-        help_text='Независим от колонки доски — просто рабочая пометка исполнителя. '
-                   'При переводе в «Отложено» дедлайн автоматически сдвигается на +3 дня '
-                   '(см. TaskUpdateSerializer.update).',
+        help_text='Единое состояние задачи: соответствует колонке канбана. При первом переводе в «Отложено» неизменённый срок сдвигается на 3 дня.',
     )
     preferred_contact_channel = models.CharField(
         'Приоритетный канал связи', max_length=20, choices=ContactChannel.choices, blank=True,
@@ -76,8 +87,9 @@ class Task(models.Model):
     uon_record_id = models.CharField('ID записи U-ON', max_length=64, blank=True)
     is_recurring = models.BooleanField(
         'Ежедневная (повторяющаяся)', default=False,
-        help_text='При переносе в последнюю колонку доски автоматически создаётся копия на завтра.',
+        help_text='При выполнении создаётся одна следующая задача. Отмена не создаёт повтор.',
     )
+    recurrence_parent = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='recurrence_next')
     deadline = models.DateTimeField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -91,19 +103,25 @@ class Task(models.Model):
     def __str__(self):
         return self.title
 
+    def save(self, *args, **kwargs):
+        from .services import save_task
+        return save_task(self, super().save, *args, **kwargs)
+
     @property
     def kind(self) -> str:
         """Тип задачи для цветовой маркировки доски: заявка / обращение / общая."""
-        if self.uon_reminder_id:
-            return 'appeal'
-        if self.lead_id:
+        if self.lead_id or self.uon_record_kind == 'request':
             return 'lead'
+        if self.uon_reminder_id or self.uon_record_kind == 'lead':
+            return 'appeal'
         return 'general'
 
     @property
     def priority(self) -> str | None:
         """Автоматическая бирка срочности — заявки и обращения всегда горят, ежедневные
         задачи важны, но не срочны, остальные общие задачи без метки."""
+        if self.archived_at or self.status in [Task.Status.DONE, Task.Status.CANCELLED]:
+            return None
         if self.kind in ('lead', 'appeal'):
             return 'urgent_important'
         if self.is_recurring:

@@ -1,13 +1,11 @@
-from datetime import timedelta
-
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
 from integrations.models import UonLeadRecord, UonRequestRecord
 
 from .models import KanbanColumn, Task, TaskAttachment
+from .services import column_for_status
 
 User = get_user_model()
 
@@ -15,7 +13,7 @@ User = get_user_model()
 class KanbanColumnSerializer(serializers.ModelSerializer):
     class Meta:
         model = KanbanColumn
-        fields = ['id', 'name', 'order']
+        fields = ['id', 'name', 'order', 'status']
 
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):
@@ -93,11 +91,18 @@ class TaskCreateSerializer(TaskSerializer):
     class Meta(TaskSerializer.Meta):
         read_only_fields = [f for f in TaskSerializer.Meta.read_only_fields if f not in ('uon_record_kind', 'uon_record_id')]
 
+    column = serializers.PrimaryKeyRelatedField(queryset=KanbanColumn.objects.filter(is_active=True, status__isnull=False), required=False)
+
     def validate(self, attrs):
         kind = attrs.get('uon_record_kind', '')
         record_id = attrs.get('uon_record_id', '')
         if bool(kind) != bool(record_id):
             raise serializers.ValidationError('uon_record_kind и uon_record_id нужно указывать вместе.')
+        column = attrs.get('column')
+        if column and 'status' in attrs and attrs['status'] != column.status:
+            raise serializers.ValidationError('Статус задачи должен соответствовать колонке.')
+        attrs['status'] = attrs.get('status', column.status if column else Task.Status.NEW)
+        attrs['column'] = column or column_for_status(attrs['status'])
         return attrs
 
 
@@ -107,31 +112,45 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
     assignee_id = serializers.PrimaryKeyRelatedField(
         source='assignee', queryset=User.objects.all(), write_only=True, required=False, allow_null=True,
     )
+    expected_updated_at = serializers.DateTimeField(required=False, write_only=True)
 
     class Meta:
         model = Task
         fields = [
             'title', 'description', 'status', 'assignee_id', 'lead', 'deadline', 'is_recurring',
             'preferred_contact_channel',
+            'expected_updated_at',
         ]
 
+    def validate(self, attrs):
+        if self.instance.origin == Task.Origin.NEXT_CONTACT:
+            if attrs.get('is_recurring'):
+                raise serializers.ValidationError('Следующий контакт планируется датой в заявке, без ежедневных копий.')
+            if 'lead' in attrs and getattr(attrs['lead'], 'pk', None) != self.instance.lead_id:
+                raise serializers.ValidationError('Задачу следующего контакта нельзя перенести в другую заявку.')
+            if attrs.get('status') not in [None, Task.Status.DONE, Task.Status.CANCELLED] and self.instance.lead and self.instance.lead.status in ['closed_won', 'closed_lost', 'failed', 'not_target']:
+                raise serializers.ValidationError('Для нового контакта сначала откройте заявку.')
+        return attrs
+
     def update(self, instance, validated_data):
-        # Переход именно В «Отложено» (не повторное сохранение уже отложенной задачи)
-        # отодвигает дедлайн на +3 дня от текущего срока — решение заказчика, 01.09.2026.
-        # Сравниваем с ТЕКУЩИМ значением, а не просто с наличием ключа в payload: форма
-        # редактирования в CRM всегда шлёт deadline (это обычное controlled-поле, не
-        # опускается, если пользователь его не трогал) — проверка "ключа нет" никогда
-        # бы не срабатывала оттуда. Если пользователь реально выбрал НОВУЮ дату — она
-        # будет отличаться от instance.deadline, и мы её не перезапишем.
-        new_status = validated_data.get('status')
-        if new_status == Task.Status.POSTPONED and instance.status != Task.Status.POSTPONED:
-            submitted_deadline = validated_data.get('deadline', instance.deadline)
-            if submitted_deadline == instance.deadline:
-                base = instance.deadline or timezone.now()
-                validated_data['deadline'] = base + timedelta(days=3)
+        instance._expected_updated_at = validated_data.pop('expected_updated_at', None)
         return super().update(instance, validated_data)
 
 
 class TaskMoveSerializer(serializers.Serializer):
-    column = serializers.PrimaryKeyRelatedField(queryset=KanbanColumn.objects.all())
+    column = serializers.PrimaryKeyRelatedField(queryset=KanbanColumn.objects.filter(is_active=True, status__isnull=False))
     order = serializers.IntegerField(min_value=0)
+    expected_updated_at = serializers.DateTimeField(required=False)
+
+
+class TaskFilterSerializer(serializers.Serializer):
+    lead = serializers.IntegerField(required=False, min_value=1)
+    assignee = serializers.IntegerField(required=False, min_value=1)
+    status = serializers.ChoiceField(choices=Task.Status.choices, required=False)
+    uon_record_kind = serializers.ChoiceField(choices=['request', 'lead'], required=False)
+    uon_record_id = serializers.CharField(required=False, max_length=64)
+
+    def validate(self, attrs):
+        if ('uon_record_kind' in attrs) != ('uon_record_id' in attrs):
+            raise serializers.ValidationError('Тип и ID записи U-ON передаются вместе.')
+        return attrs

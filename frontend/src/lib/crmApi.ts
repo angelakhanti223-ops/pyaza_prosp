@@ -1,5 +1,6 @@
 import type { ArticleCategory, ArticleTag } from "./articlesApi";
 import type { UonLeadRecord, UonRequestRecord } from "./uonApi";
+import { notifyTaskChange } from "./taskEvents";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -284,10 +285,12 @@ export async function createLead(data: {
   assigned_manager?: number | null;
   consent: boolean;
 } & LeadInputExtras): Promise<LeadDetail> {
-  return apiJson<LeadDetail>("/api/crm/leads/", {
+  const lead = await apiJson<LeadDetail>("/api/crm/leads/", {
     method: "POST",
     body: JSON.stringify(data),
   });
+  notifyTaskChange();
+  return lead;
 }
 
 export async function updateLead(
@@ -304,10 +307,12 @@ export async function updateLead(
     commission: string | null;
   }> & LeadInputExtras
 ): Promise<LeadDetail> {
-  return apiJson<LeadDetail>(`/api/crm/leads/${id}/`, {
+  const lead = await apiJson<LeadDetail>(`/api/crm/leads/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+  if (["next_contact_at", "assigned_manager", "preferred_messenger", "status"].some(key => key in data)) notifyTaskChange();
+  return lead;
 }
 
 export async function addLeadComment(id: number, text: string): Promise<LeadComment> {

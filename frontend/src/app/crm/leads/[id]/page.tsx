@@ -18,12 +18,12 @@ import {
   type LeadStatus,
 } from "@/lib/crmApi";
 import { fetchDirections, type Direction } from "@/lib/api";
-import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
+import { listenForTaskChanges } from "@/lib/taskEvents";
 import { listTourOperators, type TourOperator } from "@/lib/tourOperatorsApi";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import StatusBadge from "@/components/crm/StatusBadge";
 import { getLeadStatusLabel, LeadStatusHint } from "@/components/crm/LeadStatusInfo";
-import TaskModal from "@/components/kanban/TaskModal";
+import RelatedTasks from "@/components/kanban/RelatedTasks";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -195,8 +195,6 @@ export default function CrmLeadDetailPage() {
   const [contactError, setContactError] = useState<string | null>(null);
   const [convertingToRequest, setConvertingToRequest] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
-  const [columns, setColumns] = useState<KanbanColumn[]>([]);
-  const [showTaskModal, setShowTaskModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -209,7 +207,10 @@ export default function CrmLeadDetailPage() {
   }, [leadId]);
 
   useEffect(() => {
-    load();
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void load(); });
+    const stop = listenForTaskChanges(() => { void load(); });
+    return () => { active = false; stop(); };
   }, [load]);
 
   useEffect(() => {
@@ -218,7 +219,6 @@ export default function CrmLeadDetailPage() {
 
   useEffect(() => {
     fetchDirections().then(setDirections);
-    listColumns().then(setColumns);
     listTourOperators().then(setTourOperators).catch(() => setTourOperators([]));
   }, []);
 
@@ -444,7 +444,7 @@ export default function CrmLeadDetailPage() {
           <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-navy">Контроль продаж и оплаты</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div><FieldLabel>Следующий контакт</FieldLabel><input type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => savePatch({ next_contact_at: e.target.value ? new Date(e.target.value).toISOString() : null }, "next_contact_at")} className={inputClass(contactOverdue ? "border-red-400" : "")} />{contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}<p className="mt-1 text-xs leading-5 text-foreground/50">Для открытой заявки дата сразу создаёт или переносит задачу ответственному. Время вашего устройства.</p></div>
+              <div><FieldLabel>Следующий контакт</FieldLabel><input key={lead.next_contact_at ?? "no-contact"} type="datetime-local" defaultValue={dateTimeValue(lead.next_contact_at)} onBlur={(e) => { if (e.target.value !== dateTimeValue(lead.next_contact_at)) void savePatch({ next_contact_at: e.target.value ? new Date(e.target.value).toISOString() : null }, "next_contact_at"); }} className={inputClass(contactOverdue ? "border-red-400" : "")} />{contactOverdue && <p className="mt-1 text-xs text-red-600">Контакт просрочен</p>}<p className="mt-1 text-xs leading-5 text-foreground/50">Для открытой заявки дата сразу создаёт или переносит задачу ответственному. Время вашего устройства.</p></div>
               <div><FieldLabel>Сумма сделки</FieldLabel><input type="number" defaultValue={lead.deal_amount ?? ""} onBlur={(e) => savePatch({ deal_amount: e.target.value || null }, "deal_amount")} className={inputClass()} /></div>
               <div><FieldLabel>Валюта тура</FieldLabel><select value={leadExtra.tour_currency ?? "RUB"} onChange={(e) => savePatch({ tour_currency: e.target.value } as UpdatePatch, "tour_currency")} className={inputClass()}>{CURRENCY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
               <div><FieldLabel>Курс на момент оплаты</FieldLabel><input type="number" step="0.0001" placeholder="например: 92.5000" defaultValue={leadExtra.payment_exchange_rate ?? ""} onBlur={(e) => savePatch({ payment_exchange_rate: e.target.value || null } as UpdatePatch, "payment_exchange_rate")} className={inputClass()} /></div>
@@ -480,7 +480,7 @@ export default function CrmLeadDetailPage() {
         <div>
           <section className="rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Файлы</h2><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/15 px-3 py-2.5 text-sm text-foreground/60 hover:border-blue hover:text-blue"><Paperclip size={15} />Прикрепить файл<input type="file" className="hidden" onChange={handleFileUpload} /></label><ul className="mt-3 flex flex-col gap-2">{lead.attachments.map((a) => <li key={a.id}><a href={mediaUrl(a.file)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue underline underline-offset-2 hover:text-navy">{a.file.split("/").pop()}</a></li>)}{lead.attachments.length === 0 && <p className="text-xs text-foreground/40">Файлов пока нет</p>}</ul></section>
 
-          <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-navy">Связанные задачи</h2><button onClick={() => setShowTaskModal(true)} className="text-xs font-semibold text-blue hover:underline">+ Создать задачу</button></div><ul className="flex flex-col gap-2">{lead.tasks.map((t) => <li key={t.id}><Link href={`/crm/kanban?task=${t.id}`} className="block rounded-xl bg-blue-light/30 p-3 text-sm transition-colors hover:bg-blue-light"><p className="font-medium text-navy">{t.title}</p><p className="text-xs text-foreground/50">{t.column}{t.deadline && <> · до {new Date(t.deadline).toLocaleDateString("ru-RU")}</>}</p></Link></li>)}{lead.tasks.length === 0 && <p className="text-xs text-foreground/40">Задач на канбан-доске пока нет</p>}</ul></section>
+          <RelatedTasks key={lead.id} filters={{ lead: lead.id }} presetLead={{ id: lead.id, name: lead.name }} />
 
           {lead.uon_lead && <section className="mt-6 rounded-2xl border border-black/5 bg-white p-6"><h2 className="mb-3 text-sm font-semibold text-navy">Обращение в U-ON</h2><dl className="flex flex-col gap-2 text-sm"><div className="flex justify-between gap-2"><dt className="text-foreground/50">Статус</dt><dd className="font-medium text-navy">{lead.uon_lead.status_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Менеджер</dt><dd className="text-navy">{lead.uon_lead.manager_name || "—"}</dd></div><div className="flex justify-between gap-2"><dt className="text-foreground/50">Источник</dt><dd className="text-navy">{lead.uon_lead.source_name || "—"}</dd></div></dl><p className="mt-3 text-xs text-foreground/40">Обновлено: {new Date(lead.uon_lead.synced_at).toLocaleString("ru-RU")}</p></section>}
 
@@ -490,7 +490,7 @@ export default function CrmLeadDetailPage() {
         </div>
       </div>
 
-      {showTaskModal && <TaskModal columns={columns} defaultColumnId={columns[0]?.id ?? null} task={null} presetLead={{ id: lead.id, name: lead.name }} onClose={() => setShowTaskModal(false)} onSaved={() => { setShowTaskModal(false); load(); }} />}
+
     </div>
   );
 }

@@ -34,7 +34,7 @@ const NAV = [
   { href: "/crm/uon-requests", label: "Заявки U-ON", icon: FileText },
   { href: "/crm/candidates", label: "Кандидаты", icon: Users, adminOnly: true },
   { href: "/crm/clients", label: "Клиенты", icon: Users },
-  { href: "/crm/kanban", label: "Канбан", icon: Columns3 },
+  { href: "/crm/kanban", label: "Задачи", icon: Columns3 },
   { href: "/crm/knowledge-base", label: "База знаний", icon: BookOpen },
   { href: "/crm/kb/sea", label: "База ЮВА", icon: Palmtree },
   { href: "/crm/articles", label: "Статьи", icon: Newspaper },

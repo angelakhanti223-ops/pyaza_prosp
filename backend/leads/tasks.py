@@ -66,7 +66,7 @@ def check_stale_leads():
     """
     from kanban.models import Task
     from kanban.services import next_order_in_column
-    from telegrambot.services import get_first_column, get_last_column
+    from telegrambot.services import get_first_column
     from telegrambot.tasks import notify_task_created
 
     from .auto_tags import sync_automatic_tags_for_all_leads
@@ -81,7 +81,6 @@ def check_stale_leads():
     ).filter(updated_at__lte=cutoff)
 
     column = get_first_column()
-    last_column = get_last_column()
     if column is None:
         logger.warning('На доске не настроено ни одной колонки, проверка застрявших лидов пропущена')
         return
@@ -89,8 +88,7 @@ def check_stale_leads():
     created = 0
     for lead in stale_leads:
         existing = Task.objects.filter(lead=lead, title__startswith=_STALE_LEAD_TITLE_PREFIX)
-        if last_column is not None:
-            existing = existing.exclude(column=last_column)
+        existing = existing.exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
         if existing.exists():
             continue
 
