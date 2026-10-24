@@ -24,7 +24,7 @@ class ContactTaskTests(TestCase):
         self.user = User.objects.create_user(username='contact-manager')
         self.other = User.objects.create_user(username='other-manager')
         self.first = KanbanColumn.objects.order_by('order').first()
-        self.last = KanbanColumn.objects.order_by('-order').first()
+        self.last = KanbanColumn.objects.get(status='done')
         self.when = timezone.now() + timedelta(days=1)
         self.client.force_login(self.user)
 
@@ -259,7 +259,7 @@ class WebPushTests(TestCase):
         task = self.task(); task.assignee = self.other; task.save()
         task = self.task(); task.assignee = None; task.save()
         task = self.task(); task.deadline = timezone.now() + timedelta(hours=1); task.save()
-        task = self.task(); task.column = KanbanColumn.objects.order_by('-order').first(); task.save()
+        task = self.task(); task.column = KanbanColumn.objects.get(status='done'); task.save()
         self.assertEqual(dispatch_due_pushes(), 0); send.assert_not_called()
 
     @patch('kanban.push.send_push')

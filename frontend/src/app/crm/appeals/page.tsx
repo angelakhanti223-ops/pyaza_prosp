@@ -2,10 +2,9 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { listUonLeads, type UonLeadRecord } from "@/lib/uonApi";
-import { listColumns, type KanbanColumn } from "@/lib/kanbanApi";
-import TaskModal from "@/components/kanban/TaskModal";
+import RelatedTasks from "@/components/kanban/RelatedTasks";
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -18,15 +17,11 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function LeadDetailModal({
   lead,
-  columns,
   onClose,
 }: {
   lead: UonLeadRecord;
-  columns: KanbanColumn[];
   onClose: () => void;
 }) {
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskCreated, setTaskCreated] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/60 p-4" onClick={onClose}>
@@ -63,38 +58,10 @@ function LeadDetailModal({
           Обновлено: {new Date(lead.synced_at).toLocaleString("ru-RU")}
         </p>
 
-        <div className="mt-4 border-t border-black/5 pt-4">
-          <button
-            onClick={() => {
-              setShowTaskModal(true);
-              setTaskCreated(false);
-            }}
-            className="rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white hover:bg-blue"
-          >
-            + Создать задачу
-          </button>
-          {taskCreated && (
-            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-green-700">
-              <Check size={13} />
-              Задача создана — найдёте её на канбан-доске
-            </p>
-          )}
-        </div>
+        <RelatedTasks key={lead.uon_id} filters={{ uon_record_kind: "lead", uon_record_id: lead.uon_id }} presetUonRecord={{ kind: "lead", id: lead.uon_id, label: lead.client_name || `#${lead.uon_id}` }} />
       </div>
 
-      {showTaskModal && (
-        <TaskModal
-          columns={columns}
-          defaultColumnId={columns[0]?.id ?? null}
-          task={null}
-          presetUonRecord={{ kind: "lead", id: lead.uon_id, label: lead.client_name || `#${lead.uon_id}` }}
-          onClose={() => setShowTaskModal(false)}
-          onSaved={() => {
-            setShowTaskModal(false);
-            setTaskCreated(true);
-          }}
-        />
-      )}
+
     </div>
   );
 }
@@ -103,12 +70,10 @@ function CrmAppealsContent() {
   const [leads, setLeads] = useState<UonLeadRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<UonLeadRecord | null>(null);
-  const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("uon_id");
 
   useEffect(() => {
-    listColumns().then(setColumns);
   }, []);
 
   useEffect(() => {
@@ -188,7 +153,7 @@ function CrmAppealsContent() {
       </div>
 
       {selected && (
-        <LeadDetailModal lead={selected} columns={columns} onClose={() => setSelected(null)} />
+        <LeadDetailModal lead={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );

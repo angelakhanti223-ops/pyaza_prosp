@@ -16,15 +16,16 @@ from .serializers import (
     TaskMoveSerializer,
     TaskSerializer,
     TaskUpdateSerializer,
+    TaskFilterSerializer,
 )
 from .services import next_order_in_column, reposition_task
 from telegrambot.tasks import notify_task_assignment
 
 
 class KanbanColumnListView(generics.ListAPIView):
-    """Настраиваемые колонки доски (ТЗ 6) — управляются через Django admin."""
+    """Действующие колонки единого жизненного цикла задач."""
 
-    queryset = KanbanColumn.objects.all()
+    queryset = KanbanColumn.objects.filter(is_active=True, status__isnull=False)
     serializer_class = KanbanColumnSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
@@ -38,8 +39,7 @@ class TaskViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Канбан-доска (ТЗ 6). Личная доска менеджера (свои задачи) + общая доска отдела
-    для руководителя (тот же принцип ролевого доступа, что и в LeadViewSet)."""
+    """Общие задачи CRM с фильтрами исполнителя и связанной заявки/обращения."""
 
     permission_classes = [IsAuthenticated]
     # Доска должна показывать ВСЕ задачи во всех колонках сразу — глобальная
@@ -57,23 +57,29 @@ class TaskViewSet(
         # до конкретного исполнителя может теперь любой, не только руководитель.
         qs = Task.objects.select_related('column', 'assignee', 'lead')
 
-        assignee_id = self.request.query_params.get('assignee')
+        params = TaskFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        values = params.validated_data
+        assignee_id = values.get('assignee')
         if assignee_id:
             qs = qs.filter(assignee_id=assignee_id)
 
-        # Обращения (задачи, пришедшие из синхронизации напоминаний U-ON), привязанные
-        # к нашему собственному Lead, актуальны на доске только пока связанная заявка
-        # ещё новая/в работе — как только сделка продвинулась дальше, показывать их
-        # незачем. Задачи-заявки (созданные вручную по Lead в нашей CRM) остаются
-        # видимыми в любом статусе заявки. Задачи, подтянутые напрямую по обращениям/
-        # заявкам из зеркала U-ON (integrations.tasks.sync_uon_request/sync_uon_lead)
-        # не привязаны ни к какому Lead (lead=None) — для них статус-фильтр неприменим,
-        # они должны быть видны всегда.
-        qs = qs.exclude(
-            Q(uon_reminder_id__isnull=False)
-            & Q(lead__isnull=False)
-            & ~Q(lead__status__in=[Lead.Status.NEW, Lead.Status.IN_PROGRESS]),
-        )
+        if values.get('status'):
+            qs = qs.filter(status=values['status'])
+        if values.get('lead'):
+            lead_id = values['lead']
+            lead = Lead.objects.filter(pk=lead_id).first()
+            related = Q(lead_id=lead_id)
+            if lead and lead.uon_ticket_id:
+                related |= Q(uon_record_kind='lead', uon_record_id=lead.uon_ticket_id)
+            if lead and lead.uon_request_id:
+                related |= Q(uon_record_kind='request', uon_record_id=lead.uon_request_id)
+            qs = qs.filter(related)
+        if values.get('uon_record_id'):
+            kind, record_id = values['uon_record_kind'], values['uon_record_id']
+            related = Q(uon_record_kind=kind, uon_record_id=record_id)
+            related |= Q(**{f'lead__{"uon_ticket_id" if kind == "lead" else "uon_request_id"}': record_id})
+            qs = qs.filter(related)
 
         return qs
 
@@ -131,6 +137,10 @@ class TaskViewSet(
         task = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Dragging has the same lifecycle restrictions as editing the status.
+        status_check = TaskUpdateSerializer(task, data={'status': serializer.validated_data['column'].status}, partial=True)
+        status_check.is_valid(raise_exception=True)
+        task._expected_updated_at = serializer.validated_data.get('expected_updated_at')
         reposition_task(task, serializer.validated_data['column'], serializer.validated_data['order'])
         task.refresh_from_db()
         return Response(TaskSerializer(task).data)

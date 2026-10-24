@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -13,37 +13,19 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
+import { listenForTaskChanges } from "@/lib/taskEvents";
+import { previewTaskMove, dropIndex, matchesTaskDate } from "@/lib/boardState";
+import TaskList from "./TaskList";
+import { useTaskClock } from "@/lib/useTaskClock";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import { listManagers, type CrmUser } from "@/lib/crmApi";
-import { listColumns, listTasks, moveTask, type KanbanColumn, type KanbanTask } from "@/lib/kanbanApi";
+import { listColumns, listTasks, moveTask, updateTask, type KanbanColumn, type KanbanTask, type TaskStatus } from "@/lib/kanbanApi";
 import BoardToolbar, { type AssigneeFilter, type DateFilter, type SortMode } from "./BoardToolbar";
 import Column from "./Column";
 import TaskCard from "./TaskCard";
 import TaskModal from "./TaskModal";
 
 const PRIORITY_RANK: Record<string, number> = { urgent_important: 0, important: 1 };
-
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function matchesDateFilter(task: KanbanTask, filter: DateFilter): boolean {
-  if (filter === "all") return true;
-  if (!task.deadline) return false;
-
-  const today = startOfDay(new Date());
-  const deadlineDay = startOfDay(new Date(task.deadline));
-
-  if (filter === "overdue") return deadlineDay.getTime() < today.getTime();
-  if (filter === "today") return deadlineDay.getTime() === today.getTime();
-  // week — сегодня и ещё 6 дней вперёд (просроченные сюда не попадают, для них своя кнопка)
-  const weekEnd = new Date(today);
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  return deadlineDay.getTime() >= today.getTime() && deadlineDay.getTime() <= weekEnd.getTime();
-}
 
 function sortTasks(tasks: KanbanTask[], mode: SortMode): KanbanTask[] {
   if (mode === "manual") return [...tasks].sort((a, b) => a.order - b.order);
@@ -68,10 +50,13 @@ function resolveTargetColumnId(overId: string | number, tasks: KanbanTask[]): nu
 }
 
 export default function Board() {
+  const now = useTaskClock();
   const { user } = useCrmAuth();
   const searchParams = useSearchParams();
   const taskParam = searchParams.get("task");
-  const openedFromQuery = useRef(false);
+  const openedFromQuery = useRef("");
+  const dragSnapshot = useRef<KanbanTask[] | null>(null);
+  const requestId = useRef(0);
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [managers, setManagers] = useState<CrmUser[]>([]);
@@ -82,27 +67,35 @@ export default function Board() {
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("manual");
+  const [view, setView] = useState<"board" | "list">("board");
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const load = () => {
-    Promise.all([listColumns(), listTasks(), listManagers()]).then(([cols, tks, mgrs]) => {
-      setColumns(cols);
-      setTasks(tks);
-      setManagers(mgrs);
-      setLoading(false);
-    });
-  };
-
-  useEffect(() => {
-    load();
+  const load = useCallback(async () => {
+    if (dragSnapshot.current) return;
+    const id = ++requestId.current;
+    try {
+      const [cols, rows, people] = await Promise.all([listColumns(), listTasks(), listManagers()]);
+      if (id === requestId.current && !dragSnapshot.current) { setColumns(cols); setTasks(rows); setManagers(people); }
+    } catch (error) { if (id === requestId.current) setError(error instanceof Error ? error.message : "Не удалось загрузить задачи."); }
+    finally { if (id === requestId.current) setLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (openedFromQuery.current || !taskParam || tasks.length === 0) return;
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void load(); });
+    const stop = listenForTaskChanges(() => { void load(); });
+    return () => { active = false; stop(); requestId.current += 1; };
+  }, [load]);
+
+  useEffect(() => {
+    if (openedFromQuery.current === taskParam || !taskParam || tasks.length === 0) return;
     const match = tasks.find((t) => t.id === Number(taskParam));
     if (match) {
-      openedFromQuery.current = true;
+      openedFromQuery.current = taskParam;
       // Открытие модалки задачи по ссылке из карточки заявки (?task=id) — это
       // единоразовая синхронизация с URL при монтировании (охраняется ref'ом
       // выше), а не циклический побочный эффект, которого опасается это правило.
@@ -110,22 +103,6 @@ export default function Board() {
       setModalState({ task: match, columnId: null });
     }
   }, [tasks, taskParam]);
-
-  const tasksByColumn = useMemo(() => {
-    const grouped: Record<number, KanbanTask[]> = {};
-    for (const col of columns) grouped[col.id] = [];
-    for (const task of tasks) {
-      if (!grouped[task.column]) grouped[task.column] = [];
-      grouped[task.column].push(task);
-    }
-    for (const colId in grouped) {
-      grouped[colId].sort((a, b) => a.order - b.order);
-    }
-    return grouped;
-  }, [columns, tasks]);
-
-  const filtersActive =
-    search.trim() !== "" || assigneeFilter !== "all" || dateFilter !== "all" || sortMode !== "manual";
 
   const visibleTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -137,10 +114,10 @@ export default function Board() {
       if (assigneeFilter === "mine" && task.assignee?.id !== user?.id) return false;
       if (assigneeFilter === "unassigned" && task.assignee) return false;
       if (typeof assigneeFilter === "number" && task.assignee?.id !== assigneeFilter) return false;
-      if (!matchesDateFilter(task, dateFilter)) return false;
+      if (!matchesTaskDate(task, dateFilter, new Date(now))) return false;
       return true;
     });
-  }, [tasks, search, assigneeFilter, dateFilter, user]);
+  }, [tasks, search, assigneeFilter, dateFilter, user, now]);
 
   const visibleTasksByColumn = useMemo(() => {
     const grouped: Record<number, KanbanTask[]> = {};
@@ -156,54 +133,61 @@ export default function Board() {
   }, [columns, visibleTasks, sortMode]);
 
   function handleDragStart(event: DragStartEvent) {
-    const task = tasks.find((t) => t.id === event.active.id);
-    setActiveTask(task ?? null);
+    dragSnapshot.current = tasks;
+    setError(""); setMessage("");
+    setActiveTask(tasks.find(task => task.id === event.active.id) ?? null);
   }
 
   function handleDragOver(event: DragOverEvent) {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeTaskItem = tasks.find((t) => t.id === active.id);
-    if (!activeTaskItem) return;
-
-    const targetColumnId = resolveTargetColumnId(over.id, tasks);
-    if (targetColumnId === null || targetColumnId === activeTaskItem.column) return;
-
-    setTasks((prev) => prev.map((t) => (t.id === active.id ? { ...t, column: targetColumnId } : t)));
+    if (!event.over || !dragSnapshot.current) return;
+    const targetId = resolveTargetColumnId(event.over.id, tasks);
+    const column = columns.find(column => column.id === targetId);
+    if (column) setTasks(previewTaskMove(dragSnapshot.current, Number(event.active.id), column));
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
+  function cancelDrag() {
+    if (dragSnapshot.current) setTasks(dragSnapshot.current);
+    dragSnapshot.current = null;
     setActiveTask(null);
-    if (!over) return;
+    void load();
+  }
 
-    const activeTaskItem = tasks.find((t) => t.id === active.id);
-    if (!activeTaskItem) return;
+  async function handleDragEnd(event: DragEndEvent) {
+    const snapshot = dragSnapshot.current;
+    const task = snapshot?.find(task => task.id === event.active.id);
+    if (!snapshot || !task || !event.over) { cancelDrag(); return; }
+    const columnId = resolveTargetColumnId(event.over.id, tasks) ?? task.column;
+    if (columnId === task.column && (sortMode !== "manual" || event.over.id === task.id)) { cancelDrag(); return; }
+    const order = dropIndex(snapshot, task.id, columnId, event.over.id);
+    dragSnapshot.current = null;
+    setActiveTask(null); setBusyId(task.id);
+    try {
+      const saved = await moveTask(task.id, columnId, order, task.updated_at);
+      setTasks(current => current.map(item => item.id === saved.id ? saved : item));
+      if (saved.status === "postponed" && task.status !== "postponed" && saved.deadline) setMessage(`Задача отложена до ${new Date(saved.deadline).toLocaleString("ru-RU")}.`);
+      await load();
+    } catch (error) {
+      setTasks(snapshot);
+      setError(error instanceof Error ? error.message : "Не удалось переместить задачу.");
+      await load();
+    } finally { setBusyId(null); }
+  }
 
-    const targetColumnId = resolveTargetColumnId(over.id, tasks) ?? activeTaskItem.column;
-    const columnTasks = tasksByColumn[targetColumnId] ?? [];
-    const overIndex = columnTasks.findIndex((t) => t.id === over.id);
-    const newIndex = overIndex >= 0 ? overIndex : columnTasks.length;
-
-    setTasks((prev) => {
-      const withoutActive = prev.filter((t) => t.id !== active.id);
-      const reorderedColumnTasks = arrayMove(
-        [...columnTasks.filter((t) => t.id !== active.id), activeTaskItem],
-        columnTasks.filter((t) => t.id !== active.id).length,
-        newIndex
-      );
-      const otherTasks = withoutActive.filter((t) => t.column !== targetColumnId);
-      return [...otherTasks, ...reorderedColumnTasks];
-    });
-
-    moveTask(Number(active.id), targetColumnId, newIndex).catch(() => load());
+  async function changeStatus(task: KanbanTask, status: TaskStatus) {
+    setBusyId(task.id); setError("");
+    try { await updateTask(task.id, { status, expected_updated_at: task.updated_at }); await load(); }
+    catch (error) { setError(error instanceof Error ? error.message : "Не удалось изменить статус."); await load(); }
+    finally { setBusyId(null); }
   }
 
   if (loading) return <p className="text-sm text-foreground/50">Загрузка доски…</p>;
 
   return (
     <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div role="group" aria-label="Вид задач" className="flex gap-2"><button type="button" aria-pressed={view === "board"} onClick={() => setView("board")} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "board" ? "bg-navy text-white" : "bg-white text-navy"}`}>Канбан</button><button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "list" ? "bg-navy text-white" : "bg-white text-navy"}`}>Список</button></div><button type="button" onClick={() => setModalState({ task: null, columnId: columns.find(column => column.status === "new")?.id ?? null })} disabled={!columns.length} className="rounded-full bg-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">+ Задача</button></div>
+      <p className="mb-4 text-xs leading-5 text-foreground/55">Колонка — это статус задачи. Его можно менять перетаскиванием или в карточке. Фильтры дней работают по московскому времени.</p>
+      {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}<button type="button" onClick={() => void load()} className="ml-3 underline">Обновить</button></p>}
+      {message && <p role="status" className="mb-4 rounded-xl bg-blue-light p-3 text-xs text-navy">{message}</p>}
       <BoardToolbar
         search={search}
         onSearchChange={setSearch}
@@ -216,12 +200,13 @@ export default function Board() {
         managers={managers}
         resultCount={visibleTasks.length}
       />
-      <DndContext
+      {view === "list" ? <TaskList tasks={sortTasks(visibleTasks, sortMode === "manual" ? "deadline" : sortMode)} onEdit={task => setModalState({ task, columnId: null })} onStatus={changeStatus} busyId={busyId} /> : <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={cancelDrag}
       >
         <div className="flex gap-4 overflow-x-auto pb-4">
           {columns.map((col) => (
@@ -229,7 +214,7 @@ export default function Board() {
               key={col.id}
               column={col}
               tasks={visibleTasksByColumn[col.id] ?? []}
-              draggable={!filtersActive}
+              draggable={busyId === null}
               onTaskClick={(task) => setModalState({ task, columnId: null })}
               onAddTask={(columnId) => setModalState({ task: null, columnId })}
             />
@@ -239,7 +224,7 @@ export default function Board() {
         <DragOverlay>
           {activeTask ? <TaskCard task={activeTask} onClick={() => {}} /> : null}
         </DragOverlay>
-      </DndContext>
+      </DndContext>}
 
       {modalState && (
         <TaskModal
@@ -249,7 +234,7 @@ export default function Board() {
           onClose={() => setModalState(null)}
           onSaved={() => {
             setModalState(null);
-            load();
+            void load();
           }}
         />
       )}

@@ -1,41 +1,132 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
+from rest_framework.exceptions import APIException
 
 from .models import KanbanColumn, Task, TaskPushReceipt
 
+CLOSED_STATUSES = [Task.Status.DONE, Task.Status.CANCELLED]
+
+
+class TaskConflict(APIException):
+    status_code = 409
+    default_detail = 'Задача уже изменена. Обновите данные и повторите действие.'
+
+
+def column_for_status(status):
+    column, _ = KanbanColumn.objects.get_or_create(status=status, defaults={
+        'name': Task.Status(status).label, 'order': list(Task.Status.values).index(status), 'is_active': True,
+    })
+    if not column.is_active:
+        column.is_active = True
+        column.save(update_fields=['is_active'])
+    return column
+
 
 def task_is_closed(task):
-    if task.status in [Task.Status.DONE, Task.Status.CANCELLED] or task.archived_at:
-        return True
-    columns = list(KanbanColumn.objects.order_by('order', 'pk').values_list('pk', flat=True))
-    return len(columns) > 1 and task.column_id == columns[-1]
+    return bool(task.archived_at or task.status in CLOSED_STATUSES)
+
+
+def next_order_in_column(column):
+    last = Task.objects.filter(column=column).order_by('-order').first()
+    return last.order + 1 if last else 0
+
+
+def _recreate_recurring_task(task):
+    deadline = task.deadline + timedelta(days=1) if task.deadline else None
+    if deadline and deadline <= timezone.now():
+        deadline += timedelta(days=(timezone.localdate() - timezone.localtime(deadline).date()).days + 1)
+    column = column_for_status(Task.Status.NEW)
+    return Task.all_objects.get_or_create(recurrence_parent=task, defaults={
+        'title': task.title, 'description': task.description, 'column': column, 'status': Task.Status.NEW,
+        'assignee': task.assignee, 'lead': task.lead, 'deadline': deadline, 'is_recurring': True,
+        'preferred_contact_channel': task.preferred_contact_channel,
+        'uon_record_kind': task.uon_record_kind, 'uon_record_id': task.uon_record_id,
+        'order': next_order_in_column(column),
+    })[0]
+
+
+def save_task(task, parent_save, *args, **kwargs):
+    """All save paths share one status/column, postponement and completion lifecycle."""
+    from leads.models import Lead
+
+    with transaction.atomic():
+        old_lead = Task.all_objects.filter(pk=task.pk).values_list('lead_id', flat=True).first() if task.pk else None
+        lead_ids = sorted({value for value in [old_lead, task.lead_id] if value is not None})
+        # Same lock order as contact scheduling: lead, then task.
+        list(Lead.objects.select_for_update().filter(pk__in=lead_ids).order_by('pk'))
+        old = Task.all_objects.select_for_update().filter(pk=task.pk).first() if task.pk else None
+        expected = getattr(task, '_expected_updated_at', None)
+        if old and expected is not None and old.updated_at != expected:
+            raise TaskConflict()
+        fields = kwargs.get('update_fields')
+        writes = lambda name: fields is None or name in fields or f'{name}_id' in fields
+        if old:
+            for name in ['deadline', 'order', 'assignee_id', 'lead_id', 'is_recurring', 'archived_at']:
+                base_name = name.removesuffix('_id')
+                if not writes(base_name):
+                    setattr(task, name, getattr(old, name))
+        column_id = task.column_id if not old or writes('column') else old.column_id
+        column = KanbanColumn.objects.filter(pk=column_id).first() if column_id else None
+        status = task.status if not old or writes('status') else old.status
+        if old:
+            if status == old.status and column_id != old.column_id:
+                if not column or not column.is_active or not column.status:
+                    raise ValidationError('Колонка не связана с действующим статусом задачи.')
+                status = column.status
+        elif status == Task.Status.NEW and column and column.status:
+            status = column.status
+        if status not in Task.Status.values:
+            raise ValidationError('Неизвестный статус задачи.')
+        if task.origin == Task.Origin.NEXT_CONTACT and task.lead_id and not task.archived_at and status not in CLOSED_STATUSES:
+            if Lead.objects.filter(pk=task.lead_id, status__in=['closed_won', 'closed_lost', 'failed', 'not_target']).exists():
+                status = Task.Status.CANCELLED
+        task.status = status
+        task.column = column_for_status(status)
+        if old and old.origin == Task.Origin.NEXT_CONTACT and task.lead_id != old.lead_id:
+            raise ValidationError('Задача следующего контакта связана со своей заявкой.')
+        if task.origin == Task.Origin.NEXT_CONTACT and task.is_recurring:
+            raise ValidationError('Следующий контакт планируется датой в заявке, без ежедневных копий.')
+        if status == Task.Status.POSTPONED:
+            if old and old.status != status and task.deadline == old.deadline:
+                task.deadline = (old.deadline or timezone.now()) + timedelta(days=3)
+            elif not old and task.deadline is None:
+                task.deadline = timezone.now() + timedelta(days=3)
+        if old and old.column_id != task.column_id and not getattr(task, '_position_managed', False):
+            Task.objects.filter(column_id=old.column_id, order__gt=old.order).exclude(pk=task.pk).update(order=F('order') - 1)
+            task.order = next_order_in_column(task.column)
+        if fields is not None:
+            kwargs['update_fields'] = set(fields) | {'status', 'column', 'order', 'deadline', 'updated_at'}
+        result = parent_save(*args, **kwargs)
+        task.__dict__.pop('_position_managed', None)
+        if expected is not None:
+            task._expected_updated_at = task.updated_at
+        if old and (old.status in CLOSED_STATUSES or old.archived_at) and not task_is_closed(task):
+            TaskPushReceipt.objects.filter(task=task).delete()
+        if (old is None or old.status != Task.Status.DONE) and task.status == Task.Status.DONE and task.is_recurring and not task.archived_at:
+            _recreate_recurring_task(task)
+        return result
 
 
 def sync_next_contact_task(lead_id, allow_create=False):
-    """One contact task per lead, updated synchronously with the saved schedule."""
     from leads.models import Lead
 
     with transaction.atomic():
         lead = Lead.objects.select_for_update().get(pk=lead_id)
         key = f'next-contact:{lead.pk}'
         task = Task.all_objects.select_for_update().filter(automation_key=key).first()
-        closed = lead.status in ['closed_won', 'closed_lost', 'failed', 'not_target']
-        if not lead.next_contact_at or closed:
+        if not lead.next_contact_at or lead.status in ['closed_won', 'closed_lost', 'failed', 'not_target']:
             if task and not task_is_closed(task):
                 task.status = Task.Status.CANCELLED
                 task.save(update_fields=['status', 'updated_at'])
-                last = KanbanColumn.objects.order_by('-order', '-pk').first()
-                if last:
-                    reposition_task(task, last, next_order_in_column(last))
             return
         if task is None and not allow_create:
-            return  # Unrelated sync must not backfill years of old next-contact dates.
-        column = KanbanColumn.objects.order_by('order', 'pk').first()
-        if column is None:
-            column = KanbanColumn.objects.create(name='Новые', order=0)
+            return
         if task is None:
+            column = column_for_status(Task.Status.NEW)
             task = Task(automation_key=key, origin=Task.Origin.NEXT_CONTACT, lead=lead, column=column, order=next_order_in_column(column))
         elif task_is_closed(task) and task.deadline == lead.next_contact_at and not allow_create:
             return
@@ -50,64 +141,34 @@ def sync_next_contact_task(lead_id, allow_create=False):
         task.archived_at = None
         if rescheduled:
             task.status = Task.Status.NEW
-        if rescheduled and task.column_id != column.pk:
-            reposition_task(task, column, next_order_in_column(column))
         task.save()
 
 
-def next_order_in_column(column: KanbanColumn) -> int:
-    """Order value that appends a new task to the end of `column`."""
-    last = Task.objects.filter(column=column).order_by('-order').first()
-    return (last.order + 1) if last else 0
+def reposition_task(task, target_column, target_order):
+    if not target_column.is_active or not target_column.status:
+        raise ValidationError('Колонка не связана со статусом задачи.')
+    from leads.models import Lead
 
-
-def _recreate_recurring_task(task: Task) -> None:
-    """Spawns tomorrow's copy of a daily task once its current instance reaches
-    the last column — keeps the same title/assignee/lead, shifts the deadline by a day."""
-    first_column = KanbanColumn.objects.order_by('order').first()
-    if first_column is None:
-        return
-    Task.objects.create(
-        title=task.title,
-        description=task.description,
-        column=first_column,
-        assignee=task.assignee,
-        lead=task.lead,
-        deadline=(task.deadline + timedelta(days=1)) if task.deadline else None,
-        is_recurring=True,
-        order=next_order_in_column(first_column),
-    )
-
-
-def reposition_task(task: Task, target_column: KanbanColumn, target_order: int):
-    """Shifts sibling `order` values so the task lands at `target_order` in `target_column`,
-    matching the drag-and-drop position from the board (ТЗ 6)."""
     with transaction.atomic():
-        old_column_id = task.column_id
-        old_order = task.order
-
-        if old_column_id == target_column.id:
-            if target_order > old_order:
-                Task.objects.filter(
-                    column_id=old_column_id, order__gt=old_order, order__lte=target_order,
-                ).exclude(pk=task.pk).update(order=F('order') - 1)
-            elif target_order < old_order:
-                Task.objects.filter(
-                    column_id=old_column_id, order__gte=target_order, order__lt=old_order,
-                ).exclude(pk=task.pk).update(order=F('order') + 1)
-        else:
-            Task.objects.filter(column_id=old_column_id, order__gt=old_order).update(order=F('order') - 1)
-            Task.objects.filter(column_id=target_column.id, order__gte=target_order).update(order=F('order') + 1)
-
-        task.column = target_column
-        task.order = target_order
-        task.save(update_fields=['column', 'order'])
-
-        last_column = KanbanColumn.objects.order_by('-order').first()
-        if (
-            task.is_recurring
-            and last_column is not None
-            and target_column.id == last_column.id
-            and old_column_id != last_column.id
-        ):
-            _recreate_recurring_task(task)
+        if task.lead_id:
+            Lead.objects.select_for_update().get(pk=task.lead_id)
+        current = Task.objects.select_for_update().get(pk=task.pk)
+        expected = getattr(task, '_expected_updated_at', None)
+        if expected is not None and current.updated_at != expected:
+            raise TaskConflict()
+        old_column_id = current.column_id
+        target_order = min(max(0, target_order), Task.objects.filter(column=target_column).exclude(pk=task.pk).count())
+        current.column, current.order = target_column, target_order
+        current._position_managed = True
+        current.save(update_fields=['column', 'order'])
+        # Rebuild dense positions from actual rows, including any new recurring child.
+        # This also repairs historic gaps after archival/deletion and preserves hidden rows.
+        for column_id in {old_column_id, current.column_id}:
+            rows = list(Task.objects.filter(column_id=column_id).exclude(pk=current.pk).order_by('order', 'pk'))
+            if column_id == current.column_id:
+                rows.insert(min(target_order, len(rows)), current)
+            for index, row in enumerate(rows):
+                row.order = index
+            Task.objects.bulk_update(rows, ['order'])
+        current.refresh_from_db()
+        task.__dict__.update(current.__dict__)

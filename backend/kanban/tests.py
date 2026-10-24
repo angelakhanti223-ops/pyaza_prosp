@@ -14,8 +14,7 @@ User = get_user_model()
 
 
 class TaskVisibilityTests(TestCase):
-    """Обращения (задачи из U-ON reminder sync) показываются на доске только пока связанная
-    заявка новая/в работе; задачи-заявки (созданные вручную по Lead) — в любом статусе."""
+    """Активные задачи видны независимо от этапа связанной заявки."""
 
     def setUp(self):
         self.head = User.objects.create_user(username='head', password='x', role=User.Role.HEAD)
@@ -40,7 +39,7 @@ class TaskVisibilityTests(TestCase):
         self.assertIn('Appeal new', titles)
         self.assertIn('Appeal in_progress', titles)
 
-    def test_appeal_hidden_once_lead_progresses_past_in_progress(self):
+    def test_task_stays_visible_when_lead_changes_sales_stage(self):
         advanced_statuses = [
             Lead.Status.OPTIONS_PROPOSED, Lead.Status.BOOKED, Lead.Status.PAID,
             Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST,
@@ -52,7 +51,7 @@ class TaskVisibilityTests(TestCase):
             )
         titles = self._titles()
         for status in advanced_statuses:
-            self.assertNotIn(f'Appeal {status}', titles)
+            self.assertIn(f'Appeal {status}', titles)
 
     def test_lead_task_visible_regardless_of_lead_status(self):
         lead = Lead.objects.create(name='Клиент', direction=self.direction, status=Lead.Status.CLOSED_WON)
@@ -75,8 +74,7 @@ class TaskVisibilityTests(TestCase):
 
 
 class TaskStatusFieldsTests(TestCase):
-    """Карточка задачи показывает статус связанного обращения/заявки — своего (CRM Lead)
-    или из U-ON-зеркала — раз у самой задачи нет отдельного статуса, только колонка."""
+    """Карточка показывает этап связанной заявки отдельно от статуса задачи."""
 
     def setUp(self):
         self.head = User.objects.create_user(username='statushead', password='x', role=User.Role.HEAD)

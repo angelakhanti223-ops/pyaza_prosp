@@ -160,10 +160,7 @@ def _load_task_buckets(user):
 
     from .services import resolve_task_client_name
 
-    last_column = get_last_column()
-    qs = Task.objects.select_related('column', 'lead').filter(assignee=user)
-    if last_column:
-        qs = qs.exclude(column=last_column)
+    qs = Task.objects.select_related('column', 'lead').filter(assignee=user).exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
     tasks = list(qs.order_by('column__order', 'order'))
     for task in tasks:
         task.client_name = resolve_task_client_name(task)

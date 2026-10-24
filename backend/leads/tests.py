@@ -394,7 +394,7 @@ class CheckStaleLeadsTests(TestCase):
         self.manager = User.objects.create_user(username='manager5', password='x')
         self.direction = Direction.objects.create(name='Абхазия')
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
 
     def _make_stale_lead(self, **kwargs):
         lead = Lead.objects.create(name='Клиент', direction=self.direction, **kwargs)
@@ -444,7 +444,7 @@ class CheckStaleLeadsTests(TestCase):
     def test_recreates_after_previous_stale_task_closed(self, mock_notify):
         lead = self._make_stale_lead(status=Lead.Status.IN_PROGRESS)
         check_stale_leads()
-        Task.objects.filter(lead=lead).update(column=self.column_done)
+        Task.objects.filter(lead=lead).update(column=self.column_done, status='done')
 
         check_stale_leads()
 
@@ -989,24 +989,26 @@ class TaskCountsTests(TestCase):
         self.manager = User.objects.create_user(username='taskcountmanager', password='x', role=User.Role.MANAGER)
         self.other = User.objects.create_user(username='taskcountother', password='x', role=User.Role.MANAGER)
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
 
     def _task(self, assignee, deadline, column=None):
         return Task.objects.create(
             title='Задача', column=column or self.column_new, assignee=assignee, deadline=deadline,
         )
 
-    def test_counts_today_and_overdue_excluding_done_column(self):
-        now = timezone.now()
+    def test_counts_today_and_overdue_excluding_closed_tasks(self):
+        now = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
         self._task(self.manager, now)  # сегодня
+        self._task(self.manager, now - timedelta(minutes=30))  # просрочено сегодня
         self._task(self.manager, now - timedelta(days=2))  # просрочено
         self._task(self.manager, now + timedelta(days=3))  # будущее — не считается
         self._task(self.manager, now - timedelta(days=1), column=self.column_done)  # готово — не считается
 
-        data = task_counts_data(self.manager, head=False)
+        with patch('leads.dashboard.timezone.now', return_value=now):
+            data = task_counts_data(self.manager, head=False)
 
-        self.assertEqual(data['today'], 1)
-        self.assertEqual(data['overdue'], 1)
+        self.assertEqual(data['today'], 2)
+        self.assertEqual(data['overdue'], 2)
 
     def test_manager_sees_only_own_tasks(self):
         now = timezone.now()

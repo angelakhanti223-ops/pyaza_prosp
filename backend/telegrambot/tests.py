@@ -160,7 +160,7 @@ class BotHandlersTests(TestCase):
         self.manager = User.objects.create_user(username='manager', password='x', role=User.Role.MANAGER)
         self.other_manager = User.objects.create_user(username='other', password='x', role=User.Role.MANAGER)
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
         self.account = TelegramAccount.objects.create(user=self.manager, chat_id=555)
 
     def test_start_links_account_with_valid_code(self):
@@ -307,7 +307,7 @@ class CallbackHandlerTests(TestCase):
         self.manager = User.objects.create_user(username='manager', password='x', role=User.Role.MANAGER)
         self.other_manager = User.objects.create_user(username='other', password='x', role=User.Role.MANAGER)
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
         self.account = TelegramAccount.objects.create(user=self.manager, chat_id=555)
 
     def test_unlinked_chat_gets_alert(self):

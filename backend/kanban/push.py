@@ -68,9 +68,6 @@ def session_is_active(subscription):
 
 def due_tasks(user_id):
     tasks = Task.objects.filter(assignee_id=user_id, deadline__lte=timezone.now()).exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
-    columns = list(KanbanColumn.objects.order_by('order', 'pk').values_list('pk', flat=True))
-    if len(columns) > 1:
-        tasks = tasks.exclude(column_id=columns[-1])
     return tasks.order_by('deadline', 'pk')
 
 

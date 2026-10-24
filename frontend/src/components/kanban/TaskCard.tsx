@@ -1,14 +1,17 @@
 "use client";
 
+import Link from "next/link";
+import { taskContext } from "./TaskList";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, ExternalLink, Flame, Link2, Repeat } from "lucide-react";
-import { uonRecordUrl, type KanbanTask, type TaskKind, type TaskStatus } from "@/lib/kanbanApi";
+import { isTaskClosed, uonRecordUrl, type KanbanTask, type TaskKind, type TaskStatus } from "@/lib/kanbanApi";
 
 // "new" не показываем — это статус по умолчанию, бейдж по нему был бы шумом на
 // каждой карточке доски.
 const TASK_STATUS_STYLES: Partial<Record<TaskStatus, string>> = {
   in_progress: "bg-blue-100 text-blue-700",
+  waiting_client: "bg-violet-100 text-violet-700",
   postponed: "bg-amber-100 text-amber-700",
   done: "bg-green-100 text-green-700",
   cancelled: "bg-black/10 text-foreground/50",
@@ -48,7 +51,9 @@ export default function TaskCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const status = deadlineStatus(task.deadline);
+  const closed = isTaskClosed(task);
+  const status = closed ? "normal" : deadlineStatus(task.deadline);
+  const context = taskContext(task);
   const recordUrl = uonRecordUrl(task);
   // Статус связанного обращения/заявки — своей CRM (lead_status_display) или
   // из U-ON-зеркала (uon_status_name), смотря что привязано к задаче.
@@ -75,15 +80,10 @@ export default function TaskCard({
           </span>
         )}
       </div>
-      {task.lead_name && (
-        <p className="mt-1 flex items-center gap-1 text-xs text-blue">
-          <Link2 size={12} />
-          {task.lead_name}
-        </p>
-      )}
+      {context && <Link href={context.href} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} className="mt-1 flex items-center gap-1 text-xs text-blue hover:underline"><Link2 size={12} />{context.label}</Link>}
       {linkedStatus && (
         <span className="mt-1 inline-block rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-medium text-navy">
-          {linkedStatus}
+          Этап {task.lead || task.uon_record_kind === "request" ? "заявки" : "обращения"}: {linkedStatus}
         </span>
       )}
       {recordUrl && (
@@ -98,13 +98,13 @@ export default function TaskCard({
           Открыть в U-ON
         </a>
       )}
-      {task.priority === "urgent_important" && (
+      {!closed && task.priority === "urgent_important" && (
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
           <Flame size={10} />
           Срочно · Важно
         </span>
       )}
-      {task.priority === "important" && (
+      {!closed && task.priority === "important" && (
         <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
           <Repeat size={10} />
           Важно · не срочно
@@ -119,7 +119,7 @@ export default function TaskCard({
             }`}
           >
             {status !== "normal" && <AlertTriangle size={12} />}
-            {new Date(task.deadline).toLocaleDateString("ru-RU")}
+            {new Date(task.deadline).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
       </div>

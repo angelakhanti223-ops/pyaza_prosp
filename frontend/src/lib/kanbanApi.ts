@@ -1,4 +1,5 @@
 import type { CrmUser } from "./crmApi";
+import { notifyTaskChange } from "./taskEvents";
 
 export { mediaUrl } from "./crmApi";
 
@@ -8,16 +9,18 @@ export type KanbanColumn = {
   id: number;
   name: string;
   order: number;
+  status: TaskStatus;
 };
 
 export type TaskKind = "lead" | "appeal" | "general";
 export type TaskPriority = "urgent_important" | "important" | null;
 export type UonRecordKind = "request" | "lead" | "";
-export type TaskStatus = "new" | "in_progress" | "postponed" | "done" | "cancelled";
+export type TaskStatus = "new" | "in_progress" | "waiting_client" | "postponed" | "done" | "cancelled";
 
 export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: "new", label: "Новая" },
   { value: "in_progress", label: "В работе" },
+  { value: "waiting_client", label: "Ждём клиента" },
   { value: "postponed", label: "Отложено" },
   { value: "done", label: "Выполнено" },
   { value: "cancelled", label: "Отменено" },
@@ -65,6 +68,7 @@ export type KanbanTask = {
   order: number;
   created_at: string;
   updated_at: string;
+  origin: "manual" | "uon_import" | "next_contact";
 };
 
 const UON_CABINET_URL = process.env.NEXT_PUBLIC_UON_CABINET_URL ?? "https://id62499.u-on.ru";
@@ -85,6 +89,7 @@ export type TaskInput = {
   deadline?: string | null;
   is_recurring?: boolean;
   status?: TaskStatus;
+  expected_updated_at?: string;
   preferred_contact_channel?: ContactChannel;
   // Только для создания — связь с обращением/заявкой U-ON, у которой нет своего
   // Lead в нашей базе (карточка на /crm/appeals или /crm/uon-requests). После
@@ -136,40 +141,57 @@ export async function listColumns(): Promise<KanbanColumn[]> {
   return apiJson<KanbanColumn[]>("/api/crm/kanban/columns/");
 }
 
-export async function listTasks(params: { assignee?: number } = {}): Promise<KanbanTask[]> {
+export type TaskFilters = { assignee?: number; lead?: number; status?: TaskStatus; uon_record_kind?: "request" | "lead"; uon_record_id?: string };
+
+export function isTaskClosed(task: Pick<KanbanTask, "status">) {
+  return task.status === "done" || task.status === "cancelled";
+}
+
+export async function listTasks(params: TaskFilters = {}): Promise<KanbanTask[]> {
   const qs = new URLSearchParams();
   if (params.assignee) qs.set("assignee", String(params.assignee));
+  if (params.lead) qs.set("lead", String(params.lead));
+  if (params.status) qs.set("status", params.status);
+  if (params.uon_record_kind) qs.set("uon_record_kind", params.uon_record_kind);
+  if (params.uon_record_id) qs.set("uon_record_id", params.uon_record_id);
   const query = qs.toString() ? `?${qs.toString()}` : "";
   const data = await apiJson<KanbanTask[] | { results: KanbanTask[] }>(`/api/crm/kanban/tasks/${query}`);
   return Array.isArray(data) ? data : data.results;
 }
 
 export async function createTask(input: TaskInput): Promise<KanbanTask> {
-  return apiJson<KanbanTask>("/api/crm/kanban/tasks/", {
+  const task = await apiJson<KanbanTask>("/api/crm/kanban/tasks/", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  notifyTaskChange();
+  return task;
 }
 
 export async function updateTask(
   id: number,
   input: Partial<Omit<TaskInput, "column" | "uon_record_kind" | "uon_record_id">>
 ): Promise<KanbanTask> {
-  return apiJson<KanbanTask>(`/api/crm/kanban/tasks/${id}/`, {
+  const task = await apiJson<KanbanTask>(`/api/crm/kanban/tasks/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
+  notifyTaskChange();
+  return task;
 }
 
-export async function moveTask(id: number, column: number, order: number): Promise<KanbanTask> {
-  return apiJson<KanbanTask>(`/api/crm/kanban/tasks/${id}/move/`, {
+export async function moveTask(id: number, column: number, order: number, expected_updated_at?: string): Promise<KanbanTask> {
+  const task = await apiJson<KanbanTask>(`/api/crm/kanban/tasks/${id}/move/`, {
     method: "POST",
-    body: JSON.stringify({ column, order }),
+    body: JSON.stringify({ column, order, expected_updated_at }),
   });
+  notifyTaskChange();
+  return task;
 }
 
 export async function deleteTask(id: number): Promise<void> {
   await apiJson(`/api/crm/kanban/tasks/${id}/`, { method: "DELETE" });
+  notifyTaskChange();
 }
 
 export async function uploadTaskAttachment(id: number, file: File): Promise<TaskAttachment> {

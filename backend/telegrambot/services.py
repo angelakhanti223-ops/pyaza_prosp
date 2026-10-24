@@ -39,15 +39,15 @@ def is_local_url(url: str) -> bool:
 
 
 def get_first_column():
-    from kanban.models import KanbanColumn
-
-    return KanbanColumn.objects.order_by('order').first()
+    from kanban.models import Task
+    from kanban.services import column_for_status
+    return column_for_status(Task.Status.NEW)
 
 
 def get_last_column():
-    from kanban.models import KanbanColumn
-
-    return KanbanColumn.objects.order_by('-order').first()
+    from kanban.models import Task
+    from kanban.services import column_for_status
+    return column_for_status(Task.Status.DONE)
 
 
 def escape_html(value: str) -> str:

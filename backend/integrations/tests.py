@@ -229,7 +229,7 @@ class PullUonRemindersTests(TestCase):
             name='Клиент', direction=self.direction, assigned_manager=self.manager, uon_ticket_id='61',
         )
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
 
     def test_skips_lead_without_uon_ticket(self):
         lead = Lead.objects.create(name='Без U-ON', direction=self.direction)
@@ -479,7 +479,7 @@ class CheckDocumentIssuanceDeadlinesTests(TestCase):
     def setUp(self):
         self.manager = User.objects.create_user(username='ekaterina2', password='x', first_name='Екатерина')
         self.column_new = KanbanColumn.objects.get(name='Новая')
-        self.column_done = KanbanColumn.objects.get(name='Готово')
+        self.column_done = KanbanColumn.objects.get(status='done')
         self.target_date = timezone.localdate() + timedelta(days=DOCUMENT_ISSUANCE_LEAD_DAYS)
 
     @patch('telegrambot.tasks.notify_task_created.delay')
@@ -537,7 +537,7 @@ class CheckDocumentIssuanceDeadlinesTests(TestCase):
     def test_recreates_after_previous_task_closed(self, mock_notify):
         UonRequestRecord.objects.create(uon_id='305', client_name='Клиент', date_begin=self.target_date)
         check_document_issuance_deadlines()
-        Task.objects.filter(uon_record_id='305').update(column=self.column_done)
+        Task.objects.filter(uon_record_id='305').update(column=self.column_done, status='done')
 
         created_second_pass = check_document_issuance_deadlines()
 

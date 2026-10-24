@@ -309,7 +309,6 @@ def notify_daily_deadlines():
     """Утренняя сводка: задачи с дедлайном сегодня плюс просроченные незакрытые."""
     from django.utils import timezone as tz
     from kanban.models import Task
-    from telegrambot.services import get_last_column
 
     if not settings.TELEGRAM_BOT_ENABLED:
         return
@@ -317,10 +316,7 @@ def notify_daily_deadlines():
     today = tz.localdate()
     queryset = Task.objects.select_related('assignee', 'column', 'lead').filter(
         deadline__isnull=False, deadline__date__lte=today,
-    ).order_by('deadline')
-    last_column = get_last_column()
-    if last_column is not None:
-        queryset = queryset.exclude(column_id=last_column.pk)
+    ).exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED]).order_by('deadline')
 
     tasks = list(queryset)
     if not tasks:
