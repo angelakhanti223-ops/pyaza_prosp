@@ -393,9 +393,13 @@ class LeadUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
+        explicit_contact = 'next_contact_at' in validated_data
         tags = validated_data.pop('tags', None)
         instance = super().update(instance, validated_data)
         if tags is not None:
             instance.tags.set(tags)
         _sync_client_contact_from_lead(instance)
+        if explicit_contact:
+            from kanban.services import sync_next_contact_task
+            sync_next_contact_task(instance.pk, allow_create=True)
         return instance

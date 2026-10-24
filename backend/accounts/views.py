@@ -37,6 +37,8 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from kanban.models import WebPushSubscription
+        WebPushSubscription.objects.filter(user=request.user, session_key=request.session.session_key).update(is_active=False)
         logout(request)
         return Response(status=204)
 

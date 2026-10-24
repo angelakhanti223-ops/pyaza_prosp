@@ -204,6 +204,29 @@ export async function login(username: string, password: string): Promise<CrmUser
 
 export async function logout(): Promise<void> {
   await apiJson("/api/auth/logout/", { method: "POST" });
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration("/crm/");
+      for (const notification of await registration?.getNotifications() ?? []) notification.close();
+      await (await registration?.pushManager.getSubscription())?.unsubscribe();
+    } catch { /* Session invalidation on the server already stops delivery. */ }
+  }
+}
+
+export function getTaskPushConfig(): Promise<{ public_key: string; enabled: boolean }> {
+  return apiJson("/api/crm/task-push/config/", { cache: "no-store" });
+}
+
+export function enableTaskPush(subscription: PushSubscriptionJSON): Promise<void> {
+  return apiJson("/api/crm/task-push/subscription/", { method: "POST", body: JSON.stringify(subscription) });
+}
+
+export function disableTaskPush(endpoint: string): Promise<void> {
+  return apiJson("/api/crm/task-push/subscription/", { method: "DELETE", body: JSON.stringify({ endpoint }) });
+}
+
+export function testTaskPush(): Promise<{ detail: string }> {
+  return apiJson("/api/crm/task-push/test/", { method: "POST", body: "{}" });
 }
 
 export async function fetchMe(): Promise<CrmUser | null> {

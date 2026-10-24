@@ -11,9 +11,9 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
-    return ["/candidates", "/candidate-form.html"].map(source => ({
+    return [{ source: "/crm-task-sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }, ...["/candidates", "/candidate-form.html"].map(source => ({
       source, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }, { key: "Referrer-Policy", value: "no-referrer" }],
-    }));
+    }))];
   },
   images: {
     remotePatterns: [

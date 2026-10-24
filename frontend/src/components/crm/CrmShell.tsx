@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { triggerUonSync } from "@/lib/crmApi";
 import { useCrmAuth } from "./CrmAuthProvider";
+import BrowserTaskNotifications from "./BrowserTaskNotifications";
 
 const NAV = [
   { href: "/crm/dashboard", label: "Дашборд", icon: LayoutDashboard },
@@ -134,6 +135,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
+        <BrowserTaskNotifications />
         <main className="min-w-0 flex-1 overflow-hidden p-3 sm:p-6">{children}</main>
       </div>
     </div>

@@ -2,6 +2,11 @@ from django.conf import settings
 from django.db import models
 
 
+class ActiveTaskManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(archived_at__isnull=True)
+
+
 class KanbanColumn(models.Model):
     """Настраиваемая колонка доски (ТЗ 6): например Новая → В работе → Ждём клиента → Готово."""
 
@@ -16,6 +21,13 @@ class KanbanColumn(models.Model):
 
 
 class Task(models.Model):
+    class Origin(models.TextChoices):
+        MANUAL = 'manual', 'Ручная / прежняя локальная'
+        UON = 'uon_import', 'Импорт напоминания U-ON'
+        NEXT_CONTACT = 'next_contact', 'Следующий контакт'
+
+    objects = ActiveTaskManager()
+    all_objects = models.Manager()
     class Status(models.TextChoices):
         NEW = 'new', 'Новая'
         IN_PROGRESS = 'in_progress', 'В работе'
@@ -32,6 +44,9 @@ class Task(models.Model):
         VK = 'vk', 'VK'
 
     title = models.CharField(max_length=255)
+    origin = models.CharField(max_length=20, choices=Origin.choices, default=Origin.MANUAL)
+    automation_key = models.CharField(max_length=128, unique=True, null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     description = models.TextField(blank=True)
     status = models.CharField(
         'Статус задачи', max_length=20, choices=Status.choices, default=Status.NEW,
@@ -70,6 +85,8 @@ class Task(models.Model):
 
     class Meta:
         ordering = ['column', 'order']
+        base_manager_name = 'all_objects'
+        default_manager_name = 'objects'
 
     def __str__(self):
         return self.title
@@ -106,3 +123,34 @@ class TaskAttachment(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+class WebPushKey(models.Model):
+    """Server-only VAPID identity, generated once and shared by API/worker."""
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    private_key = models.TextField()
+    public_key = models.CharField(max_length=128)
+
+
+class WebPushSubscription(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    session_key = models.CharField(max_length=64)
+    endpoint_hash = models.CharField(max_length=64, unique=True)
+    endpoint = models.TextField()
+    p256dh = models.CharField(max_length=128)
+    auth = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class TaskPushReceipt(models.Model):
+    subscription = models.ForeignKey(WebPushSubscription, on_delete=models.CASCADE)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    deadline = models.DateTimeField()
+    sent_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    retry_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['subscription', 'task', 'deadline'], name='unique_task_push_deadline')]

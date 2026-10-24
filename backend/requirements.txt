@@ -12,3 +12,4 @@ gunicorn>=22.0,<22.1
 whitenoise>=6.7,<6.8
 python-telegram-bot[webhooks]>=21.0,<21.1
 reportlab>=4.4,<5
+pywebpush>=2.5,<2.6

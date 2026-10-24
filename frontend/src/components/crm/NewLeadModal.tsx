@@ -72,7 +72,7 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
         adults: adults ? Number(adults) : undefined,
         children_count: childrenCount ? Number(childrenCount) : undefined,
         budget_to: budgetTo || undefined,
-        next_contact_at: nextContactAt || undefined,
+        next_contact_at: nextContactAt ? new Date(nextContactAt).toISOString() : undefined,
         consent,
       });
       onCreated(lead);
