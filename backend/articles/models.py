@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -49,8 +51,8 @@ class Article(models.Model):
     published_at = models.DateTimeField(null=True, blank=True)
     views = models.PositiveIntegerField(
         'Просмотров', default=0,
-        help_text='Растёт при каждом открытии страницы статьи на сайте (ArticleDetailView) — '
-                   'без дедупликации по IP/сессии, простой счётчик (ТЗ по требованию клиента, 03.09.2026).',
+        help_text='Исторический итог и новые открытия статьи в браузере. '
+                   'Повторная отправка одного события не увеличивает счётчик.',
     )
 
     # SEO (ТЗ 4.1)
@@ -90,3 +92,20 @@ class ArticleGalleryImage(models.Model):
 
     def __str__(self):
         return self.caption or f'Изображение #{self.pk} — {self.article.title}'
+
+
+class ArticleReadSession(models.Model):
+    """One page opening, with cumulative visible/focused time. No visitor identity."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='read_sessions')
+    started_at = models.DateTimeField(default=timezone.now, editable=False)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    active_ms = models.PositiveIntegerField(default=0)
+    duration_reported = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['started_at'], name='article_read_started_idx'),
+            models.Index(fields=['article', 'started_at'], name='article_read_article_idx'),
+        ]
