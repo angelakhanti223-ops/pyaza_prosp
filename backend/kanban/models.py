@@ -43,6 +43,12 @@ class Task(models.Model):
         MANUAL = 'manual', 'Ручная / прежняя локальная'
         UON = 'uon_import', 'Импорт напоминания U-ON'
         NEXT_CONTACT = 'next_contact', 'Следующий контакт'
+        AFTER_SALE = 'after_sale', 'После успешной сделки'
+
+    class Purpose(models.TextChoices):
+        GENERAL = 'general', 'Работа по заявке'
+        DOCUMENTS = 'documents', 'Выдача документов'
+        FOLLOW_UP_6M = 'follow_up_6m', 'Связь через полгода'
 
     objects = ActiveTaskManager()
     all_objects = models.Manager()
@@ -61,6 +67,9 @@ class Task(models.Model):
     automation_key = models.CharField(max_length=128, unique=True, null=True, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     description = models.TextField(blank=True)
+    purpose = models.CharField('Назначение задачи', max_length=20, choices=Purpose.choices, default=Purpose.GENERAL)
+    closed_at = models.DateTimeField('Закрыта', null=True, blank=True)
+    closure_reason = models.CharField('Причина закрытия', max_length=20, blank=True, choices=[('manual', 'Закрыта сотрудником'), ('deal_won', 'Сделка успешна')])
     status = models.CharField(
         'Статус задачи', max_length=20, choices=Status.choices, default=Status.NEW,
         help_text='Единое состояние задачи: соответствует колонке канбана. При первом переводе в «Отложено» неизменённый срок сдвигается на 3 дня.',
@@ -122,6 +131,8 @@ class Task(models.Model):
         задачи важны, но не срочны, остальные общие задачи без метки."""
         if self.archived_at or self.status in [Task.Status.DONE, Task.Status.CANCELLED]:
             return None
+        if self.purpose == self.Purpose.FOLLOW_UP_6M:
+            return 'important'
         if self.kind in ('lead', 'appeal'):
             return 'urgent_important'
         if self.is_recurring:

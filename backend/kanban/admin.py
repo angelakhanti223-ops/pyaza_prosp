@@ -28,11 +28,11 @@ class TaskAdmin(admin.ModelAdmin):
     list_display = (
         'title', 'column', 'assignee', 'lead', 'origin', 'archived_at', 'deadline', 'order',
     )
-    list_filter = ('origin', 'archived_at', 'column', 'assignee', 'is_recurring', 'preferred_contact_channel')
+    list_filter = ('origin', 'purpose', 'closure_reason', 'archived_at', 'column', 'assignee', 'is_recurring', 'preferred_contact_channel')
     search_fields = ('title', 'description')
     inlines = [TaskAttachmentInline]
     actions = ['archive_tasks', 'restore_tasks']
-    readonly_fields = ['automation_key', 'origin', 'recurrence_parent', 'column']
+    readonly_fields = ['automation_key', 'origin', 'recurrence_parent', 'column', 'closed_at', 'closure_reason']
 
     def get_queryset(self, request):
         return Task.all_objects.all()

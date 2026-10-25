@@ -75,14 +75,14 @@ class ContactTaskTests(TestCase):
         self.assertEqual(task.assignee, self.other)
         self.assertEqual(task.preferred_contact_channel, 'telegram')
 
-    def test_clear_or_closed_lead_cancels_contact_task_but_preserves_manual(self):
+    def test_success_completes_work_while_other_closures_cancel_only_contact(self):
         for status in ['closed_won', 'closed_lost', 'failed', 'not_target']:
             lead = self.lead(next_contact_at=self.when)
             manual = Task.objects.create(title='Ручная', lead=lead, column=self.first)
             lead.status = status
             lead.save()
-            self.assertEqual(Task.objects.get(lead=lead, origin='next_contact').status, 'cancelled')
-            self.assertEqual(Task.objects.get(pk=manual.pk).status, 'new')
+            self.assertEqual(Task.objects.get(lead=lead, origin='next_contact').status, 'done' if status == 'closed_won' else 'cancelled')
+            self.assertEqual(Task.objects.get(pk=manual.pk).status, 'done' if status == 'closed_won' else 'new')
         lead = self.lead(next_contact_at=self.when)
         lead.next_contact_at = None
         lead.save()

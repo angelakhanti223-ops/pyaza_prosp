@@ -426,7 +426,7 @@ class CheckStaleLeadsTests(TestCase):
         self._make_stale_lead(status=Lead.Status.CLOSED_WON)
         self._make_stale_lead(status=Lead.Status.CLOSED_LOST)
         check_stale_leads()
-        self.assertEqual(Task.objects.count(), 0)
+        self.assertEqual(Task.objects.exclude(purpose=Task.Purpose.FOLLOW_UP_6M).count(), 0)
         mock_notify.assert_not_called()
 
     @patch('telegrambot.tasks.notify_task_created.delay')

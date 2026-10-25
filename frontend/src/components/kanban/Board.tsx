@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { listenForTaskChanges } from "@/lib/taskEvents";
-import { previewTaskMove, dropIndex, matchesTaskDate } from "@/lib/boardState";
+import { previewTaskMove, dropIndex, matchesTaskDate, taskGroupMatches, sortClosedTasks } from "@/lib/boardState";
 import TaskList from "./TaskList";
 import { useTaskClock } from "@/lib/useTaskClock";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
@@ -68,6 +68,7 @@ export default function Board() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("manual");
   const [view, setView] = useState<"board" | "list">("board");
+  const [showClosed, setShowClosed] = useState(false);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -104,7 +105,7 @@ export default function Board() {
     }
   }, [tasks, taskParam]);
 
-  const visibleTasks = useMemo(() => {
+  const matchingTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
     return tasks.filter((task) => {
       if (query) {
@@ -114,10 +115,13 @@ export default function Board() {
       if (assigneeFilter === "mine" && task.assignee?.id !== user?.id) return false;
       if (assigneeFilter === "unassigned" && task.assignee) return false;
       if (typeof assigneeFilter === "number" && task.assignee?.id !== assigneeFilter) return false;
-      if (!matchesTaskDate(task, dateFilter, new Date(now))) return false;
       return true;
     });
-  }, [tasks, search, assigneeFilter, dateFilter, user, now]);
+  }, [tasks, search, assigneeFilter, user]);
+
+  const closedCount = matchingTasks.filter(task => taskGroupMatches(task, true)).length;
+  const workingColumns = columns.filter(column => column.status !== "done" && column.status !== "cancelled");
+  const visibleTasks = useMemo(() => matchingTasks.filter(task => taskGroupMatches(task, showClosed) && (showClosed || matchesTaskDate(task, dateFilter, new Date(now)))), [matchingTasks, showClosed, dateFilter, now]);
 
   const visibleTasksByColumn = useMemo(() => {
     const grouped: Record<number, KanbanTask[]> = {};
@@ -184,7 +188,7 @@ export default function Board() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div role="group" aria-label="Вид задач" className="flex gap-2"><button type="button" aria-pressed={view === "board"} onClick={() => setView("board")} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "board" ? "bg-navy text-white" : "bg-white text-navy"}`}>Канбан</button><button type="button" aria-pressed={view === "list"} onClick={() => setView("list")} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "list" ? "bg-navy text-white" : "bg-white text-navy"}`}>Список</button></div><button type="button" onClick={() => setModalState({ task: null, columnId: columns.find(column => column.status === "new")?.id ?? null })} disabled={!columns.length} className="rounded-full bg-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">+ Задача</button></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div role="group" aria-label="Вид задач" className="flex gap-2"><button type="button" aria-pressed={view === "board" && !showClosed} onClick={() => { setView("board"); setShowClosed(false); }} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "board" && !showClosed ? "bg-navy text-white" : "bg-white text-navy"}`}>Канбан</button><button type="button" aria-pressed={view === "list" && !showClosed} onClick={() => { setView("list"); setShowClosed(false); }} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "list" && !showClosed ? "bg-navy text-white" : "bg-white text-navy"}`}>Список</button></div><div className="ml-auto flex flex-wrap items-center gap-2"><button type="button" aria-pressed={showClosed} onClick={() => setShowClosed(value => !value)} className={`rounded-full border px-4 py-2 text-sm font-semibold ${showClosed ? "border-navy bg-navy text-white" : "border-navy/15 bg-white text-navy"}`}>{showClosed ? "Скрыть закрытые задачи" : "Показать закрытые задачи"} · {closedCount}</button><button type="button" onClick={() => setModalState({ task: null, columnId: columns.find(column => column.status === "new")?.id ?? null })} disabled={!columns.length} className="rounded-full bg-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">+ Задача</button></div></div>
       <p className="mb-4 text-xs leading-5 text-foreground/55">Колонка — это статус задачи. Его можно менять перетаскиванием или в карточке. Фильтры дней работают по московскому времени.</p>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}<button type="button" onClick={() => void load()} className="ml-3 underline">Обновить</button></p>}
       {message && <p role="status" className="mb-4 rounded-xl bg-blue-light p-3 text-xs text-navy">{message}</p>}
@@ -199,8 +203,9 @@ export default function Board() {
         onSortModeChange={setSortMode}
         managers={managers}
         resultCount={visibleTasks.length}
+        closedView={showClosed}
       />
-      {view === "list" ? <TaskList tasks={sortTasks(visibleTasks, sortMode === "manual" ? "deadline" : sortMode)} onEdit={task => setModalState({ task, columnId: null })} onStatus={changeStatus} busyId={busyId} /> : <DndContext
+      {showClosed ? <section aria-label="Закрыто"><h2 className="mb-3 text-lg font-semibold text-navy">Закрыто · {visibleTasks.length}</h2><p className="mb-4 text-xs text-foreground/55">Выполненные и отменённые задачи. Последние закрытые — сверху. Задачу можно открыть или возобновить.</p><TaskList tasks={sortClosedTasks(visibleTasks)} onEdit={task => setModalState({ task, columnId: null })} onStatus={changeStatus} busyId={busyId} /></section> : view === "list" ? <TaskList tasks={sortTasks(visibleTasks, sortMode === "manual" ? "deadline" : sortMode)} onEdit={task => setModalState({ task, columnId: null })} onStatus={changeStatus} busyId={busyId} /> : <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
@@ -209,7 +214,7 @@ export default function Board() {
         onDragCancel={cancelDrag}
       >
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((col) => (
+          {workingColumns.map((col) => (
             <Column
               key={col.id}
               column={col}
@@ -217,6 +222,7 @@ export default function Board() {
               draggable={busyId === null}
               onTaskClick={(task) => setModalState({ task, columnId: null })}
               onAddTask={(columnId) => setModalState({ task: null, columnId })}
+              onComplete={(task) => void changeStatus(task, "done")}
             />
           ))}
         </div>
@@ -233,6 +239,7 @@ export default function Board() {
           task={modalState.task}
           onClose={() => setModalState(null)}
           onSaved={() => {
+            if (!modalState.task) setShowClosed(false);
             setModalState(null);
             void load();
           }}

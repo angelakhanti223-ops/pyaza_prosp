@@ -33,6 +33,8 @@ class TaskSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True, default=None)
     lead_status_display = serializers.CharField(source='lead.get_status_display', read_only=True, default=None)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    purpose_display = serializers.CharField(source='get_purpose_display', read_only=True)
+    closure_reason_display = serializers.CharField(source='get_closure_reason_display', read_only=True)
     preferred_contact_channel_display = serializers.CharField(
         source='get_preferred_contact_channel_display', read_only=True,
     )
@@ -49,12 +51,12 @@ class TaskSerializer(serializers.ModelSerializer):
             'preferred_contact_channel', 'preferred_contact_channel_display',
             'uon_record_kind', 'uon_record_id', 'uon_status_name', 'attachments', 'order', 'created_at',
             'updated_at',
-            'origin',
+            'origin', 'purpose', 'purpose_display', 'closed_at', 'closure_reason', 'closure_reason_display',
         ]
         read_only_fields = [
             'id', 'status_display', 'preferred_contact_channel_display', 'order', 'created_at', 'updated_at',
             'kind', 'priority', 'uon_record_kind', 'uon_record_id', 'attachments',
-            'origin',
+            'origin', 'purpose_display', 'closed_at', 'closure_reason', 'closure_reason_display',
         ]
 
     def get_uon_status_name(self, obj):
@@ -103,6 +105,8 @@ class TaskCreateSerializer(TaskSerializer):
             raise serializers.ValidationError('Статус задачи должен соответствовать колонке.')
         attrs['status'] = attrs.get('status', column.status if column else Task.Status.NEW)
         attrs['column'] = column or column_for_status(attrs['status'])
+        if attrs.get('purpose', Task.Purpose.GENERAL) != Task.Purpose.GENERAL and attrs.get('is_recurring'):
+            raise serializers.ValidationError('Выдача документов и связь через полгода — разовые задачи.')
         return attrs
 
 
@@ -118,12 +122,20 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'title', 'description', 'status', 'assignee_id', 'lead', 'deadline', 'is_recurring',
-            'preferred_contact_channel',
+            'preferred_contact_channel', 'purpose',
             'expected_updated_at',
         ]
 
     def validate(self, attrs):
+        purpose = attrs.get('purpose', self.instance.purpose)
+        if purpose != Task.Purpose.GENERAL and attrs.get('is_recurring', self.instance.is_recurring):
+            raise serializers.ValidationError('Выдача документов и связь через полгода — разовые задачи.')
+        if self.instance.origin == Task.Origin.AFTER_SALE:
+            if purpose != Task.Purpose.FOLLOW_UP_6M or ('lead' in attrs and getattr(attrs['lead'], 'pk', None) != self.instance.lead_id):
+                raise serializers.ValidationError('Автоматический контакт через полгода сохраняет тип и связь со сделкой.')
         if self.instance.origin == Task.Origin.NEXT_CONTACT:
+            if purpose != Task.Purpose.GENERAL:
+                raise serializers.ValidationError('Следующий контакт сохраняет тип «Работа по заявке».')
             if attrs.get('is_recurring'):
                 raise serializers.ValidationError('Следующий контакт планируется датой в заявке, без ежедневных копий.')
             if 'lead' in attrs and getattr(attrs['lead'], 'pk', None) != self.instance.lead_id:
@@ -144,6 +156,8 @@ class TaskMoveSerializer(serializers.Serializer):
 
 
 class TaskFilterSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(choices=['open', 'closed', 'all'], required=False)
+    purpose = serializers.ChoiceField(choices=Task.Purpose.choices, required=False)
     lead = serializers.IntegerField(required=False, min_value=1)
     assignee = serializers.IntegerField(required=False, min_value=1)
     status = serializers.ChoiceField(choices=Task.Status.choices, required=False)

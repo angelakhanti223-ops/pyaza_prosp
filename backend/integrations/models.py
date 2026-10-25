@@ -24,6 +24,14 @@ class UonRequestRecord(UonMirrorRecord):
     проходит по Lead.uon_ticket_id — списочного эндпоинта в API попросту нет)."""
 
     reservation_number = models.CharField('Номер брони', max_length=64, blank=True)
+
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        with transaction.atomic():
+            if self.pk:
+                list(type(self).objects.select_for_update().filter(pk=self.pk).values_list('pk', flat=True))
+            return super().save(*args, **kwargs)
+
     client_id = models.CharField('ID клиента в U-ON', max_length=64, blank=True)
     client_name = models.CharField('Имя клиента', max_length=255, blank=True)
     client_phone = models.CharField('Телефон', max_length=32, blank=True)

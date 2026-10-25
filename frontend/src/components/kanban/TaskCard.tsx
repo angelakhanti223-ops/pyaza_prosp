@@ -35,10 +35,12 @@ export default function TaskCard({
   task,
   draggable = true,
   onClick,
+  onComplete,
 }: {
   task: KanbanTask;
   draggable?: boolean;
   onClick: () => void;
+  onComplete?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -79,7 +81,9 @@ export default function TaskCard({
             {task.status_display}
           </span>
         )}
+        {!closed && onComplete && <button type="button" aria-label={`Выполнить задачу: ${task.title}`} disabled={!draggable} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); onComplete(); }} className="shrink-0 rounded-full border border-navy/20 bg-white px-2 py-0.5 text-xs text-navy hover:bg-green-50 disabled:opacity-40">✓</button>}
       </div>
+      {task.purpose !== "general" && task.purpose_display && <p className="mt-1 text-[10px] font-medium text-violet-700">{task.purpose_display}</p>}
       {context && <Link href={context.href} onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()} className="mt-1 flex items-center gap-1 text-xs text-blue hover:underline"><Link2 size={12} />{context.label}</Link>}
       {linkedStatus && (
         <span className="mt-1 inline-block rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-medium text-navy">

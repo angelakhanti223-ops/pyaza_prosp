@@ -60,6 +60,12 @@ class TaskViewSet(
         params = TaskFilterSerializer(data=self.request.query_params)
         params.is_valid(raise_exception=True)
         values = params.validated_data
+        if values.get('state') == 'closed':
+            qs = qs.filter(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
+        elif values.get('state') == 'open':
+            qs = qs.exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
+        if values.get('purpose'):
+            qs = qs.filter(purpose=values['purpose'])
         assignee_id = values.get('assignee')
         if assignee_id:
             qs = qs.filter(assignee_id=assignee_id)

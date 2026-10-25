@@ -34,6 +34,13 @@ def create_new_lead_task(lead_id: int):
         logger.warning('Лид #%s не найден, задачу на контакт не создаём', lead_id)
         return
 
+    if lead.status in [Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST, Lead.Status.FAILED, Lead.Status.NOT_TARGET]:
+        return  # A queued initial-contact job must not revive work after closing a deal.
+    if lead.uon_request_id:
+        from kanban.deals import successful_request_ids
+        if lead.uon_request_id in successful_request_ids():
+            return
+
     if Task.objects.filter(lead=lead, origin=Task.Origin.NEXT_CONTACT).exclude(status__in=['done', 'cancelled']).exists():
         return  # A scheduled contact already represents this action.
     if Task.objects.filter(lead=lead, title__startswith=_NEW_LEAD_TITLE_PREFIX).exists():
@@ -76,9 +83,10 @@ def check_stale_leads():
     logger.info('Автоматические метки заявок: %s', auto_tags_result)
 
     cutoff = timezone.now() - timedelta(days=STALE_LEAD_THRESHOLD_DAYS)
+    from kanban.deals import successful_request_ids
     stale_leads = Lead.objects.exclude(
-        status__in=[Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST],
-    ).filter(updated_at__lte=cutoff)
+        status__in=[Lead.Status.CLOSED_WON, Lead.Status.CLOSED_LOST, Lead.Status.FAILED, Lead.Status.NOT_TARGET],
+    ).exclude(uon_request_id__in=successful_request_ids()).filter(updated_at__lte=cutoff)
 
     column = get_first_column()
     if column is None:

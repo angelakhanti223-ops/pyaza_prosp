@@ -12,9 +12,10 @@ type Props = {
   draggable?: boolean;
   onTaskClick: (task: KanbanTask) => void;
   onAddTask: (columnId: number) => void;
+  onComplete?: (task: KanbanTask) => void;
 };
 
-export default function Column({ column, tasks, draggable = true, onTaskClick, onAddTask }: Props) {
+export default function Column({ column, tasks, draggable = true, onTaskClick, onAddTask, onComplete }: Props) {
   const { setNodeRef } = useDroppable({ id: `column-${column.id}` });
 
   return (
@@ -35,7 +36,7 @@ export default function Column({ column, tasks, draggable = true, onTaskClick, o
       <div ref={setNodeRef} className="flex min-h-[60px] flex-col gap-2">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} draggable={draggable} onClick={() => onTaskClick(task)} />
+            <TaskCard key={task.id} task={task} draggable={draggable} onClick={() => onTaskClick(task)} onComplete={onComplete ? () => onComplete(task) : undefined} />
           ))}
         </SortableContext>
       </div>
