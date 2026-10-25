@@ -31,6 +31,7 @@ class GiftCertificateApplicationTests(TestCase):
         self.assertIn('рассылки: нет', lead.initial_comment)
         evidence = lead.gift_certificate_application
         self.assertEqual(evidence['version'], CONSENTS['version'])
+        self.assertEqual(evidence['capture_method'], 'preselected_checkboxes_submitted')
         self.assertTrue(evidence['consents']['communication']['accepted'])
         self.assertFalse(evidence['consents']['marketing']['accepted'])
         self.assertEqual(evidence['consents']['personal_data']['text'], '\n\n'.join(CONSENTS['documents']['personal-data']['paragraphs']))
