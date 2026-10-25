@@ -14,6 +14,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { fetchManagementDashboard, type ManagementDashboardData } from "@/lib/managementDashboardApi";
+import { CONVERSION_RULE, conversionExplanation, formatConversionPercent } from "@/lib/managementConversion";
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value || 0) + " ₽";
@@ -51,26 +52,26 @@ function KpiCard({
   tone = "blue",
 }: {
   title: string;
-  actual: number;
+  actual: number | null;
   target: number;
   subtitle: string;
   formatter?: (value: number) => string;
   tone?: "blue" | "gold" | "green" | "red" | "navy";
 }) {
-  const progress = percent(actual, target);
+  const progress = actual === null ? null : percent(actual, target);
   return (
     <div className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/45">{title}</p>
-      <div className="mt-3 flex items-end justify-between gap-3">
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-3xl font-bold text-navy">{formatter(actual)}</p>
+          <p className="text-3xl font-bold text-navy">{actual === null ? "—" : formatter(actual)}</p>
           <p className="mt-1 text-xs text-foreground/45">цель: {formatter(target)}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${progress >= 100 ? "bg-emerald-50 text-emerald-700" : "bg-blue-light text-navy"}`}>
-          {progress}%
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${progress !== null && progress >= 100 ? "bg-emerald-50 text-emerald-700" : "bg-blue-light text-navy"}`}>
+          {progress === null ? "Нет расчёта" : `Выполнение цели: ${progress}%`}
         </span>
       </div>
-      <ProgressBar value={progress} tone={progress >= 100 ? "green" : tone} />
+      <ProgressBar value={progress ?? 0} tone={progress !== null && progress >= 100 ? "green" : tone} />
       <p className="mt-3 min-h-9 text-xs leading-5 text-foreground/55">{subtitle}</p>
     </div>
   );
@@ -185,6 +186,8 @@ const PRODUCT_GOALS = [
 export default function OfficeGoalsPage() {
   const [data, setData] = useState<ManagementDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -192,18 +195,19 @@ export default function OfficeGoalsPage() {
       .then((result) => {
         if (active) setData(result);
       })
+      .catch((err) => { if (active) setError(err instanceof Error ? err.message : "Не удалось загрузить показатели"); })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [retry]);
 
   const actuals = useMemo(() => {
-    const leads = data?.daily_rows.reduce((sum, row) => sum + row.leads, 0) ?? 0;
+    const leads = data?.conversion.incoming_count ?? 0;
     const deals = data?.money.deals_count ?? 0;
-    const conversion = leads ? Math.round((deals / leads) * 100) : 0;
+    const conversion = data?.conversion.percent ?? null;
     return {
       leads,
       deals,
@@ -233,7 +237,7 @@ export default function OfficeGoalsPage() {
         </div>
       </div>
 
-      {loading ? (
+      {error ? <div role="alert" className="rounded-3xl border border-red-100 bg-red-50 p-5 text-sm text-red-700">{error}<button type="button" onClick={() => { setError(""); setLoading(true); setRetry(value => value + 1); }} className="ml-3 font-semibold underline">Повторить</button></div> : loading ? (
         <div className="rounded-3xl border border-black/5 bg-white p-5 text-sm text-foreground/50">Загружаем факт по текущему месяцу…</div>
       ) : (
         <Section title="Главные KPI месяца" subtitle="Цели заданы на октябрь. Пока месяц не октябрь, факт будет показывать текущий месяц CRM.">
@@ -257,9 +261,9 @@ export default function OfficeGoalsPage() {
               title="Конверсия"
               actual={actuals.conversion}
               target={30}
-              formatter={(value) => `${value}%`}
+              formatter={formatConversionPercent}
               tone="green"
-              subtitle="Цель по конверсии — 30%. Факт считается как продажи / входящие лиды."
+              subtitle={data ? conversionExplanation(data.conversion) : ""}
             />
             <KpiCard
               title="Комиссия"
@@ -270,6 +274,7 @@ export default function OfficeGoalsPage() {
               subtitle="Бизнес-цель по комиссии офиса на месяц — 200 000 ₽."
             />
           </div>
+          <p className="mt-4 text-xs leading-5 text-foreground/55">{CONVERSION_RULE} Для сравнения выберите «Месяц» в управленческом дашборде.</p>
         </Section>
       )}
 

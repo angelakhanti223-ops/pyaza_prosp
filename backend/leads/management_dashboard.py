@@ -82,6 +82,11 @@ def money(value):
     return float(value or Decimal('0'))
 
 
+def sales_to_incoming_percent(sold, incoming):
+    """Period sales / all incoming leads of the same period; not a cohort rate."""
+    return round(sold / incoming * 100, 1) if incoming else None
+
+
 def user_name(user):
     if not user:
         return 'Не назначен'
@@ -222,6 +227,13 @@ class ManagementDashboardView(APIView):
             deal_amount=Sum('deal_amount'),
             deals=Count('id'),
         )
+        incoming_count = period_leads.count()
+        conversion = {
+            'sold_count': money_totals['deals'],
+            'incoming_count': incoming_count,
+            'percent': sales_to_incoming_percent(money_totals['deals'], incoming_count),
+            'previous_period_sales_count': revenue_leads.filter(created_at__lt=date_from).count(),
+        }
 
         manager_map = {}
         for lead in all_leads:
@@ -237,7 +249,7 @@ class ManagementDashboardView(APIView):
         for lead in period_leads:
             key = str(lead.assigned_manager_id or 'no-manager')
             row = manager_map.setdefault(key, empty_manager_row(lead))
-            row['new_leads'] += 1 if lead.status == Lead.Status.NEW else 0
+            row['new_leads'] += 1  # Created in this period, regardless of the current sales stage.
             row['lost'] += 1 if lead.status == Lead.Status.CLOSED_LOST else 0
             row['failed'] += 1 if lead.status == Lead.Status.FAILED else 0
 
@@ -248,7 +260,7 @@ class ManagementDashboardView(APIView):
             row['commission'] += money(lead.commission)
 
         for row in manager_map.values():
-            row['conversion_percent'] = round(row['sold'] / row['new_leads'] * 100, 1) if row['new_leads'] else 0
+            row['conversion_percent'] = sales_to_incoming_percent(row['sold'], row['new_leads'])
 
         status_counts = {row['status']: row['count'] for row in period_leads.values('status').annotate(count=Count('id'))}
         status_rows = [
@@ -262,7 +274,8 @@ class ManagementDashboardView(APIView):
         for row in revenue_leads.values('source').annotate(count=Count('id'), commission=Sum('commission')):
             source_sales[row['source']] = {'sold': row['count'], 'commission': money(row['commission'])}
         source_rows = []
-        for source, count in source_created.items():
+        for source in source_created.keys() | source_sales.keys():
+            count = source_created.get(source, 0)
             sales = source_sales.get(source, {'sold': 0, 'commission': 0.0})
             source_rows.append({
                 'source': source,
@@ -270,7 +283,7 @@ class ManagementDashboardView(APIView):
                 'count': count,
                 'sold': sales['sold'],
                 'commission': sales['commission'],
-                'conversion_percent': round(sales['sold'] / count * 100, 1) if count else 0,
+                'conversion_percent': sales_to_incoming_percent(sales['sold'], count),
             })
         source_rows.sort(key=lambda row: (row['commission'], row['count']), reverse=True)
 
@@ -323,6 +336,7 @@ class ManagementDashboardView(APIView):
         }
 
         return Response({
+            'conversion': conversion,
             'period': {
                 'code': period_code,
                 'label': period_label,
