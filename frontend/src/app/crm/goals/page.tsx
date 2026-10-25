@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { fetchManagementDashboard, type ManagementDashboardData } from "@/lib/managementDashboardApi";
 import { CONVERSION_RULE, conversionExplanation, formatConversionPercent } from "@/lib/managementConversion";
+import ManagerConversion from "@/components/crm/ManagerConversion";
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value || 0) + " ₽";
@@ -277,6 +278,8 @@ export default function OfficeGoalsPage() {
           <p className="mt-4 text-xs leading-5 text-foreground/55">{CONVERSION_RULE} Для сравнения выберите «Месяц» в управленческом дашборде.</p>
         </Section>
       )}
+
+      {!loading && !error && data && <ManagerConversion rows={data.manager_rows} office={data.conversion} periodLabel={data.period.label} />}
 
       <Section title="Соцсети и входящий поток" subtitle="Цели по росту аудитории и ежедневному контенту.">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

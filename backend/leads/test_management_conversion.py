@@ -125,6 +125,50 @@ class ManagementConversionTests(TestCase):
         self.lead('prepaid', sale=None)
         self.assertEqual(self.data()['conversion']['sold_count'], 1)
 
+    def test_manager_comparison_preserves_weighted_office_result(self):
+        self.lead('prepaid', sale=at(10, 3))
+        self.lead('paid', manager=self.other, sale=at(10, 4))
+        for _ in range(3):
+            self.lead('selection', manager=self.other)
+        data = self.data()
+        rows = {row['manager_id']: row for row in data['manager_rows']}
+        self.assertEqual(rows[self.owner.pk]['conversion_percent'], 100)
+        self.assertEqual(rows[self.other.pk]['conversion_percent'], 25)
+        self.assertEqual(data['conversion']['percent'], 40)  # 2/5, not the 62.5% average.
+
+    def test_previous_period_sales_are_broken_down_by_manager(self):
+        self.lead('paid', created=at(9, 1), sale=at(10, 3))
+        self.lead('paid', manager=self.other, created=at(10, 2), sale=at(10, 4))
+        data = self.data()
+        rows = {row['manager_id']: row for row in data['manager_rows']}
+        self.assertEqual(rows[self.owner.pk]['previous_period_sales_count'], 1)
+        self.assertIsNone(rows[self.owner.pk]['conversion_percent'])
+        self.assertEqual(rows[self.other.pk]['previous_period_sales_count'], 0)
+        self.assertEqual(sum(row['previous_period_sales_count'] for row in rows.values()), data['conversion']['previous_period_sales_count'])
+
+    def test_unassigned_work_is_kept_in_manager_and_office_totals(self):
+        lead = self.lead('paid', created=at(9, 1), sale=at(10, 3))
+        Lead.objects.filter(pk=lead.pk).update(assigned_manager=None)
+        current = self.lead('selection')
+        Lead.objects.filter(pk=current.pk).update(assigned_manager=None)
+        self.lead('selection', manager=self.other)
+        data = self.data()
+        unassigned = next(row for row in data['manager_rows'] if row['manager_id'] is None)
+        self.assertEqual(unassigned['new_leads'], 1)
+        self.assertEqual(unassigned['sold'], 1)
+        self.assertEqual(unassigned['previous_period_sales_count'], 1)
+        self.assertEqual(unassigned['conversion_percent'], 100)
+        self.assertEqual(sum(row['new_leads'] for row in data['manager_rows']), data['conversion']['incoming_count'])
+
+    def test_attribution_follows_current_assignee(self):
+        lead = self.lead('paid', sale=at(10, 3))
+        lead.assigned_manager = self.other; lead.save()
+        data = self.data()
+        owner_row = next(row for row in data['manager_rows'] if row['manager_id'] == self.other.pk)
+        self.assertEqual(owner_row['new_leads'], 1)
+        self.assertEqual(owner_row['sold'], 1)
+        self.assertEqual(owner_row['conversion_percent'], 100)
+
     def test_access_stays_restricted_to_management(self):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get('/api/crm/management-dashboard/').status_code, 403)

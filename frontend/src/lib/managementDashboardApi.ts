@@ -41,6 +41,7 @@ export type ManagementManagerRow = {
   overdue_contacts: number;
   overdue_payments: number;
   sold: number;
+  previous_period_sales_count: number;
   commission: number;
   lost: number;
   failed: number;
