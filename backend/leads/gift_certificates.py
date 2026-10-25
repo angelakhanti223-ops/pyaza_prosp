@@ -64,6 +64,7 @@ class GiftCertificateSerializer(serializers.Serializer):
             'version': CONSENTS['version'], 'submitted_at': now.isoformat(),
             'operator': CONSENTS['operator'], 'inn': CONSENTS['inn'],
             'page': '/gift-certificates', 'amount': amount,
+            'capture_method': 'preselected_checkboxes_submitted',
             'consents': {},
         }
         for key, document in [('personal_data', 'personal-data'), ('communication', 'communication'), ('marketing', 'marketing')]:
