@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useContext, useMemo, useState } from "react";
 
 type LeadFormContextValue = {
@@ -12,6 +13,7 @@ type LeadFormContextValue = {
 const LeadFormContext = createContext<LeadFormContextValue | null>(null);
 
 export function LeadFormProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [prefillComment, setPrefillComment] = useState("");
 
@@ -20,12 +22,16 @@ export function LeadFormProvider({ children }: { children: React.ReactNode }) {
       isOpen,
       prefillComment,
       open: (comment?: string) => {
+        if (pathname === "/gift-certificates") {
+          document.getElementById("application")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
         setPrefillComment(comment ?? "");
         setIsOpen(true);
       },
       close: () => setIsOpen(false),
     }),
-    [isOpen, prefillComment]
+    [isOpen, prefillComment, pathname]
   );
 
   return <LeadFormContext.Provider value={value}>{children}</LeadFormContext.Provider>;

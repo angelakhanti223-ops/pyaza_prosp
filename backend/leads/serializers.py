@@ -363,7 +363,7 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
             'source', 'source_display', 'direction', 'direction_name', 'status', 'status_display',
             'assigned_manager', 'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
             'tour_operator_details', *OPERATOR_RATE_FIELDS, 'uon_ticket_id', 'uon_request_id',
-            'initial_comment', 'consent_personal_data_at', 'created_at', 'updated_at', 'comments',
+            'initial_comment', 'gift_certificate_application', 'consent_personal_data_at', 'created_at', 'updated_at', 'comments',
             'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead', 'uon_request',
         ]
 

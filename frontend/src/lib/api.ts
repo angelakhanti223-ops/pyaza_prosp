@@ -116,6 +116,22 @@ export function createLead(payload: LeadPayload) {
   return postJson("/api/leads/", payload);
 }
 
+export type GiftCertificatePayload = {
+  name: string;
+  phone: string;
+  email?: string;
+  comment?: string;
+  amount?: number | null;
+  consent_personal_data: boolean;
+  consent_communication: boolean;
+  consent_marketing: boolean;
+  consent_version: string;
+};
+
+export function createGiftCertificateApplication(payload: GiftCertificatePayload) {
+  return postJson("/api/gift-certificates/", payload);
+}
+
 export function subscribe(payload: SubscribePayload) {
   return postJson("/api/subscribe/", payload);
 }

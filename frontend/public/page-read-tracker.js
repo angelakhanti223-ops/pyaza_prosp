@@ -4,7 +4,7 @@ export const PUBLIC_PAGE_PATHS = [
   '/', '/tours', '/tours/china-constructor', '/tours/russia-january-2027',
   '/tours/china-2026', '/tours/china-november-2026', '/tours/shanghai-beijing-constructor',
   '/directions', '/cruises', '/promotions', '/blog', '/blog/kakie-gory-i-sklon-vam-podoydut',
-  '/middle-east', '/about', '/team', '/certificates', '/contacts', '/privacy', '/terms',
+  '/middle-east', '/about', '/team', '/certificates', '/gift-certificates', '/contacts', '/privacy', '/terms',
 ];
 const MAX_ACTIVE_MS = 2 * 60 * 60 * 1000;
 

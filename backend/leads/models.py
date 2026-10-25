@@ -261,6 +261,7 @@ class Lead(models.Model):
                   'отдельная сущность и ID-последовательность от uon_ticket_id.',
     )
     initial_comment = models.TextField('Комментарий из формы', blank=True)
+    gift_certificate_application = models.JSONField('Заявка на подарочный сертификат и согласия', default=dict, blank=True)
     consent_personal_data_at = models.DateTimeField('Согласие на обработку ПДн', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
