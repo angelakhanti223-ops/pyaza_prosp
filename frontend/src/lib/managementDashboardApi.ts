@@ -26,6 +26,13 @@ export type ManagementMoney = {
   active_period_count: number;
 };
 
+export type ManagementConversion = {
+  sold_count: number;
+  incoming_count: number;
+  percent: number | null;
+  previous_period_sales_count: number;
+};
+
 export type ManagementManagerRow = {
   manager_id: number | null;
   manager_name: string;
@@ -37,7 +44,7 @@ export type ManagementManagerRow = {
   commission: number;
   lost: number;
   failed: number;
-  conversion_percent: number;
+  conversion_percent: number | null;
 };
 
 export type ManagementStatusRow = {
@@ -52,7 +59,7 @@ export type ManagementSourceRow = {
   count: number;
   sold: number;
   commission: number;
-  conversion_percent: number;
+  conversion_percent: number | null;
 };
 
 export type ManagementReasonRow = {
@@ -105,6 +112,7 @@ export type ManagementDashboardData = {
   period: { code: ManagementPeriod; label: string; from: string; to: string };
   operational: ManagementOperational;
   money: ManagementMoney;
+  conversion: ManagementConversion;
   manager_rows: ManagementManagerRow[];
   status_rows: ManagementStatusRow[];
   source_rows: ManagementSourceRow[];

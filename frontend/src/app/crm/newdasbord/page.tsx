@@ -25,6 +25,7 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
+import { formatConversionPercent } from "@/lib/managementConversion";
 import { useCrmAuth } from "@/components/crm/CrmAuthProvider";
 import {
   fetchDashboard,
@@ -93,7 +94,7 @@ type ManagerPerformanceRow = {
   new_leads: number;
   sold: number;
   commission: number;
-  conversion_percent: number;
+  conversion_percent: number | null;
   overdue_contacts: number;
   overdue_payments: number;
   lost: number;
@@ -335,14 +336,11 @@ function DirectionDonut({ data }: { data: DashboardData | null }) {
 
   if (!rows.length || total === 0) return <p className="text-sm text-[#292725]/45">Нет продаж по направлениям за выбранный период.</p>;
 
-  let start = 0;
   const gradient = rows
-    .map((row, index) => {
-      const end = start + (row.count / total) * 100;
-      const segment = `${colors[index % colors.length]} ${start}% ${end}%`;
-      start = end;
-      return segment;
-    })
+    .reduce<{ end: number; segments: string[] }>((acc, row, index) => {
+      const end = acc.end + (row.count / total) * 100;
+      return { end, segments: [...acc.segments, `${colors[index % colors.length]} ${acc.end}% ${end}%`] };
+    }, { end: 0, segments: [] }).segments
     .join(", ");
 
   return (
@@ -437,7 +435,7 @@ function ManagerTable({ rows }: { rows: ManagerPerformanceRow[] }) {
           <tr className="border-b border-[#684B38]/10 text-xs uppercase tracking-[0.14em] text-[#684B38]/55">
             <th className="py-3 pr-3 font-semibold">Менеджер</th>
             <th className="px-3 py-3 font-semibold">Активные</th>
-            <th className="px-3 py-3 font-semibold">Новые</th>
+            <th className="px-3 py-3 font-semibold">Входящие</th>
             <th className="px-3 py-3 font-semibold">Продажи</th>
             <th className="px-3 py-3 font-semibold">Комиссия</th>
             <th className="px-3 py-3 font-semibold">Конверсия</th>
@@ -457,7 +455,7 @@ function ManagerTable({ rows }: { rows: ManagerPerformanceRow[] }) {
                 <td className="px-3 py-4 text-[#292725]/75">{formatNumber(row.new_leads)}</td>
                 <td className="px-3 py-4 font-semibold text-[#292725]">{formatNumber(row.sold)}</td>
                 <td className="px-3 py-4 font-semibold text-[#292725]">{formatMoney(row.commission)}</td>
-                <td className="px-3 py-4 text-[#292725]/75">{formatPercent(row.conversion_percent)}</td>
+                <td className="px-3 py-4 text-[#292725]/75">{formatConversionPercent(row.conversion_percent)}</td>
                 <td className="px-3 py-4">
                   <span className={cx("rounded-full px-3 py-1 text-xs font-semibold", risk > 0 ? "bg-[#B96F4E]/12 text-[#B96F4E]" : "bg-[#7C8A6A]/12 text-[#7C8A6A]")}>
                     {risk > 0 ? `${risk} проср.` : "чисто"}
@@ -538,7 +536,7 @@ export default function NewDashboardPage() {
       new_leads: 0,
       sold: 0,
       commission: row.actual,
-      conversion_percent: 0,
+      conversion_percent: null,
       overdue_contacts: 0,
       overdue_payments: 0,
       lost: 0,
