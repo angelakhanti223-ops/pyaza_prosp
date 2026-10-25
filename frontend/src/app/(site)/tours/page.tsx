@@ -62,15 +62,15 @@ export default async function ToursPage() {
 
         <a
           href="/tours/china-constructor"
-          className="mt-10 block rounded-3xl border border-[#ded2c4] bg-[#f7f3ed] p-6 transition hover:shadow-md sm:p-8"
+          className="mt-10 block rounded-3xl border border-navy/10 bg-blue-light p-6 transition hover:shadow-md sm:p-8"
         >
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#684b38]">EMOTIONS · Онлайн-конструктор</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue">Китай · Онлайн-конструктор</p>
           <h2 className="mt-3 text-2xl font-bold text-navy">Рассчитать свой тур в Китай</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70">
             Пекин, Шанхай, Хайнань, горы Аватар и Фуронг. Выберите города, ночи,
             отели и экскурсии — предварительная стоимость на двоих пересчитается сразу.
           </p>
-          <span className="mt-5 inline-block rounded-full bg-[#684b38] px-5 py-3 text-sm font-semibold text-white">
+          <span className="mt-5 inline-block rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white">
             Собрать путешествие →
           </span>
         </a>

@@ -7,8 +7,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/candidates", destination: "/candidate-form.html" },
-      { source: "/tours/china-constructor", destination: "/china-tour-builder.html" },
     ];
+  },
+  async redirects() {
+    return [{ source: "/china-tour-builder.html", destination: "/tours/china-constructor", permanent: true }];
   },
   async headers() {
     return [{ source: "/crm-task-sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }, ...["/candidates", "/candidate-form.html"].map(source => ({
