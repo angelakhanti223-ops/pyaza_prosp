@@ -164,6 +164,7 @@ def empty_manager_row(lead):
         'overdue_contacts': 0,
         'overdue_payments': 0,
         'sold': 0,
+        'previous_period_sales_count': 0,
         'commission': 0.0,
         'lost': 0,
         'failed': 0,
@@ -257,6 +258,8 @@ class ManagementDashboardView(APIView):
             key = str(lead.assigned_manager_id or 'no-manager')
             row = manager_map.setdefault(key, empty_manager_row(lead))
             row['sold'] += 1
+            if lead.created_at < date_from:
+                row['previous_period_sales_count'] += 1
             row['commission'] += money(lead.commission)
 
         for row in manager_map.values():
