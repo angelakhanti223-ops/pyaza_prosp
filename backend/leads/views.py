@@ -11,6 +11,7 @@ from kanban.models import Task
 from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 
 from .auto_tags import AUTO_TAG_NAMES, sync_automatic_lead_tags
+from .gift_certificates import GiftCertificateSerializer
 from .models import Contact, Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
 from .serializers import (
     ContactSerializer,
@@ -91,6 +92,11 @@ class LeadCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'lead_create'
+
+
+class GiftCertificateCreateView(LeadCreateView):
+    """Публичная заявка на сертификат с независимыми согласиями."""
+    serializer_class = GiftCertificateSerializer
 
 
 class LeadViewSet(

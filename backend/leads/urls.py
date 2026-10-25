@@ -9,6 +9,7 @@ router = DefaultRouter()
 router.register('crm/leads', views.LeadViewSet, basename='crm-lead')
 
 urlpatterns = [
+    path('gift-certificates/', views.GiftCertificateCreateView.as_view(), name='gift-certificate-create'),
     path('leads/', views.LeadCreateView.as_view(), name='lead-create'),
     path('directions/', views.DirectionListView.as_view(), name='direction-list'),
     path('crm/tour-operators/', views.TourOperatorListView.as_view(), name='crm-tour-operators'),

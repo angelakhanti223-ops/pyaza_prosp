@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/about", label: "О нас" },
   { href: "/team", label: "Команда" },
   { href: "/certificates", label: "Сертификаты" },
+  { href: "/gift-certificates", label: "Подарки" },
   { href: "/contacts", label: "Контакты" },
 ];
 
@@ -26,7 +27,7 @@ export default function Header() {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <Logo />
 
-        <nav className="hidden items-center gap-5 lg:flex">
+        <nav className="hidden items-center gap-4 lg:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
