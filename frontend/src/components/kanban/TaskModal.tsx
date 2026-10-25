@@ -11,6 +11,7 @@ import {
   deleteTask,
   mediaUrl,
   TASK_STATUS_OPTIONS,
+  TASK_PURPOSE_OPTIONS,
   updateTask,
   uonRecordUrl,
   uploadTaskAttachment,
@@ -19,6 +20,7 @@ import {
   type KanbanTask,
   type TaskAttachment,
   type TaskStatus,
+  type TaskPurpose,
 } from "@/lib/kanbanApi";
 
 type Props = {
@@ -55,6 +57,7 @@ export default function TaskModal({
   const [leadId, setLeadId] = useState<number | null>(task?.lead ?? presetLead?.id ?? null);
   const [isRecurring, setIsRecurring] = useState(task?.is_recurring ?? false);
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? columns.find(column => column.id === defaultColumnId)?.status ?? "new");
+  const [purpose, setPurpose] = useState<TaskPurpose>(task?.purpose ?? "general");
   const [contactChannel, setContactChannel] = useState<ContactChannel>(task?.preferred_contact_channel ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -101,6 +104,7 @@ export default function TaskModal({
           description,
           expected_updated_at: task.updated_at,
           status,
+          purpose,
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           ...taskDeadlinePatch(task.deadline, deadline),
@@ -115,6 +119,7 @@ export default function TaskModal({
           description,
           column: column.id,
           status,
+          purpose,
           assignee_id: assigneeId ? Number(assigneeId) : null,
           lead: leadId,
           deadline: deadlineIso,
@@ -221,6 +226,10 @@ export default function TaskModal({
             <p className="mt-1 text-xs leading-5 text-foreground/45">Этот же статус определяет колонку на доске.</p>
             {status === "postponed" && task?.status !== "postponed" && <p className="mt-1 text-xs text-foreground/55">Если оставить прежний срок, он сдвинется на 3 дня. Можно выбрать другую дату ниже.</p>}
           </label>
+          <label className="text-xs text-foreground/60">Тип задачи
+            <select aria-label="Тип задачи" value={purpose} disabled={task?.origin === "next_contact" || task?.origin === "after_sale"} onChange={event => { const value = event.target.value as TaskPurpose; setPurpose(value); if (value !== "general") setIsRecurring(false); }} className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm text-navy outline-none focus:border-blue disabled:opacity-60">{TASK_PURPOSE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            {purpose !== "general" && <p className="mt-1 text-xs leading-5 text-foreground/45">При успешном закрытии сделки эта задача останется открытой.</p>}
+          </label>
 
           <select
             value={assigneeId}
@@ -258,7 +267,7 @@ export default function TaskModal({
           <label className="flex items-center gap-2 text-sm text-foreground/70">
             <input
               type="checkbox"
-              disabled={task?.origin === "next_contact"}
+              disabled={task?.origin === "next_contact" || purpose !== "general"}
               checked={isRecurring}
               onChange={(e) => setIsRecurring(e.target.checked)}
               className="h-4 w-4 rounded border-black/20"
@@ -266,9 +275,9 @@ export default function TaskModal({
             Ежедневная задача: после выполнения создаётся следующая
           </label>
 
-          {presetLead || task?.origin === "next_contact" ? (
+          {presetLead || task?.origin === "next_contact" || task?.origin === "after_sale" ? (
             <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">
-              Заявка: <strong>{presetLead?.name ?? task?.lead_name}</strong>
+              Заявка: <strong>{presetLead?.name ?? task?.lead_name ?? `U-ON №${task?.uon_record_id}`}</strong>
             </p>
           ) : presetUonRecord ? (
             <p className="rounded-xl border border-black/10 bg-blue-light/20 px-3 py-2 text-sm text-navy">

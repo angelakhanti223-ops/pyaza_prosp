@@ -16,6 +16,12 @@ export type TaskKind = "lead" | "appeal" | "general";
 export type TaskPriority = "urgent_important" | "important" | null;
 export type UonRecordKind = "request" | "lead" | "";
 export type TaskStatus = "new" | "in_progress" | "waiting_client" | "postponed" | "done" | "cancelled";
+export type TaskPurpose = "general" | "documents" | "follow_up_6m";
+export const TASK_PURPOSE_OPTIONS: { value: TaskPurpose; label: string }[] = [
+  { value: "general", label: "Работа по заявке" },
+  { value: "documents", label: "Выдача документов" },
+  { value: "follow_up_6m", label: "Связь через полгода" },
+];
 
 export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: "new", label: "Новая" },
@@ -68,7 +74,12 @@ export type KanbanTask = {
   order: number;
   created_at: string;
   updated_at: string;
-  origin: "manual" | "uon_import" | "next_contact";
+  origin: "manual" | "uon_import" | "next_contact" | "after_sale";
+  purpose: TaskPurpose;
+  purpose_display: string;
+  closed_at: string | null;
+  closure_reason: "" | "manual" | "deal_won";
+  closure_reason_display: string;
 };
 
 const UON_CABINET_URL = process.env.NEXT_PUBLIC_UON_CABINET_URL ?? "https://id62499.u-on.ru";
@@ -83,6 +94,7 @@ export function uonRecordUrl(task: KanbanTask): string | null {
 export type TaskInput = {
   title: string;
   description?: string;
+  purpose?: TaskPurpose;
   column: number;
   assignee_id?: number | null;
   lead?: number | null;
@@ -141,7 +153,7 @@ export async function listColumns(): Promise<KanbanColumn[]> {
   return apiJson<KanbanColumn[]>("/api/crm/kanban/columns/");
 }
 
-export type TaskFilters = { assignee?: number; lead?: number; status?: TaskStatus; uon_record_kind?: "request" | "lead"; uon_record_id?: string };
+export type TaskFilters = { assignee?: number; lead?: number; status?: TaskStatus; purpose?: TaskPurpose; state?: "open" | "closed" | "all"; uon_record_kind?: "request" | "lead"; uon_record_id?: string };
 
 export function isTaskClosed(task: Pick<KanbanTask, "status">) {
   return task.status === "done" || task.status === "cancelled";
@@ -152,6 +164,8 @@ export async function listTasks(params: TaskFilters = {}): Promise<KanbanTask[]>
   if (params.assignee) qs.set("assignee", String(params.assignee));
   if (params.lead) qs.set("lead", String(params.lead));
   if (params.status) qs.set("status", params.status);
+  if (params.state) qs.set("state", params.state);
+  if (params.purpose) qs.set("purpose", params.purpose);
   if (params.uon_record_kind) qs.set("uon_record_kind", params.uon_record_kind);
   if (params.uon_record_id) qs.set("uon_record_id", params.uon_record_id);
   const query = qs.toString() ? `?${qs.toString()}` : "";

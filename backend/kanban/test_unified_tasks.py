@@ -207,7 +207,7 @@ class UnifiedTaskTests(TestCase):
         self.assertEqual(self.update(task, status='new').status_code, 400)
         self.assertEqual(self.move(task, 'new').status_code, 400)
         self.assert_consistent(task)
-        self.assertEqual(task.status, 'cancelled')
+        self.assertEqual(task.status, 'done')
 
     def test_completing_contact_with_edited_deadline_clears_previous_schedule(self):
         deadline = timezone.now()

@@ -909,10 +909,10 @@ def check_document_issuance_deadlines():
 
     created = 0
     for record in requests:
-        existing = Task.objects.filter(
-            uon_record_kind='request', uon_record_id=record.uon_id, title__startswith=_DOCS_TITLE_PREFIX,
-        )
-        existing = existing.exclude(status__in=[Task.Status.DONE, Task.Status.CANCELLED])
+        from kanban.deals import related_deal_tasks
+        from django.db.models import Q
+        scope, _ = related_deal_tasks(request=record)
+        existing = Task.all_objects.filter(scope).filter(Q(purpose=Task.Purpose.DOCUMENTS) | Q(title__startswith=_DOCS_TITLE_PREFIX))
         if existing.exists():
             continue
 
@@ -926,10 +926,13 @@ def check_document_issuance_deadlines():
             f'Заявка №{record.uon_id}\nКлиент: {record.client_name or "—"}\n'
             f'Телефон: {record.client_phone or "—"}\nВылет: {record.date_begin:%d.%m.%Y}'
         )
-        task = Task.objects.create(
-            title=title, description=description, column=column, assignee=assignee,
-            order=next_order_in_column(column), uon_record_kind='request', uon_record_id=record.uon_id,
-        )
+        task, task_created = Task.all_objects.get_or_create(automation_key=f'documents:request:{record.uon_id}', defaults={
+            'title': title, 'description': description, 'column': column, 'assignee': assignee,
+            'purpose': Task.Purpose.DOCUMENTS, 'deadline': timezone.now(),
+            'order': next_order_in_column(column), 'uon_record_kind': 'request', 'uon_record_id': record.uon_id,
+        })
+        if not task_created:
+            continue
         notify_task_created.delay(task.pk)
         created += 1
 

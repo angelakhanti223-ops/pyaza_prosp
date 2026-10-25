@@ -31,8 +31,10 @@ export default function TaskList({ tasks, onEdit, onStatus, busyId }: {
       <div className="min-w-0 flex-1 basis-40">
         <button type="button" onClick={() => onEdit(task)} className={`break-words text-left text-sm font-semibold text-navy hover:underline ${closed ? "opacity-60" : ""}`}>{task.title}</button>
         {context && <Link href={context.href} className="mt-1 block break-words text-xs text-blue hover:underline">{context.label}</Link>}
+        {task.purpose !== "general" && task.purpose_display && <p className="mt-1 text-xs text-violet-700">{task.purpose_display}</p>}
         <p className="mt-1 text-xs text-foreground/55">{task.assignee?.full_name || "Ответственный не назначен"}</p>
         <p className={`mt-1 text-xs ${overdue ? "font-medium text-red-600" : "text-foreground/50"}`}>{task.deadline ? `${overdue ? "Просрочено · " : ""}${new Date(task.deadline).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "Без срока"}</p>
+        {closed && task.closed_at && <p className="mt-1 text-xs text-foreground/50">Закрыта {new Date(task.closed_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{task.closure_reason === "deal_won" ? " · Сделка успешна" : ""}</p>}
       </div>
       <select aria-label={`Статус задачи ${task.title}`} value={task.status} onChange={event => onStatus(task, event.target.value as TaskStatus)} disabled={busyId !== null} className="min-h-10 max-w-full rounded-xl border border-navy/15 bg-white px-3 text-xs text-navy disabled:opacity-50">{TASK_STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
     </li>;

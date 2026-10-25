@@ -146,6 +146,13 @@ class LeadTag(models.Model):
 
 
 class Lead(models.Model):
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        with transaction.atomic():
+            if self.pk:
+                list(type(self).objects.select_for_update().filter(pk=self.pk).values_list('pk', flat=True))
+            return super().save(*args, **kwargs)
+
     class Source(models.TextChoices):
         SITE_FORM = 'site_form', 'Сайт / форма'
         SLETAT = 'sletat', 'Слетать.ру'

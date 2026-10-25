@@ -1,5 +1,13 @@
 import type { KanbanColumn, KanbanTask } from "./kanbanApi";
 
+export function taskGroupMatches(task: Pick<KanbanTask, "status">, closed: boolean) {
+  return (task.status === "done" || task.status === "cancelled") === closed;
+}
+
+export function sortClosedTasks(tasks: KanbanTask[]) {
+  return [...tasks].sort((a, b) => new Date(b.closed_at || b.updated_at).getTime() - new Date(a.closed_at || a.updated_at).getTime());
+}
+
 export function previewTaskMove(tasks: KanbanTask[], taskId: number, column: KanbanColumn) {
   return tasks.map(task => task.id === taskId ? { ...task, column: column.id, status: column.status, status_display: column.name } : task);
 }

@@ -5,7 +5,20 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/lib/boardState.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { previewTaskMove, dropIndex, matchesTaskDate } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { previewTaskMove, dropIndex, matchesTaskDate, taskGroupMatches, sortClosedTasks } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+
+test('closed section includes done and cancelled, with no overlap with working states', () => {
+  for (const status of ['new', 'in_progress', 'waiting_client', 'postponed', 'done', 'cancelled']) {
+    assert.equal(taskGroupMatches({ status }, true), ['done', 'cancelled'].includes(status));
+    assert.notEqual(taskGroupMatches({ status }, true), taskGroupMatches({ status }, false));
+  }
+});
+
+test('closed records sort by closure date, with fallback for unknown historical date', () => {
+  const tasks = [{id:1,closed_at:'2026-10-24T10:00:00Z',updated_at:'2026-10-25T11:00:00Z'}, {id:2,closed_at:'2026-10-25T10:00:00Z'}, {id:3,closed_at:null,updated_at:'2026-10-23T10:00:00Z'}];
+  assert.deepEqual(sortClosedTasks(tasks).map(t=>t.id), [2,1,3]);
+  assert.deepEqual(tasks.map(t=>t.id), [1,2,3]);
+});
 
 test('drag preview changes status and column together while preserving the cancellation snapshot', () => {
   const tasks = [{ id: 1, column: 10, status: 'new', status_display: 'Новая', order: 0 }, { id: 2, column: 10, status: 'new', order: 1 }];

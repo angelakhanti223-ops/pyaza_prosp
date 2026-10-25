@@ -90,6 +90,8 @@ def save_task(task, parent_save, *args, **kwargs):
             raise ValidationError('Задача следующего контакта связана со своей заявкой.')
         if task.origin == Task.Origin.NEXT_CONTACT and task.is_recurring:
             raise ValidationError('Следующий контакт планируется датой в заявке, без ежедневных копий.')
+        if task.purpose != Task.Purpose.GENERAL and task.is_recurring:
+            raise ValidationError('Выдача документов и связь через полгода — разовые задачи.')
         if status == Task.Status.POSTPONED:
             if old and old.status != status and task.deadline == old.deadline:
                 task.deadline = (old.deadline or timezone.now()) + timedelta(days=3)
@@ -99,14 +101,20 @@ def save_task(task, parent_save, *args, **kwargs):
             Task.objects.filter(column_id=old.column_id, order__gt=old.order).exclude(pk=task.pk).update(order=F('order') - 1)
             task.order = next_order_in_column(task.column)
         if fields is not None:
-            kwargs['update_fields'] = set(fields) | {'status', 'column', 'order', 'deadline', 'updated_at'}
+            kwargs['update_fields'] = set(fields) | {'status', 'column', 'order', 'deadline', 'closed_at', 'closure_reason', 'updated_at'}
+        if status in CLOSED_STATUSES:
+            if not old or old.status not in CLOSED_STATUSES:
+                task.closed_at = timezone.now()
+                task.closure_reason = 'deal_won' if getattr(task, '_closing_for_success', False) else 'manual'
+        else:
+            task.closed_at, task.closure_reason = None, ''
         result = parent_save(*args, **kwargs)
         task.__dict__.pop('_position_managed', None)
         if expected is not None:
             task._expected_updated_at = task.updated_at
         if old and (old.status in CLOSED_STATUSES or old.archived_at) and not task_is_closed(task):
             TaskPushReceipt.objects.filter(task=task).delete()
-        if (old is None or old.status != Task.Status.DONE) and task.status == Task.Status.DONE and task.is_recurring and not task.archived_at:
+        if (old is None or old.status != Task.Status.DONE) and task.status == Task.Status.DONE and task.is_recurring and not task.archived_at and not getattr(task, '_closing_for_success', False):
             _recreate_recurring_task(task)
         return result
 

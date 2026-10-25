@@ -534,15 +534,15 @@ class CheckDocumentIssuanceDeadlinesTests(TestCase):
         self.assertEqual(Task.objects.filter(uon_record_id='304').count(), 1)
 
     @patch('telegrambot.tasks.notify_task_created.delay')
-    def test_recreates_after_previous_task_closed(self, mock_notify):
+    def test_does_not_recreate_completed_document_issuance(self, mock_notify):
         UonRequestRecord.objects.create(uon_id='305', client_name='Клиент', date_begin=self.target_date)
         check_document_issuance_deadlines()
         Task.objects.filter(uon_record_id='305').update(column=self.column_done, status='done')
 
         created_second_pass = check_document_issuance_deadlines()
 
-        self.assertEqual(created_second_pass, 1)
-        self.assertEqual(Task.objects.filter(uon_record_id='305').count(), 2)
+        self.assertEqual(created_second_pass, 0)
+        self.assertEqual(Task.objects.filter(uon_record_id='305').count(), 1)
 
 
 REAL_LEAD_PAYLOAD = {

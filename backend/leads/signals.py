@@ -10,12 +10,18 @@ from .models import Lead
 @receiver(pre_save, sender=Lead)
 def remember_contact_date(sender, instance, raw=False, **kwargs):
     if not raw:
-        instance._previous_contact_at = Lead.objects.filter(pk=instance.pk).values_list('next_contact_at', flat=True).first() if instance.pk else None
+        previous = Lead.objects.filter(pk=instance.pk).values('next_contact_at', 'status').first() if instance.pk else None
+        instance._previous_contact_at = previous['next_contact_at'] if previous else None
+        instance._previous_status = previous['status'] if previous else None
 
 
 @receiver(post_save, sender=Lead)
 def sync_contact_task(sender, instance, created, raw=False, **kwargs):
     if not raw:
+        fields = kwargs.get('update_fields')
+        if instance.status == Lead.Status.CLOSED_WON and (fields is None or 'status' in fields) and (created or getattr(instance, '_previous_status', None) != Lead.Status.CLOSED_WON):
+            from kanban.deals import close_successful_deal
+            close_successful_deal(lead=instance)
         sync_next_contact_task(instance.pk, allow_create=created or getattr(instance, '_previous_contact_at', None) != instance.next_contact_at)
 
 

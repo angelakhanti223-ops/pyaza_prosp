@@ -24,6 +24,7 @@ type Props = {
   onSortModeChange: (value: SortMode) => void;
   managers: CrmUser[];
   resultCount: number;
+  closedView?: boolean;
 };
 
 export default function BoardToolbar({
@@ -37,6 +38,7 @@ export default function BoardToolbar({
   onSortModeChange,
   managers,
   resultCount,
+  closedView = false,
 }: Props) {
   const filtersActive =
     search.trim() !== "" || assigneeFilter !== "all" || dateFilter !== "all" || sortMode !== "manual";
@@ -72,7 +74,7 @@ export default function BoardToolbar({
         ))}
       </select>
 
-      <div className="flex items-center gap-1 rounded-xl bg-blue-light/40 p-1">
+      {!closedView && <div className="flex items-center gap-1 rounded-xl bg-blue-light/40 p-1">
         {DATE_FILTER_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -85,9 +87,9 @@ export default function BoardToolbar({
             {opt.label}
           </button>
         ))}
-      </div>
+      </div>}
 
-      <select
+      {!closedView && <select
         value={sortMode}
         onChange={(e) => onSortModeChange(e.target.value as SortMode)}
         className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-blue"
@@ -95,7 +97,7 @@ export default function BoardToolbar({
         <option value="manual">Порядок на доске</option>
         <option value="deadline">По сроку (ближайшие сначала)</option>
         <option value="priority">По приоритету</option>
-      </select>
+      </select>}
 
       {filtersActive && (
         <>
