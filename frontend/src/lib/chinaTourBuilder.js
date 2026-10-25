@@ -1,410 +1,18 @@
-<!DOCTYPE html>
-<html lang="ru"><head><meta charset="utf-8">
-<title>Рассчитать тур в Китай онлайн — конструктор EMOTIONS | Слетать.ру</title>
-<meta name="description" content="Соберите тур в Китай на двоих: Пекин, Шанхай, Хайнань, Чжанцзяцзе и Фуронг. Выберите отели, переезды и экскурсии — предварительная стоимость пересчитывается сразу.">
-<link rel="canonical" href="https://flypenza.ru/tours/china-constructor">
-<link rel="icon" href="/favicon.ico">
-<meta property="og:type" content="website"><meta property="og:locale" content="ru_RU">
-<meta property="og:title" content="Китай — в вашем ритме. Рассчитайте своё путешествие">
-<meta property="og:description" content="Пять городов, отели и экскурсии — соберите маршрут и отправьте его на точный расчёт.">
-<meta property="og:url" content="https://flypenza.ru/tours/china-constructor">
-<meta property="og:image" content="https://flypenza.ru/tours/shanghai-beijing-constructor/hero.jpg">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="stylesheet" href="/tours/china-constructor/fonts.css">
-<style>
-/* Layout: route spine (Москва → города → Москва) on the left, live estimate pinned on the right; stacks on phones */
-:root{
-  --bg:#F4EFE7; --surface:#FFFCF7; --surface-2:#EDE4D9; --ink:#292725; --muted:#81766B; --line:#D8C8B6;
-  --jade:#684B38; --jade-soft:#E9DED2; --seal:#B96F4E; --seal-soft:#F3E2D8; --warn:#8C603D; --warn-soft:#F4E8DB;
-  --f-display:"Cormorant Garamond", "Prata", Georgia, "Times New Roman", serif;
-  --f-body:"Manrope", "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --r:16px;
-}
-/* Светлая палитра emotions принудительно используется на всех устройствах */
-:root{color-scheme:light;--bg:#F7F3ED;--surface:#FFFCF8;--surface-2:#EFE7DD;--ink:#342A23;--muted:#81766B;--line:#DED2C4;--jade:#684B38;--jade-soft:#EDE2D6;--seal:#B96F4E;--seal-soft:#F5E5DA;--warn:#8C603D;--warn-soft:#F4E8DB}
-:root[data-theme="dark"]{color-scheme:light;--bg:#F7F3ED;--surface:#FFFCF8;--surface-2:#EFE7DD;--ink:#342A23;--muted:#81766B;--line:#DED2C4;--jade:#684B38;--jade-soft:#EDE2D6;--seal:#B96F4E;--seal-soft:#F5E5DA;--warn:#8C603D;--warn-soft:#F4E8DB}
+/** Adapted from the supplied HTML. Queries and events stay inside root; React owns CTA and site chrome. */
+export function initChinaTourBuilder(root, { onRequest, onChange }) {
+  const controller = new AbortController();
+  const listen = (target, type, callback, options = {}) => target.addEventListener(type, callback, {
+    ...(typeof options === "boolean" ? { capture: options } : options), signal: controller.signal,
+  });
+  const dom = {
+    getElementById: id => root.querySelector(`[id="${id}"]`),
+    querySelector: selector => root.querySelector(selector),
+    querySelectorAll: selector => root.querySelectorAll(selector),
+    createElement: name => root.ownerDocument.createElement(name),
+    get activeElement() { return root.ownerDocument.activeElement; },
+    addEventListener: (type, callback, options) => listen(root, type, callback, options),
+  };
 
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
-.wrap{max-width:1180px;margin:0 auto;padding-block:28px 120px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
-h1,h2,h3{font-family:var(--f-display);font-weight:400;text-wrap:balance;margin:0}
-h1{font-size:clamp(28px,4.4vw,44px);line-height:1.1}
-h2{font-size:22px}
-h3{font-size:19px}
-.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--jade);font-weight:600}
-.lead{color:var(--muted);max-width:62ch;margin:10px 0 0}
-.num{font-variant-numeric:tabular-nums}
-button,select,input{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--jade);outline-offset:2px}
-
-header.top{display:grid;gap:18px;margin-bottom:26px}
-.presets{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.presets span{font-size:13px;color:var(--muted);margin-right:4px}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:14px}
-.chip:hover{border-color:var(--jade);color:var(--jade)}
-
-.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;align-items:start}
-@media (max-width:920px){.grid{grid-template-columns:minmax(0,1fr)}}
-
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);flex-wrap:wrap}
-.seg button{border:0;background:transparent;border-radius:999px;padding:6px 14px;cursor:pointer;font-size:14px;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--jade);color:var(--surface)}
-.month{display:flex;flex-direction:column;gap:4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.month select{font:inherit;font-size:15px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:500;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface)}
-.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
-
-/* route spine */
-.route{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin-top:18px}
-.node,.leg,.city,.city-head>*{min-width:0}
-.route::before{content:"";position:absolute;left:13px;top:14px;bottom:14px;width:2px;background:repeating-linear-gradient(var(--jade) 0 8px, transparent 8px 13px);opacity:.55}
-.node{position:relative;padding-left:42px}
-.dot{position:absolute;left:5px;top:14px;width:18px;height:18px;border-radius:50%;background:var(--surface);border:3px solid var(--jade)}
-.node.home .dot{background:var(--seal);border-color:var(--seal)}
-.node.home{padding-block:8px}
-.home-title{font-family:var(--f-display);font-size:18px;padding-top:9px}
-.leg{position:relative;padding:10px 0 10px 42px}
-.leg .legbox{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:14px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line);border-radius:var(--r);padding:10px 12px}
-.leg .legbox strong{color:var(--ink);font-weight:600}
-.leg select{max-width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface)}
-.leg .price{margin-left:auto;color:var(--ink);font-weight:600}
-.transit{font-size:13px;color:var(--muted);padding:6px 0 6px 42px}
-
-.city{padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
-.city-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.city-head select.cityname{font-family:var(--f-display);font-size:20px;border:0;border-bottom:1px solid var(--line);background:transparent;padding:2px 22px 2px 0;border-radius:0;min-width:0;max-width:100%;flex:1 1 220px}
-.city-blurb{font-size:13px;color:var(--muted);flex-basis:100%}
-.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden}
-.stepper button{border:0;background:var(--surface-2);width:32px;height:32px;cursor:pointer;font-size:18px;line-height:1}
-.stepper span{min-width:76px;text-align:center;font-size:14px}
-.tools{margin-left:auto;display:flex;gap:4px}
-.icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-width:32px;height:32px;cursor:pointer;color:var(--muted)}
-.icon-btn:hover{color:var(--ink);border-color:var(--muted)}
-.icon-btn:disabled{opacity:.35;cursor:default}
-
-.block{display:grid;gap:8px}
-.block-title{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.opts{display:grid;gap:6px}
-.opt{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 11px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--surface)}
-.opt:hover{border-color:var(--muted)}
-.opt input{margin:3px 0 0;accent-color:var(--jade)}
-.opt.on{border-color:var(--jade);background:var(--jade-soft)}
-.opt .t{font-size:14px}
-.opt .s{font-size:12.5px;color:var(--muted)}
-.photo{color:var(--jade);font-weight:600;text-decoration:none;border-bottom:1px dotted currentColor;white-space:nowrap}
-.photo::before{content:"▣ ";font-size:11px}
-.opt .p{font-size:14px;font-weight:600;white-space:nowrap;text-align:right}
-.opt .p small{display:block;font-weight:400;color:var(--muted);font-size:12px}
-.exc{max-height:320px;overflow:auto;padding-right:2px}
-.note{font-size:13px;color:var(--muted)}
-.link{color:var(--jade);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor}
-.warn{font-size:13px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 10px}
-details.more summary{cursor:pointer;font-size:13px;color:var(--jade);font-weight:600;list-style:none}
-details.more summary::-webkit-details-marker{display:none}
-details.more summary::before{content:"+ "}
-details.more[open] summary::before{content:"– "}
-
-.add{margin:12px 0 0 42px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.btn{text-decoration:none;border:1px solid var(--jade);background:transparent;color:var(--jade);border-radius:999px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:14px}
-.btn.solid{background:var(--jade);color:var(--surface)}
-.btn:hover{filter:brightness(1.05)}
-
-.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);margin-bottom:22px}
-.tabs button{border:0;background:transparent;padding:10px 4px;margin-right:18px;cursor:pointer;font-size:16px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
-.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--seal);font-weight:600}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:16px;align-items:start}
-.card{padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
-.card .tag{display:flex;flex-wrap:wrap;gap:6px}
-.card .pill.off{background:var(--warn-soft);color:var(--warn)}
-.card .route-line{font-size:14px;color:var(--ink)}
-.card ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13.5px;color:var(--muted)}
-.card .price{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;border-top:1px solid var(--line);padding-top:10px}
-.card .price b{font-family:var(--f-display);font-weight:400;font-size:26px;color:var(--seal)}
-.card .price span{font-size:13px;color:var(--muted)}
-.card .dates{font-size:13px;color:var(--muted)}
-.card .acts{display:flex;flex-wrap:wrap;gap:8px}
-.per1{display:inline-block;margin:8px 0 0;font-size:13px;font-weight:700;color:var(--seal);background:var(--seal-soft);border-radius:6px;padding:4px 10px}
-.excsec{margin-top:30px;display:grid;gap:14px}
-.excsec .chips{display:flex;flex-wrap:wrap;gap:8px}
-.excsec .chip[aria-pressed="true"]{background:var(--jade);border-color:var(--jade);color:var(--surface)}
-.excsec .chip .cnt{display:inline-block;margin-left:6px;font-size:12px;font-weight:700}
-.exc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:10px}
-.exc-card{display:grid;gap:8px;align-content:space-between;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);min-width:0}
-.exc-card.on{border-color:var(--jade);background:var(--jade-soft)}
-.exc-card .nm{font-size:14.5px;font-weight:600;line-height:1.35}
-.exc-card .dur{font-size:12.5px;color:var(--muted)}
-.exc-card .ds{font-size:13px;color:var(--muted);line-height:1.45}
-.exc-card .tags{display:flex;flex-wrap:wrap;gap:4px}
-.exc-card .tags span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted)}
-.exc-card .bot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
-.exc-card .pr{font-weight:700;font-size:15px}
-.exc-card .pr small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
-.exc-card .btn{padding:6px 12px;font-size:13px}
-.exc-card.on .btn{background:var(--jade);color:var(--surface)}
-.excsum{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:14px}
-.rm{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 0 0 6px;font-size:13px}
-.rm:hover{color:var(--seal)}
-.cta{margin-top:20px;padding:20px;display:grid;gap:12px;background:var(--jade-soft);border-color:var(--jade)}
-.cta .acts{display:flex;flex-wrap:wrap;gap:8px}
-.tour{padding:20px;display:grid;gap:12px;align-content:start;min-width:0}
-.tour .tag{display:flex;flex-wrap:wrap;gap:6px}
-.tour h3{font-size:22px}
-.tour .route-line{font-size:14.5px}
-.tour ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px}
-.tour .fish li::marker{color:var(--seal)}
-.tour .prices{display:grid;gap:6px;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--surface-2)}
-.tour .prow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px}
-.tour .prow b{font-family:var(--f-display);font-weight:400;font-size:26px;color:var(--seal)}
-.tour .prow span{font-size:13px;color:var(--muted)}
-.tour .acts{display:flex;flex-wrap:wrap;gap:8px}
-.tour details{border-top:1px solid var(--line);padding-top:10px}
-.tour details summary{cursor:pointer;font-weight:600;color:var(--jade)}
-.tour .dl{display:grid;gap:14px;margin-top:12px}
-.tour .dl h4{margin:0 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.tour ol{margin:0;padding-left:0;list-style:none;display:grid;gap:6px;font-size:14px}
-.tour ol li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px}
-.tour ol li b{color:var(--jade);font-weight:600}
-.tour .muted{color:var(--muted);font-size:13.5px}
-.know{margin-top:40px;display:grid;gap:16px}
-.know-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:14px}
-.kcard{padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
-.kcard h3{font-size:18px}
-.kcard p{margin:0;font-size:14px;color:var(--muted)}
-.kcard p b{color:var(--ink);font-weight:600}
-.kcard .src{font-size:12px}
-.kcard .src a{color:var(--muted)}
-.wx{display:grid;gap:6px}
-.wx-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;font-size:14px;border-bottom:1px dashed var(--line);padding-bottom:6px}
-.wx-row b{font-weight:600}
-.wx-row span{color:var(--muted)}
-.lead-sec{margin-top:40px;padding:22px;display:grid;gap:16px}
-.lead-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px 16px}
-.lead-form label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
-.lead-form .wide{grid-column:1/-1}
-.lead-form input[type=text],.lead-form input[type=tel],.lead-form select,.lead-form textarea{font:inherit;font-size:15px;font-weight:400;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:var(--surface);width:100%}
-.lead-form textarea{resize:vertical}
-.lead-form .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400}
-.lead-form .chk input{margin-top:3px;accent-color:var(--jade)}
-.lead-form .err{color:var(--seal);font-size:13px;min-height:0}
-.lead-done{display:grid;gap:10px;padding:16px;border-radius:var(--r);background:var(--jade-soft);border:1px solid var(--jade)}
-.lead-done .acts{display:flex;flex-wrap:wrap;gap:8px}
-section.extras{margin-top:26px;padding:18px;display:grid;gap:10px}
-
-/* estimate */
-aside.est{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px);padding:20px;display:grid;gap:14px}
-@media (max-width:920px){aside.est{position:static}}
-.total{display:grid;gap:2px}
-.total .sum{font-family:var(--f-display);font-size:38px;line-height:1.1;color:var(--seal)}
-.total .pp{font-size:14px;color:var(--muted)}
-.meta{display:flex;flex-wrap:wrap;gap:6px}
-.pill{font-size:12.5px;border-radius:999px;padding:3px 10px;background:var(--jade-soft);color:var(--jade);font-weight:600}
-.lines{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:12px}
-.grp{display:grid;gap:4px}
-.grp-h{display:flex;justify-content:space-between;font-weight:600;font-size:14px}
-.ln{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}
-.ln span:first-child{min-width:0}
-.ln span:last-child{white-space:nowrap}
-.disclaim{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
-.actions{display:grid;gap:8px}
-.contact{font-size:13px;color:var(--muted)}
-.contact b{color:var(--ink);user-select:all}
-.toast{font-size:13px;color:var(--jade);min-height:1em}
-.msg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.msg .btn{text-align:center}
-footer.contacts{margin-top:40px;padding:22px;display:grid;gap:16px}
-.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 24px}
-.citem{display:grid;gap:2px;min-width:0}
-.citem .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.citem .v{font-size:15px;overflow-wrap:anywhere}
-.citem .v b{font-weight:600;user-select:all}
-
-.bar{display:none}
-@media (max-width:920px){
-  .bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);border-top:1px solid var(--line);
-    padding:10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
-  .bar .sum{font-family:var(--f-display);font-size:22px;color:var(--seal)}
-}
-@media (prefers-reduced-motion: no-preference){.opt,.chip,.btn{transition:border-color .15s, background .15s, color .15s}}
-
-/* emotions visual system: warm editorial minimalism */
-body{background:var(--bg);background-image:radial-gradient(ellipse at 8% 0%,rgba(216,200,182,.32),transparent 38%);font-size:15px}
-.wrap{max-width:1240px;padding-top:30px}
-h1{font-size:clamp(38px,5.5vw,64px);letter-spacing:-.025em;max-width:850px}
-h2{font-size:clamp(26px,3vw,36px);letter-spacing:-.015em}
-h3{letter-spacing:-.01em}
-.eyebrow{color:var(--jade);letter-spacing:.18em;font-size:11px}
-.lead{font-size:16px;line-height:1.75;max-width:68ch}
-.panel{border-color:rgba(104,75,56,.17);border-radius:var(--r);box-shadow:0 8px 30px rgba(65,45,30,.035)}
-.top{position:relative;isolation:isolate;padding:clamp(26px,5vw,58px);border-radius:24px;overflow:hidden;min-height:310px;display:flex;align-items:center;background:#D8C8B6 url('/tours/china-constructor/beijing.jpg') center 48%/cover no-repeat;color:#fff}
-.top:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(37,30,24,.78),rgba(37,30,24,.44) 55%,rgba(37,30,24,.08));z-index:-1}
-.top .eyebrow,.top .lead{color:#F4EFE7}.top h1{color:#FFFCF7}.top .eyebrow{font-weight:600}
-.top .lead{max-width:640px}
-.top .top-copy{max-width:760px}
-.top .mini-note{display:inline-flex;margin-top:18px;padding:8px 13px;border:1px solid rgba(255,252,247,.48);border-radius:999px;color:#FFFCF7;font-size:12px;letter-spacing:.03em}
-.tabs{gap:10px;border-bottom:1px solid var(--line);margin:24px 0 26px}
-.tabs button{padding:12px 16px;margin:0 4px -1px 0;border-bottom-width:2px;font-size:14px}
-.tabs button[aria-selected="true"]{border-bottom-color:var(--jade);color:var(--jade)}
-.chip,.btn{border-radius:999px}.chip{padding:9px 15px}.btn{padding:10px 18px}.btn.solid{background:var(--jade);border-color:var(--jade);color:#FFFCF7}.btn:hover,.chip:hover{transform:translateY(-1px)}
-.grid{gap:24px}.city{padding:0 0 18px;overflow:hidden;gap:16px}.city-head{padding:18px 18px 0}.city-head select.cityname{font-size:27px}.city .block,.city .excsum{margin-inline:18px}.city .block-title{letter-spacing:.14em}.city .opts{padding:0 0}.opt{border-radius:12px;padding:12px 13px;border-color:rgba(104,75,56,.16)}.opt.on{border-color:var(--jade);background:#F1E8DE}.opt input{accent-color:var(--jade)}.hotel-thumb{display:block;width:min(100%,180px);height:66px;object-fit:cover;border-radius:8px;margin-top:7px;opacity:.94}
-.route::before{background:repeating-linear-gradient(var(--jade) 0 7px,transparent 7px 13px);opacity:.28}.dot{border-color:var(--jade)}.node.home .dot{background:var(--seal);border-color:var(--seal)}
-.presets{padding:14px;background:rgba(255,252,247,.65);border:1px solid var(--line);border-radius:16px}.presets span{font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-.excsec{padding-top:6px}.exc-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:14px}.exc-card{padding:0 0 14px;overflow:hidden;border-radius:15px;border-color:rgba(104,75,56,.16);gap:12px}.exc-card .exc-copy{padding:0 14px;display:grid;gap:8px}.exc-card .bot{padding:0 14px}.exc-card .nm{font-size:16px;line-height:1.35}.exc-card .pr{color:var(--jade);font-size:17px}.exc-card .btn{padding:7px 13px}
-.media-thumb{display:block;width:100%;height:160px;object-fit:cover;background:#D8C8B6}.city-photo{width:100%;height:190px;object-fit:cover;display:block}.tour{padding:0 0 20px;overflow:hidden;border-radius:18px;gap:12px}.tour>*:not(.tour-photo){margin-left:20px;margin-right:20px}.tour-photo{width:100%;height:220px;object-fit:cover;display:block}.tour h3{font-size:28px;line-height:1.1}.tour .prices{border-radius:12px;background:#F4EFE7}.tour .prow b{color:var(--jade);font-size:29px}.tour .tag{margin-top:18px}.tour .fish li::marker{color:var(--seal)}
-.tour .acts{margin-top:2px}.tour details{margin-top:4px;padding-top:12px}.tour details[open]{padding-bottom:4px}.tour .dl{padding-right:2px}
-.excsec .chips{gap:7px}.excsec .chip[aria-pressed="true"]{background:var(--jade);border-color:var(--jade)}
-aside.est{top:16px;border-radius:18px;padding:22px}.total .sum{font-size:42px;color:var(--jade)}.bar{background:#FFFCF7;border-color:var(--line)}.bar .sum{color:var(--jade)}
-.cta{background:#E9DED2;border-color:#C9B39F;border-radius:16px}.lead-sec{padding:clamp(20px,4vw,38px);border-radius:20px}.lead-form input,.lead-form select,.lead-form textarea{border-radius:10px!important}.know-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}.kcard{border-radius:15px}
-.disclaim{font-size:12px;line-height:1.65}
-@media(max-width:700px){.top{min-height:350px;padding:25px 21px;border-radius:18px;background-position:58% center}.top:before{background:linear-gradient(90deg,rgba(37,30,24,.8),rgba(37,30,24,.48))}h1{font-size:39px}.tabs{overflow:auto;flex-wrap:nowrap}.tabs button{white-space:nowrap;font-size:13px;padding:11px 10px}.tour-photo{height:190px}.city-photo{height:160px}.exc-card .media-thumb{height:145px}.tour h3{font-size:25px}}
-
-
-/* FINAL LIGHT EDITION — emotions */
-html{scroll-behavior:smooth;background:#F7F3ED;color-scheme:light}
-body{background:#F7F3ED!important;color:#342A23!important;background-image:radial-gradient(ellipse at 8% 0%,rgba(216,200,182,.22),transparent 42%)!important}
-.brandline{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px;padding:0 2px;color:#684B38}
-.wordmark{font-family:var(--f-display);font-size:30px;line-height:1;text-decoration:none;color:#684B38;letter-spacing:-.045em;font-weight:600}
-.wordmark span{color:#B96F4E}
-.brandline-tag{font-family:var(--f-display);font-size:17px;font-style:italic;color:#81766B}
-.top{min-height:390px;padding:clamp(28px,5vw,64px);border:1px solid rgba(104,75,56,.12);box-shadow:0 18px 50px rgba(65,45,30,.07);background-color:#E9DCCD;background-image:linear-gradient(90deg,rgba(247,243,237,.97) 0%,rgba(247,243,237,.91) 30%,rgba(247,243,237,.62) 49%,rgba(247,243,237,.05) 100%),url('/tours/china-constructor/beijing.jpg');background-position:center,center 48%;background-size:cover;background-repeat:no-repeat;color:#342A23}
-.top:before{display:none}
-.top .eyebrow{color:#8A6348}.top h1{color:#493324;max-width:720px}.top .lead{color:#6F6256;max-width:600px}.top .mini-note{color:#684B38;border:1px solid rgba(104,75,56,.28);background:rgba(255,252,248,.72);backdrop-filter:blur(8px)}
-.tabs button[aria-selected="true"]{color:#684B38;border-bottom-color:#B96F4E}
-.presets{background:rgba(255,252,248,.82);border-color:#DED2C4;box-shadow:0 5px 18px rgba(65,45,30,.025)}
-.panel{background:#FFFCF8;border-color:rgba(104,75,56,.15);box-shadow:0 9px 30px rgba(65,45,30,.035)}
-.opt{background:#FFFCF8}.opt.on{background:#F0E6DB;border-color:#8A6348}
-.btn.solid,.exc-card.on .btn{background:#684B38;border-color:#684B38;color:#FFFCF8}
-.cta{background:#EDE2D6;border-color:#D6C2AF}
-.total .sum,.bar .sum{color:#684B38}
-.tour .prices{background:#F5F0E9}
-.city-photo,.tour-photo,.media-thumb{background:#E4D6C7}
-.city-photo{height:205px;object-position:center 48%}
-.tour-photo{height:245px}
-.media-thumb{height:180px}
-.hotel-thumb{border:1px solid rgba(104,75,56,.1)}
-.exc-card,.tour{box-shadow:0 8px 24px rgba(65,45,30,.035)}
-.exc-card:hover,.tour:hover{box-shadow:0 14px 34px rgba(65,45,30,.08);transform:translateY(-2px);transition:transform .2s ease,box-shadow .2s ease}
-.chip{background:#FFFCF8;color:#684B38}
-:focus-visible{outline-color:#B96F4E}
-@media(max-width:700px){.brandline{align-items:flex-start}.brandline-tag{font-size:13px;text-align:right;max-width:190px}.top{min-height:360px;padding:25px 21px;background-image:linear-gradient(90deg,rgba(247,243,237,.96),rgba(247,243,237,.83) 58%,rgba(247,243,237,.38)),url('/tours/china-constructor/beijing.jpg');background-position:center,58% center}.top h1{font-size:clamp(38px,10vw,50px)}.top .lead{font-size:14px}.city-photo{height:165px}.tour-photo{height:195px}.media-thumb{height:150px}}
-
-/* Site integration and accessible controls */
-body{margin:0}.site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px max(16px,calc((100% - 1208px)/2));background:#fffcf8;border-bottom:1px solid var(--line);font-size:13px}.site-nav a{color:var(--jade);text-decoration:none}.site-nav-links{display:flex;flex-wrap:wrap;gap:16px}.site-nav-brand{font-weight:700}.calc-basis{margin:12px 0 18px;padding:12px 15px;border-left:3px solid var(--seal);background:var(--surface);border-radius:0 12px 12px 0}.muted-info{font-size:12px;color:var(--muted)}.btn:disabled{opacity:.65;cursor:wait;transform:none}.opt .t,.opt .s,.city-head select{overflow-wrap:anywhere}.build-reset{margin-left:auto}.toast:empty{display:none}.saved-notice{padding:12px 16px;background:var(--warn-soft);border-radius:12px;margin-bottom:16px}.city-credit{margin:-8px 0 0;font-size:11px;color:var(--muted)}.city-credit a{color:inherit}.mobile-hint{margin:4px 0 0}.opt .p{max-width:130px}.ready-choice{grid-column:1/-1}.ready-choice select{max-width:100%}.preview-banner{padding:12px 20px;background:var(--warn-soft);color:var(--ink);font-size:13px;text-align:center}.privacy-note{grid-column:1/-1;font-size:12px;color:var(--muted)}.contact a{color:inherit}.estimate-total-label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.btn,.chip,.icon-btn,.stepper button,.seg button{min-height:40px}.tools .icon-btn{width:36px}.wordmark{display:inline-block}.opt .p{align-self:center}
-@media(max-width:540px){.site-nav{gap:8px}.site-nav-links{gap:12px}.city{padding:14px 12px}.node{padding-left:29px}.leg{padding-left:29px}.route:before{left:8px}.dot{left:0}.add{margin-left:29px}.opt{grid-template-columns:auto minmax(0,1fr);gap:7px 9px}.opt .p{grid-column:2;justify-self:start;text-align:left;max-width:none}.city-head select.cityname{flex-basis:100%;font-size:21px}.tools{margin-left:0}.tabs button{margin-right:4px;font-size:12px}.msg{grid-template-columns:1fr}.know-grid{grid-template-columns:minmax(0,1fr)}.bar .note{font-size:11px}.bar .sum{font-size:22px}.bar .btn{padding:10px 14px}.brandline-tag{max-width:170px}.brandline{gap:10px}.ln{flex-wrap:wrap}.ln span:last-child{margin-left:auto}.grp-h{gap:12px}.opt .s{line-height:1.6}.photo{white-space:normal}.tour .prow b{font-size:24px}}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn:hover,.chip:hover,.exc-card:hover,.tour:hover{transform:none;transition:none}}
-</style></head><body>
-<nav class="site-nav" aria-label="Навигация сайта"><a class="site-nav-brand" href="/">Слетать.ру · Пенза</a><div class="site-nav-links"><a href="/tours">Все туры</a><a href="/blog">Блог</a><a href="#contacts">Контакты</a></div></nav>
-<noscript><p style="padding:20px">Включите JavaScript для онлайн-расчёта или позвоните: <a href="tel:+79502302555">+7 950 230-25-55</a>.</p></noscript>
-<div class="wrap" style="padding-bottom:0">
-  <div class="brandline" aria-label="emotions — путешествия, которые остаются с вами"><a class="wordmark" href="#top" aria-label="emotions">emotions<span>.</span></a><span class="brandline-tag">Путешествия, которые остаются с вами.</span></div>
-  <header class="top" id="top">
-    <div>
-      <div class="top-copy"><div class="eyebrow">Индивидуальные путешествия · Китай</div>
-      <h1>Китай — в вашем ритме</h1>
-      <p class="lead">Соберите маршрут под себя: от одного города до большого путешествия с внутренними перелётами, отелями и экскурсиями. Или выберите готовую программу.</p><span class="mini-note">Предварительная стоимость · расчёт на 2 взрослых</span></div>
-    </div>
-  </header>
-
-  <nav class="tabs" role="tablist" aria-label="Разделы">
-    <button type="button" role="tab" id="tab-btn-build" aria-controls="tab-build" data-tab="build">Собрать тур самостоятельно</button>
-    <button type="button" role="tab" id="tab-btn-ready" aria-controls="tab-ready" data-tab="ready">Готовые туры</button>
-  </nav>
-  <nav class="presets" aria-label="Быстрая навигация" style="margin:-8px 0 24px;gap:10px"><a class="chip" href="#tab-build" data-tab-link="build">Конструктор</a><a class="chip" href="#tab-ready" data-tab-link="ready">Готовые программы</a><a class="chip" href="#excursions">Экскурсии</a><a class="chip" href="#know">Перед поездкой</a><a class="chip" href="#lead">Оставить заявку</a></nav>
-
-  <section id="tab-ready" role="tabpanel" aria-labelledby="tab-btn-ready" hidden>
-    <div class="row" style="margin-bottom:14px">
-      <div style="min-width:0;flex:1 1 360px"><p class="lead" style="margin:0">Готовые программы с русскоязычным гидом, проверенными отелями и продуманным маршрутом.</p>
-      <p class="per1">Все цены указаны за 1 человека</p></div>
-      <div class="seg" role="group" aria-label="Фильтр туров" id="readyFilter">
-        <button type="button" data-f="all" id="rf-all">Все</button>
-        <button type="button" data-f="avatar" id="rf-avatar">Горы Аватар</button>
-        <button type="button" data-f="city" id="rf-city">Города</button>
-        <button type="button" data-f="sea" id="rf-sea">Город + море</button>
-      </div>
-    </div>
-    <div class="cards" id="readyList"></div>
-  </section>
-
-  <div class="grid" id="tab-build" role="tabpanel" aria-labelledby="tab-btn-build">
-    <main>
-      <p id="restoreNotice" class="saved-notice" role="status" hidden></p>
-      <p class="calc-basis note">Расчёт на <strong>2 взрослых в одном номере</strong>, с вылетом из Москвы. Для другого состава туристов укажите пожелания в заявке — рассчитаем отдельно. Итог здесь ориентировочный, наличие и тарифы подтвердит менеджер.</p>
-      <div class="presets" id="presets" style="margin-bottom:22px">
-        <span>Быстрый старт:</span>
-      </div>
-      <div class="row" style="margin-bottom:12px">
-        <label class="month" for="month"><span>Месяц поездки</span>
-          <select id="month"></select></label>
-        <p class="note" id="holiday" style="margin:0;flex:1 1 260px" hidden></p>
-      </div>
-      <div class="row">
-        <h2>Маршрут</h2>
-        <div class="seg" role="group" aria-label="Перелёт из Москвы" id="intlSeg">
-          <button type="button" data-intl="direct" id="intl-direct">Прямые рейсы</button>
-          <button type="button" data-intl="transfer" id="intl-transfer">С пересадками</button>
-        </div>
-      </div>
-      <div class="route" id="route"></div>
-      <div class="add" id="addRow"></div>
-
-      <section class="excsec" id="excursions"></section>
-
-      <section class="extras panel" id="extras"></section>
-
-      <section class="cta panel" id="cta"></section>
-    </main>
-
-    <aside class="est panel" id="est" aria-label="Предварительная смета тура"></aside>
-  </div>
-</div>
-
-<div class="wrap" style="padding-block:0 0">
-<section class="know" id="know" aria-labelledby="know-h"></section>
-</div>
-
-<div class="wrap" style="padding-block:0 120px">
-<section class="lead-sec panel" id="lead" aria-labelledby="lead-h">
-  <div><div class="eyebrow">Заявка</div><h2 id="lead-h">Оставьте заявку — подберём и рассчитаем тур</h2>
-  <p class="note" style="margin:6px 0 0">Заполните форму: к заявке автоматически приложится ваша сборка из конструктора. Мы свяжемся с вами, уточним детали и пришлём точный расчёт.</p></div>
-  <form id="leadForm" class="lead-form" novalidate>
-    <label for="lf-name">Имя<input id="lf-name" name="name" maxlength="200" type="text" autocomplete="name" required placeholder="Как к вам обращаться"></label>
-    <label for="lf-phone">Телефон<input id="lf-phone" name="phone" maxlength="32" type="tel" autocomplete="tel" required placeholder="+7 ___ ___-__-__"></label>
-    <label for="lf-way">Как удобнее связаться<select id="lf-way" name="way"><option>WhatsApp</option><option>Telegram</option><option>MAX</option><option>Звонок</option></select></label>
-    <label for="lf-dates">Когда планируете поездку<input id="lf-dates" name="dates" type="text" placeholder="Например, 10–20 марта или «весной»"></label>
-    <label for="lf-pax">Кто едет<input id="lf-pax" name="pax" type="text" placeholder="Например, 2 взрослых и ребёнок 7 лет"></label>
-    <label for="lf-type">Что интересует<select id="lf-type" name="type"><option>Тур по моей сборке из конструктора</option><option>Готовый тур</option><option>Подобрать тур с нуля</option></select></label>
-    <label id="readyChoiceLabel" class="ready-choice" for="lf-ready" hidden>Выбранная программа<select id="lf-ready" name="ready"><option value="">Выберите программу</option></select></label>
-    <label for="lf-msg" class="wide">Комментарий<textarea id="lf-msg" name="msg" rows="3" placeholder="Пожелания по отелям, экскурсиям, бюджету"></textarea></label>
-    <label class="wide chk" for="lf-ok"><input id="lf-ok" name="ok" type="checkbox" required> Согласен(на) на обработку персональных данных для подбора тура в соответствии с <a href="/privacy" target="_blank" rel="noopener">политикой конфиденциальности</a></label>
-    <div class="wide err" id="lf-err" role="alert"></div>
-    <div class="wide"><button type="submit" class="btn solid" id="lf-submit">Отправить заявку</button></div>
-  </form>
-  <div id="leadDone" class="lead-done" hidden></div>
-</section>
-
-<footer class="contacts panel" id="contacts">
-  <div><div class="eyebrow">Контакты</div><h2>Поможем собрать и забронировать тур</h2>
-  <p class="note" style="margin:6px 0 0">Отправьте заявку с выбранным маршрутом прямо с этой страницы или напишите нам в удобный мессенджер — подтвердим цены и подберём даты.</p></div>
-  <div class="cgrid">
-    <div class="citem"><span class="k">Сайт</span><span class="v"><a class="link" href="https://flypenza.ru/" target="_blank" rel="noopener">flypenza.ru</a></span></div>
-    <div class="citem"><span class="k">Офис</span><span class="v">Пенза, пр-т Строителей, 49А, ТЦ «Проспект», 1 этаж</span></div>
-    <div class="citem"><span class="k">Екатерина</span><span class="v"><b>8-999-110-41-88</b></span></div>
-    <div class="citem"><span class="k">Елена</span><span class="v"><b>8-950-230-25-55</b></span></div>
-    <div class="citem"><span class="k">Telegram</span><span class="v"><a class="link" href="https://t.me/sletat_ru_pnz" target="_blank" rel="noopener">@sletat_ru_pnz</a></span></div>
-    <div class="citem"><span class="k">ВКонтакте</span><span class="v"><a class="link" href="https://vk.com/sletat58" target="_blank" rel="noopener">@sletat58</a></span></div>
-    <div class="citem"><span class="k">WhatsApp</span><span class="v"><a class="link" href="https://wa.me/79502302555" target="_blank" rel="noopener">+7 950 230-25-55</a></span></div>
-    <div class="citem"><span class="k">MAX</span><span class="v"><a class="link" href="https://max.ru/id583513901480_biz" target="_blank" rel="noopener">Написать в MAX</a></span></div>
-  </div>
-</footer>
-</div>
-
-<div class="bar" id="bar">
-  <div><div class="note">Итого на двоих</div><div class="sum num" id="barSum"></div></div>
-  <a class="btn solid" href="#est">Смета</a>
-</div>
-
-<script>
-(function(){
 const K = 1.1;
 const USD = 89.6682;
 const PAX = 2;
@@ -422,7 +30,7 @@ const nightsWord = n => { const a=n%10,b=n%100; return n+" "+(a===1&&b!==11?"н�
 const CITIES = {
   bj:{ en:"Beijing", ru:"Пекин", name:"Пекин", gw:true,
     blurb:"Запретный город, Великая Китайская стена, храмы и хутуны.",
-    intl:{ direct:{p:100366, n:"прямой рейс ≈ 8,5 ч"}, transfer:{p:101008, n:"1 пересадка"} },
+    intl:{ direct:{p:122571, n:"прямой рейс ≈ 8 ч, с багажом"}, transfer:{p:102679, n:"1 пересадка, с багажом"} },
     hotels:[
       {t:"Landmark Towers 4*", s:"Центр, район посольств, рядом метро", p:9637},
       {t:"Kempinski Hotel Beijing Yansha Center 5*", s:"Дипломатический район Чаоян, сад и просторные номера", p:15914},
@@ -431,11 +39,11 @@ const CITIES = {
          ag:{p:3857, t:"Индивидуальный трансфер", s:"Автомобиль стандарт-класса"},
          self:"Такси через приложение — около 2 000 ₽ в одну сторону, оплата на месте." },
     excT:"Экскурсии с личным русскоязычным гидом и трансфером", excPP:false,
-    exc:[["Запретный город Гугун + Храм Неба",328],["Храм Неба + Ламаистский храм Юнхэгун",328],["Ботанический сад + Храм спящего Будды",345],["Великая стена + Летний дворец Ихэюань",345],["Усадьба принца Гуна + Храм Неба",345],["Великая стена + Запретный город Гугун",380],["Усадьба принца Гуна + зоопарк + океанариум",414],["Геологический парк в пещерах Шихуа",431],["Самая большая стеклянная смотровая площадка",449],["Стеклянный мост в Тяньюньшане",449],["Ущелье Лунцинся",518],["Губэй — город на воде",552],["ТВ-башня + Пекинский зоопарк и аквариум",656]],
+    exc:[["Запретный город Гугун + Храм Неба",328],["Храм Неба + Ламаистский храм Юнхэгун",328],["Ботанический сад + Храм спящего Будды",345],["Великая стена + Летний дворец Ихэюань",345],["Усадьба принца Гуна + Храм Неба",345],["Великая стена + Запретный город Гугун",380],["Усадьба принца Гуна + зоопарк + океанариум",414],["Геологический парк в пещерах Шихуа",431],["Самая большая стеклянная смотровая площадка",449],["Стеклянный мост в Тяньюньшане",449],["Ущелье Лунцинся",518],["Губэй — город на воде",552],["ТВ-башня + Пекинский зоопарк и аквариум",656],["Парк Universal Beijing: билеты для двоих и трансфер туда и обратно",370]],
     partner:"https://experience.tripster.ru/experience/Beijing/" },
   sh:{ en:"Shanghai", ru:"Шанхай", name:"Шанхай", gw:true,
     blurb:"Набережная Вайтань, небоскрёбы Пудуна, водные городки и Сучжоу.",
-    intl:{ direct:{p:136906, n:"прямой рейс ≈ 9–10 ч"}, transfer:{p:103278, n:"2 пересадки"} },
+    intl:{ direct:{p:132484, n:"прямой рейс ≈ 9 ч, с багажом"}, transfer:{p:98469, n:"1 пересадка, с багажом"} },
     hotels:[
       {t:"Harbour Plaza Metropolitan Shanghai 4*", s:"Рядом торговый центр и метро", p:7212},
       {t:"Howard Johnson by Wyndham Leonora Plaza 3*", s:"Номер superior с двумя кроватями", p:9725},
@@ -444,11 +52,11 @@ const CITIES = {
          ag:{p:2780, t:"Индивидуальный трансфер", s:"Toyota Corolla или аналог"},
          self:"Такси или метро — оплата на месте." },
     excT:"Экскурсии с личным русскоязычным гидом и трансфером", excPP:false,
-    exc:[["Обзорная экскурсия по Шанхаю",449],["Деревня на воде Чжуцзяцзяо",414],["Сафари-зоопарк + Французский квартал",414],["Зоопарк + океанариум + Французский квартал",449],["Экскурсия в Сучжоу",518],["Ботанический сад + Guangfulin",569],["Экскурсия в Ханчжоу",604],["Однодневный тур в Яньгуань",794]],
+    exc:[["Обзорная экскурсия по Шанхаю",449],["Деревня на воде Чжуцзяцзяо",414],["Сафари-зоопарк + Французский квартал",414],["Зоопарк + океанариум + Французский квартал",449],["Экскурсия в Сучжоу",518],["Ботанический сад + Guangfulin",569],["Экскурсия в Ханчжоу",604],["Однодневный тур в Яньгуань",794],["Шанхайский Диснейленд: билеты для двоих и трансфер туда и обратно",430],["Сафари-парк с пандами: гид, трансфер и билеты",340],["Хучжоу: ночь в Giraffe Manor Hotel 5* с жирафами и трансфер",775]],
     partner:"https://experience.tripster.ru/experience/Shanghai/" },
   sy:{ en:"Sanya", ru:"Санья Хайнань", name:"Санья (о. Хайнань)", gw:true,
     blurb:"Тропический пляжный отдых в бухте Санья.",
-    intl:{ direct:{p:258316, n:"прямой рейс ≈ 10 ч"}, transfer:{p:112660, n:"2 пересадки"} },
+    intl:{ direct:{p:222544, n:"прямой рейс ≈ 10 ч, с багажом"}, transfer:{p:123740, n:"1 пересадка, с багажом"} },
     hotels:[
       {t:"Mangrove Tree Resort World 5*", s:"Большая территория, бассейны, пляж 2,5 км", p:4479},
       {t:"Grand Soluxe Hotel & Resort 5*", s:"150 м до моря, обновлён в 2024", p:5893},
@@ -464,23 +72,23 @@ const CITIES = {
       {t:"Jiezhi Hotel", s:"10–12 минут пешком до юго-восточного входа в парк", p:2393},
       {t:"Suoxi Smart Resort Hotel", s:"Рядом с восточным входом в нацпарк", p:5005},
       {t:"Pullman Zhangjiajie 5*", s:"Район Улинъюань, курортный отель", p:6388}],
-    tr:{ none:"Трансфер к экскурсиям уточняется по выбранной программе. Дорога от аэропорта или вокзала до отеля в базовую смету не включена — рассчитаем отдельно." },
+    tr:{ none:"Трансфер к экскурсиям уточняется по программе. Дорога из аэропорта или с вокзала до отеля в базовую смету не включена — рассчитаем отдельно." },
     excT:"Индивидуальные экскурсии с гидом и трансфером из отеля", excPP:false,
     exc:[["Чудеса Чжанцзяцзе: горы Аватара и нацпарк за один день · 9 ч",590],["По национальному парку Чжанцзяцзе, скалы «Аватара» · 8 ч",582],["Топ-локации нацпарка: горы Аватара, Байлун и Тяньцзышань · 8 ч",460],["Волшебный мир парящих гор · 8 ч",418],["Гора Тяньмэнь: канатная дорога, стеклянный мост и «Небесные врата» · 6 ч",600],["Путешествие к горе Тяньмэнь с подъёмом на вершину · 7 ч",420],["К стеклянному мосту и Небесным вратам Тяньмэня · 9 ч",460],["Большой каньон и стеклянный мост · 6,5 ч",530],["Гранд-Каньон и стеклянный мост над пропастью · 7 ч",516],["Большая долина и пещера Хуанлун · 7 ч",418],["Фуронг: древний город над водопадом · 8 ч",500],["Мост Айчжай и древний город Фужун · 9 ч",635]],
-    excNote:"В этой подборке горы Аватар предлагаются с экскурсией. Состав программы, трансферы и входные билеты подтвердим перед бронированием.",
+    excNote:"В этой подборке горы Аватар предлагаются с экскурсией. Состав программы, трансферы и билеты подтвердим перед бронированием.",
     partner:"https://experience.tripster.ru/experience/Zhangjiajie/" },
   fr:{ en:"Furong town", ru:"Фуронг Китай", name:"Фуронг — город над водопадом", gw:false,
-    blurb:"Древний городок на скалах у 60-метрового водопада, вечерняя подсветка.",
+    blurb:"Древний городок на скалах у 60-метрового водопада, вечерняя подсветка. Отсюда экскурсии с гидом едут к водопадам и в горы Аватар.",
     hotels:[
       {t:"Tuwang Palace Waterfall Inn", s:"≈ 70 м до водопада", p:7348},
       {t:"Shiercheng · Pushangxian Inn 4*", s:"60–270 м до водопада", p:10971},
       {t:"Tianquan Inn (Furong Town Xuanyage)", s:"Номер с видом на водопад", p:35473}],
     tr:{ self:"От станции Фуронг до отеля — около 10 минут на такси." },
-    excT:"", excPP:false, exc:[],
-    excNote:"Прогулки по Фуронгу удобно делать самостоятельно. Экскурсию с гидом подберём по запросу.",
+    excT:"Экскурсии с гидом и трансфером из отеля: водопады и горы Аватар", excPP:false, exc:[],
+    excNote:"Для выезда из Фуронга отдельно подтвердим программу, место встречи и стоимость трансфера.",
     partner:"https://experience.tripster.ru/experience/Zhangjiajie/" }
 };
-const EXC_INFO = {
+const EXC_INFO_TMP = {
  bj:[
   ["Императорский дворец династий Мин и Цин — крупнейший дворцовый комплекс мира, и Храм Неба, где императоры молились об урожае.","много","да"],
   ["Храм Неба и действующий тибетский монастырь Юнхэгун со статуей Будды Майтреи высотой 18 м, вырезанной из цельного сандалового дерева.","умеренно","да"],
@@ -494,7 +102,8 @@ const EXC_INFO = {
   ["Горный парк Тяньюньшань: стеклянный мост и тропы с видами на горы.","много","да, с осторожностью"],
   ["Ущелье Лунцинся: прогулка на лодке между отвесных скал и подъём по крытому эскалатору в виде дракона.","умеренно","да"],
   ["Городок на воде Губэй с каналами у подножия участка стены Сыматай. Вечером стена подсвечивается.","умеренно","да"],
-  ["Центральная телебашня Пекина со смотровой площадкой, панды в зоопарке и Пекинский океанариум.","немного","отлично подходит"]],
+  ["Центральная телебашня Пекина со смотровой площадкой, панды в зоопарке и Пекинский океанариум.","немного","отлично подходит"],
+  ["Тематический парк Universal Beijing Resort. Входные билеты 110 $ за взрослого и 95 $ за ребёнка, трансфер на машине — 75 $ в каждую сторону. Водитель приедет за вами в любое время по звонку.","много","отлично подходит"]],
  sh:[
   ["Набережная Вайтань, сад Юйюань и старый город, виды на небоскрёбы Пудуна.","умеренно","да"],
   ["Древний водный городок Чжуцзяцзяо: каменные мосты, каналы и прогулка на лодке.","умеренно","да"],
@@ -503,7 +112,10 @@ const EXC_INFO = {
   ["Сучжоу — город классических садов из списка ЮНЕСКО и каналов. Около 30 минут на скоростном поезде от Шанхая.","много","да"],
   ["Шанхайский ботанический сад и археологический парк Гуанфулинь в районе Сунцзян.","умеренно","да"],
   ["Ханчжоу: озеро Сиху из списка ЮНЕСКО, чайные плантации Лунцзин и монастырь Линъинь. Долгий день.","много","да, для детей постарше"],
-  ["Древний городок Яньгуань на реке Цяньтан, знаменитый приливной волной — одной из самых высоких в мире.","умеренно","да"]],
+  ["Древний городок Яньгуань на реке Цяньтан, знаменитый приливной волной — одной из самых высоких в мире.","умеренно","да"],
+  ["Шанхайский Диснейленд. Билет 125 $ за взрослого и 115 $ за ребёнка 3–11 лет, трансфер на машине до 7 мест отель — парк — отель без гида 180 $.","много","отлично подходит"],
+  ["Шанхайский сафари-парк с большими пандами: сопровождение гида, трансфер на машине до 7 мест и входные билеты. Цена 170 $ с человека указана для группы от 3 человек — для двоих уточним.","умеренно","отлично подходит"],
+  ["Поездка в Хучжоу с ночёвкой в отеле Giraffe Manor 5*, где жирафы заглядывают в окна. Семейный номер с завтраком и билетами в парк — 295 $ за ночь, трансфер без гида туда и обратно — 480 $. Есть вариант на скоростном поезде — 185 $ с человека при группе от 3 человек. Цена уточняется при бронировании.","умеренно","отлично подходит"]],
  sy:[
   ["Знакомство с Саньей: главные видовые точки города и шоу.","немного","да"],
   ["Обзорная поездка по городу и морская прогулка по бухте Санья.","немного","да"],
@@ -538,6 +150,8 @@ const EXC_INFO = {
   ["Древний город Фуронг на скалах у 60-метрового водопада с тропой прямо за стеной воды.","умеренно","да"],
   ["Подвесной мост Айчжай над ущельем и древний городок Фуронг с домами на сваях.","много","да"]]
 };
+CITIES.fr.exc = CITIES.zjj.exc;
+const EXC_INFO = EXC_INFO_TMP; EXC_INFO.fr = EXC_INFO.zjj;
 const ORDER = ["bj","sh","sy","zjj","fr"];
 const READY = [
  {t:"Пекин + Шанхай", kind:"Групповой экскурсионный тур", f:["city"], days:"8 дней с перелётом · 7 дней / 6 ночей в Китае",
@@ -586,10 +200,7 @@ const READY = [
   exc:["Страховка от невыезда — 3–5% от стоимости тура","Круиз по Хуанпу и дополнительные экскурсии","Чаевые — около 5 $ с человека в день","Личные расходы"],
   dates:"27.10, 03.11, 10.11, 17.11, 24.11, 01.12, 08.12, 15.12, 22.12, 29.12.2026 · 05.01, 12.01, 19.01, 26.01, 02.02, 09.02, 16.02.2027", pre:[["sy",7],["sh",3]]}
 ];
-let readyF = "all", tab = "build", selectedReady = null;
-const METRIKA_ID = 0;   // номер счётчика Яндекс Метрики — вписать после размещения на сайте
-function goal(name){ try { if (METRIKA_ID && window.ym) window.ym(METRIKA_ID, "reachGoal", name); } catch(e){} }
-if (METRIKA_ID){ (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym"); window.ym(METRIKA_ID,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true}); }
+let readyF = "all", tab = "build";
 const WX = { // Seasonal planning values supplied in the source, not a weather forecast.
   bj:{hi:[2.3,6.1,13.2,21,27.2,30.8,31.8,30.7,26.5,19.3,10.3,3.7], lo:[-6.9,-4.2,1.9,9,15.1,20,23,22,16.3,8.8,.7,-5], d:[1.6,2.3,3,4.7,6,10,11.9,10.5,7.1,5.2,2.9,1.6]},
   sh:{hi:[8.7,10.7,14.9,20.9,25.8,28.6,33.2,32.6,28.7,23.5,17.8,11.3], lo:[2.9,4.1,7.6,12.6,17.9,22,26.2,26.2,22.5,17.1,11.4,5.3], d:[10.6,10.4,12.7,11.3,11.2,14.3,12.2,12.7,10.1,7.5,9.2,8.5]},
@@ -603,15 +214,10 @@ function renderKnow(){
   const wx = cities.map(k=>{ const w=WX[k]; const nm = k==="zjj" ? "Чжанцзяцзе и Фуронг" : short(k);
     return `<div class="wx-row"><b>${esc(nm)}</b><span>днём ${t0(w.hi[m-1])}°, ночью ${t0(w.lo[m-1])}° · дней с дождём: ${Math.round(w.d[m-1])}</span></div>`; }).join("");
   const seaNote = cities.includes("sy") ? `<p>Для пляжного отдыха учтём сезон, ветер и особенности выбранной бухты. Погоду и условия купания проверяйте перед поездкой.</p>` : "";
-  document.getElementById("know").innerHTML = `
+  dom.getElementById("know").innerHTML = `
     <div><div class="eyebrow">Полезно знать</div><h2 id="know-h">Что важно знать перед поездкой в Китай</h2></div>
     <div class="know-grid">
-      <article class="kcard panel"><h3>Въезд без визы</h3>
-        <p>Граждане России могут въезжать в Китай <b>без визы на срок до 30 дней</b> — для туризма, бизнеса, поездок к родственникам и транзита. Режим действует с 15 сентября 2025 года и продлён <b>до 31 декабря 2027 года</b>. Для поездки нужен действующий обычный загранпаспорт. Цель визита, срок пребывания и остальные условия въезда проверим для вашего маршрута.</p>
-        <p class="src">Источник: заявление МИД КНР, <a href="https://ru.china-embassy.gov.cn/rus/lsfw_143010/zytz_142816/202605/t20260520_11914284.htm" target="_blank" rel="noopener">Посольство КНР, 20.05.2026</a></p></article>
-      <article class="kcard panel"><h3>Карта прибытия</h3>
-        <p>С 20 ноября 2025 года карту прибытия можно заполнить <b>онлайн до вылета</b>: на сайте Национальной иммиграционной администрации КНР, в приложении NIA 12367 или в мини-программах WeChat и Alipay. Если не успели — заполните на стойке или терминале в аэропорту. Самостоятельное заполнение на официальном сайте бесплатно. Помощь агентства при желании можно добавить в расчёт.</p>
-        <p class="src">Источник: <a href="https://www.szlhq.gov.cn/english/services/visa/content/post_12619653.html" target="_blank" rel="noopener">Национальная иммиграционная администрация КНР</a> · <a href="https://s.nia.gov.cn/ArrivalCardFillingPC/" target="_blank" rel="noopener">заполнить карту бесплатно</a></p></article>
+      <article class="kcard panel"><h3>Документы для поездки</h3><p>До бронирования проверим требования к въезду, срок действия паспорта и документы для каждого участника — с учётом гражданства, маршрута и дат.</p><p>Помощь с картой прибытия можно добавить в расчёт. Самостоятельное заполнение на официальном сайте бесплатно.</p></article>
       <article class="kcard panel"><h3>Погода в ${esc(mon)}</h3>
         <div class="wx">${wx}</div>${seaNote}
         <p class="src">Сезонные ориентиры, не прогноз на даты поездки.</p></article>
@@ -636,7 +242,6 @@ function unpackState(code){
     stops:o.s.filter(x=>Array.isArray(x)&&ORDER.includes(x[0])).map(x=>{ const st=mkStop(x[0],x[1]); st.hotel=x[2]||0; st.tr=x[3]||st.tr; st.exc=(Array.isArray(x[4])?x[4]:[]).filter(i=>Number.isInteger(i)&&i>=0&&i<CITIES[x[0]].exc.length); return st; })};
 }
 const shareUrl = () => (location.protocol==="file:"?"https://flypenza.ru/tours/china-constructor":location.origin+"/tours/china-constructor") + "#t" + packState();
-const leadText = r => "Здравствуйте! Хочу подобрать тур «"+r.t+"» ("+r.days+"). Подскажите, пожалуйста, ближайшие даты и стоимость.";
 const PHOTO = {
  bj:"/tours/china-constructor/beijing.jpg",
  sh:"/tours/china-november-2026/cities-shanghai-beijing.jpg",
@@ -659,9 +264,9 @@ function excursionPhoto(name, city){
  return PHOTO[cityPhotoKey(city)] || PHOTO.city;
 }
 function renderReady(){
-  document.querySelectorAll("#readyFilter button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.f===readyF)));
+  dom.querySelectorAll("#readyFilter button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.f===readyF)));
   const list = READY.filter(r=>readyF==="all" || r.f.includes(readyF));
-  document.getElementById("readyList").innerHTML = list.map(r=>{
+  dom.getElementById("readyList").innerHTML = list.map(r=>{
     const i = READY.indexOf(r);
     return `<article class="tour panel">
       <img class="tour-photo" src="${readyPhoto(r)}" alt="Китай: иллюстрация направления ${esc(r.t)}" loading="lazy" onerror="this.style.display='none'">
@@ -676,7 +281,7 @@ function renderReady(){
       </div>
       <div class="acts">
         <button type="button" class="btn" data-act="more" data-v="${i}" id="more-${i}">Подробнее</button>
-        <a class="btn solid" href="#lead" data-act="ready-lead" data-v="${i}">Отправить заявку на подбор</a>
+        <a class="btn solid" href="#china-request" data-act="ready-lead" data-v="${i}">Отправить заявку на подбор</a>
         ${r.pre?`<button type="button" class="btn" data-act="similar" data-v="${i}" id="sim-${i}">Собрать похожий самостоятельно</button>`:""}
       </div>
       <details id="det-${i}"><summary>Программа тура, отели и условия</summary>
@@ -686,7 +291,7 @@ function renderReady(){
           <div><h4>В стоимость включено</h4><ul>${r.inc.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
           <div><h4>Оплачивается отдельно</h4><ul class="muted">${r.exc.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
           <div><h4>Даты заездов</h4><div class="muted" style="color:var(--ink)">${esc(r.dates)}<br>Ориентировочные заезды из подборки. Ближайшие доступные даты подтвердит менеджер.</div></div>
-          <div class="acts"><a class="btn solid" href="#lead" data-act="ready-lead" data-v="${i}">Отправить заявку на подбор</a><a class="btn" href="#contacts">Связаться с нами</a></div>
+          <div class="acts"><a class="btn solid" href="#china-request" data-act="ready-lead" data-v="${i}">Отправить заявку на подбор</a><a class="btn" href="#china-request">Связаться с нами</a></div>
         </div>
       </details>
     </article>`;
@@ -694,61 +299,50 @@ function renderReady(){
 }
 function setTab(t){
   tab = t;
-  document.querySelectorAll(".tabs button").forEach(b=>{b.setAttribute("aria-selected",String(b.dataset.tab===t));b.tabIndex=b.dataset.tab===t?0:-1;});
-  document.getElementById("tab-build").hidden = t!=="build";
-  document.getElementById("tab-ready").hidden = t!=="ready";
-  document.getElementById("bar").style.visibility = t==="build" ? "" : "hidden";
+  dom.querySelectorAll(".tabs button").forEach(b=>{b.setAttribute("aria-selected",String(b.dataset.tab===t));b.tabIndex=b.dataset.tab===t?0:-1;});
+  dom.getElementById("tab-build").hidden = t!=="build";
+  dom.getElementById("tab-ready").hidden = t!=="ready";
+  dom.getElementById("bar").style.visibility = t==="build" ? "" : "hidden";
 }
 const HUBS = ["bj","sh"];
 
 const LEGS = {
-  "bj|sh":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 10 мин в полёте",p:20467},{id:"tr",t:"Скоростной поезд, 2 класс",n:"от 4 ч 18 мин, Пекин Южный → Шанхай Хунцяо, около 50 поездов в день",p:16493},{id:"tr1",t:"Скоростной поезд, 1 класс",n:"от 4 ч 18 мин, Пекин Южный → Шанхай Хунцяо",p:26814}],
-  "bj|sy":[{id:"fl",t:"Перелёт",n:"≈ 4 ч",p:34221}],
-  "sh|sy":[{id:"fl",t:"Перелёт",n:"≈ 3 ч",p:48447}],
-  "bj|zjj":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 15 мин",p:36534},{id:"tr",t:"Скоростной поезд, 2 класс",n:"≈ 12 ч, прибытие вечером",p:23041},{id:"nt",t:"Ночной поезд, купе",n:"≈ 18 ч",p:14294}],
-  "sh|zjj":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 40 мин",p:28034},{id:"tr",t:"Скоростной поезд, 2 класс",n:"≈ 7–9 ч",p:20642}],
-  "sy|zjj":[{id:"fl",t:"Два перелёта через Пекин",n:"≈ 4 ч + 2 ч 15 мин",p:70755}],
+  "bj|sh":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 10 мин в полёте",p:21849},{id:"tr",t:"Скоростной поезд, 2 класс",n:"от 4 ч 18 мин, Пекин Южный → Шанхай Хунцяо, около 50 поездов в день",p:16493},{id:"tr1",t:"Скоростной поезд, 1 класс",n:"от 4 ч 18 мин, Пекин Южный → Шанхай Хунцяо",p:26814}],
+  "bj|sy":[{id:"fl",t:"Перелёт",n:"≈ 4 ч",p:29601}],
+  "sh|sy":[{id:"fl",t:"Перелёт",n:"≈ 3 ч",p:42835}],
+  "bj|zjj":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 15 мин",p:39761},{id:"tr",t:"Скоростной поезд, 2 класс",n:"≈ 12 ч, прибытие вечером",p:23041},{id:"nt",t:"Ночной поезд, купе",n:"≈ 18 ч",p:14294}],
+  "sh|zjj":[{id:"fl",t:"Перелёт",n:"≈ 2 ч 40 мин",p:33431},{id:"tr",t:"Скоростной поезд, 2 класс",n:"≈ 7–9 ч",p:20642}],
+  "sy|zjj":[{id:"fl",t:"Два перелёта через Пекин",n:"≈ 4 ч + 2 ч 15 мин",p:69362}],
   "fr|zjj":[{id:"tr",t:"Скоростной поезд",n:"≈ 25 мин",p:1000},{id:"tx",t:"Такси",n:"≈ 1 ч 10 мин",p:2466}],
-  "bj|fr":[{id:"fl",t:"Перелёт до Чжанцзяцзе + поезд",n:"≈ 2 ч 15 мин + 25 мин",p:37534},{id:"tr",t:"Скоростной поезд с пересадкой",n:"≈ 12,5 ч",p:24041}],
-  "fr|sh":[{id:"tr",t:"Прямой скоростной поезд",n:"≈ 8 ч 45 мин",p:20642},{id:"fl",t:"Перелёт до Чжанцзяцзе + поезд",n:"≈ 2 ч 40 мин + 25 мин",p:29034}],
-  "fr|sy":[{id:"fl",t:"Перелёты через Пекин + поезд",n:"перелёты и поезд",p:71755}]
+  "bj|fr":[{id:"fl",t:"Перелёт до Чжанцзяцзе + поезд",n:"≈ 2 ч 15 мин + 25 мин",p:40761},{id:"tr",t:"Скоростной поезд с пересадкой",n:"≈ 12,5 ч",p:24041}],
+  "fr|sh":[{id:"tr",t:"Прямой скоростной поезд",n:"≈ 8 ч 45 мин",p:20642},{id:"fl",t:"Перелёт до Чжанцзяцзе + поезд",n:"≈ 2 ч 40 мин + 25 мин",p:34431}],
+  "fr|sy":[{id:"fl",t:"Перелёты через Пекин + поезд",n:"перелёты и поезд",p:70362}]
 };
 const photoUrl = q => "https://yandex.ru/images/search?text=" + encodeURIComponent(q);
 const MONTHS = [];
 (function(){ const names=["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const today = new Date();
   for (let i=0;i<12;i++){ const date=new Date(today.getFullYear(),today.getMonth()+i,1), m=date.getMonth()+1, y=date.getFullYear(); MONTHS.push({id:y+"-"+m, m, t:names[m-1]+" "+y}); } })();
-const SEAS_INTL = {
-  bj:{1:.76,2:.84,3:1.07,4:1.03,5:.93,6:.94,7:1.05,8:1.11,9:1.14,10:1.33,11:1,12:.92},
-  sh:{1:.68,2:.83,3:1.07,4:1.23,5:1.06,6:.96,7:1.06,8:1.07,9:1.07,10:1.35,11:1,12:.80},
-  sy:{1:.80,2:1.01,3:1.00,4:1.08,5:.99,6:.93,7:1.03,8:.98,9:.87,10:1.26,11:1,12:.98}};
 const SEAS_HOTEL = {
   bj:{1:.9,2:.95,3:1,4:1.15,5:1.2,6:1.1,7:1.2,8:1.2,9:1.15,10:1.25,11:1,12:1},
   sh:{1:.8,2:.85,3:.95,4:1,5:1,6:.95,7:1,8:1,9:.95,10:.9,11:1,12:.9},
   sy:{1:1.6,2:1.9,3:1.3,4:1.1,5:.9,6:.9,7:1.05,8:1.1,9:.9,10:1,11:1,12:1.35},
   zjj:{1:.6,2:.8,3:.85,4:1.05,5:1.15,6:1.05,7:1.15,8:1.15,9:1.05,10:1.25,11:1,12:.75},
   fr:{1:.6,2:.8,3:.85,4:1.05,5:1.15,6:1.05,7:1.15,8:1.15,9:1.05,10:1.25,11:1,12:.75}};
-const SEAS_LEG = {
-  "bj|sh":{1:1,2:1.1,3:.94,4:.99,5:.96,6:1.09,7:1.09,8:.95,9:1.74,10:1.03,11:1,12:.92},
-  "bj|sy":{1:1.18,2:1.24,3:.43,4:.67,5:.67,6:.73,7:.82,8:.85,9:.83,10:.98,11:1,12:.98},
-  "sh|sy":{1:1.14,2:1.5,3:.48,4:.79,5:.69,6:.7,7:.89,8:.64,9:.92,10:.84,11:1,12:1.02},
-  "bj|zjj":{1:.89,2:1.15,3:.98,4:1.33,5:1.19,6:1.21,7:.94,8:.98,9:1.38,10:1.17,11:1,12:.84},
-  "sh|zjj":{1:1.3,2:1.55,3:1,4:1.16,5:1.16,6:1.18,7:.92,8:1.01,9:1.6,10:1.24,11:1,12:1.19}};
-const LEG_SEAS_SRC = {"bj|sh":"bj|sh","bj|sy":"bj|sy","sh|sy":"sh|sy","bj|zjj":"bj|zjj","sh|zjj":"sh|zjj","sy|zjj":"bj|zjj","bj|fr":"bj|zjj","fr|sh":"sh|zjj","fr|sy":"bj|sy"};
 const HOLIDAY = {
-  12:"На новогодние даты спрос обычно выше. Стоимость перелётов и отелей проверим на конкретные даты.",
-  1:"В начале января высокий праздничный спрос. Конкретную стоимость перелётов и отелей проверим при подборе.",
-  2:"Китайский Новый год приходится на январь или февраль в зависимости от года. На праздничные даты особенно важно заранее проверять наличие.",
-  5:"В начале мая в Китае праздничный спрос: заранее проверим расписание и наличие мест.",
-  7:"Летние каникулы в Китае: много местных туристов, особенно в горах Аватар и на море.",
-  8:"Летние каникулы в Китае: много местных туристов, особенно в горах Аватар и на море.",
-  10:"В начале октября в Китае праздничный спрос: поезда, отели и экскурсии лучше планировать заранее."};
+  12:"На новогодние даты спрос и стоимость могут быть выше средней оценки.",
+  1:"На новогодние даты спрос и стоимость могут быть выше средней оценки.",
+  2:"Даты китайского Нового года и праздничные надбавки уточним для выбранного года.",
+  5:"На майские праздники заранее проверим отели, поезда и экскурсии.",
+  7:"Летние каникулы: доступность популярных отелей и экскурсий проверим на ваши даты.",
+  8:"Летние каникулы: доступность популярных отелей и экскурсий проверим на ваши даты.",
+  10:"В начале октября спрос на поездки по Китаю может быть выше обычного. Проверим даты и доступность отдельно."
+};
 const curM = () => (MONTHS.find(x=>x.id===S.month)||MONTHS[0]);
-const kI = c => SEAS_INTL[c][curM().m];
 const kH = c => SEAS_HOTEL[c][curM().m];
-const intlPrice = c => r10(CITIES[c].intl[S.intl].p/2*kI(c));
+const intlPrice = c => r10(CITIES[c].intl[S.intl].p/2);
 const hotelPrice = (c,h) => r10(h.p*kH(c));
-const legPrice = (o,a,b) => { const k=LEG_SEAS_SRC[legKey(a,b)]; return r10(o.p*(o.id==="fl" && k ? SEAS_LEG[k][curM().m] : 1)); };
+const legPrice = o => r10(o.p);
 const legKey = (a,b) => [a,b].sort().join("|");
 
 const PRESETS = [
@@ -788,7 +382,7 @@ function normalizeState(value){
 }
 let restoreProblem=false;
 let S = null;
-try { const raw=localStorage.getItem("flypenza-china-builder-v1"); if(raw) S=normalizeState(JSON.parse(raw)); } catch { S=null; }
+try { const raw=(localStorage.getItem("flypenza-china-builder-v1") || localStorage.getItem("cn-tour-v3")); if(raw) S=normalizeState(JSON.parse(raw)); } catch { S=null; }
 try { if(location.hash.startsWith("#t") && location.hash.length>3){ if(location.hash.length>16000) throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));} } catch { restoreProblem=true;S=null; }
 if(!S) S=fromPreset(PRESETS[4]);
 const save=()=>{try{localStorage.setItem("flypenza-china-builder-v1",JSON.stringify(S));}catch{}};
@@ -830,6 +424,8 @@ function calc(){
     s.exc.forEach(i=>{ const e=c.exc[i]; if(e) g.exc.push([e[0].split(" · ")[0]+" ("+short(s.city)+")", r10(usd(e[1])*(c.excPP?PAX:1)), s.id, i]); });
     if (s.exc.length > s.nights) warns.push(short(s.city)+": экскурсий больше, чем дней в городе. Добавьте ночь или уберите экскурсию.");
   });
+  if (S.stops.some(s=>s.city==="fr" && s.exc.length)) warns.push("Фуронг: выездные экскурсии и трансферы требуют отдельного подтверждения; здесь показан базовый ориентир из подборки.");
+  if (S.stops.some(s=>s.city==="sh" && s.exc.includes(9))) warns.push("Сафари-парк: базовый тариф дан для группы от 3 человек. Итог для двоих подтвердит менеджер.");
   g.extra.push(["Медицинская страховка, "+nightsWord(nights), r10(INS_NIGHT*nights)]);
   if (S.mig) g.extra.push(["Помощь с картами прибытия, 2 чел.", r10(MIG_PERSON*PAX)]);
   if (nights < MIN_NIGHTS) warns.push("Минимальная продолжительность тура — "+MIN_NIGHTS+" ночей. Сейчас: "+nightsWord(nights)+".");
@@ -843,13 +439,13 @@ const short = c => ({bj:"Пекин",sh:"Шанхай",sy:"Санья",zjj:"Чж
 
 /* ---------- render ---------- */
 function render(){
-  const focusId = document.activeElement && document.activeElement.id;
+  const focusId = dom.activeElement && dom.activeElement.id;
   const R = calc();
-  const ms = document.getElementById("month");
+  const ms = dom.getElementById("month");
   ms.innerHTML = MONTHS.map(x=>`<option value="${x.id}" ${x.id===S.month?"selected":""}>${x.t}</option>`).join("");
-  const hol = HOLIDAY[curM().m], hp = document.getElementById("holiday");
+  const hol = HOLIDAY[curM().m], hp = dom.getElementById("holiday");
   hp.hidden = !hol; hp.textContent = hol || "";
-  document.querySelectorAll("#intlSeg button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.intl===S.intl)));
+  dom.querySelectorAll("#intlSeg button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.intl===S.intl)));
 
   let h = "";
   const N = R.N;
@@ -869,15 +465,15 @@ function render(){
   });
   h += legHTML(null, last, true, short(last)+" → Москва", CITIES[last].intl[S.intl].n, intlPrice(last));
   h += homeNode("Возвращение в Москву");
-  document.getElementById("route").innerHTML = h;
+  dom.getElementById("route").innerHTML = h;
 
-  document.getElementById("addRow").innerHTML =
+  dom.getElementById("addRow").innerHTML =
     `<label for="addCity" class="note">Добавить город:</label>
      <select id="addCity" style="border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--surface)">${ORDER.map(c=>`<option value="${c}">${esc(CITIES[c].name)}</option>`).join("")}</select>
      <button type="button" class="btn" data-act="add" id="addBtn" ${S.stops.length>=8?"disabled":""}>+ Добавить</button>
      <button type="button" class="btn build-reset" data-act="reset">Сбросить сборку</button>`;
 
-  document.getElementById("extras").innerHTML = `
+  dom.getElementById("extras").innerHTML = `
     <h3>Страховка и документы</h3>
     <div class="opts">
       <div class="opt on" style="cursor:default"><input type="checkbox" checked disabled aria-label="Медицинская страховка включена"><div><div class="t">Медицинская страховка</div><div class="s">Ориентировочная стоимость; страховщик и покрытие — при подтверждении тура</div></div><div class="p num">${fmt(r10(INS_NIGHT*R.nights))}</div></div>
@@ -888,10 +484,10 @@ function render(){
 
   renderEst(R);
   renderExc();
-  renderCta();
+  onChange(textEstimate());
   renderKnow();
-  document.getElementById("barSum").textContent = fmt(R.total);
-  if (focusId){ const el=document.getElementById(focusId); if(el) el.focus({preventScroll:true}); }
+  dom.getElementById("barSum").textContent = fmt(R.total);
+  if (focusId){ const el=dom.getElementById(focusId); if(el) el.focus({preventScroll:true}); }
   save();
 }
 function homeNode(t){ return `<div class="node home"><span class="dot"></span><div class="home-title">${t}</div></div>`; }
@@ -980,18 +576,7 @@ function renderExc(){
   }
   if (c.excNote) h += `<p class="note" style="margin:0">${esc(c.excNote)}</p>`;
   h += `<p class="note" style="margin:0">Хотите другую программу? Больше экскурсий с русскоязычными гидами — <a class="link" href="${c.partner}" target="_blank" rel="noopener">у наших партнёров</a>, любую из них добавим в расчёт по запросу.</p>`;
-  document.getElementById("excursions").innerHTML = h;
-}
-function renderCta(){
-  document.getElementById("cta").innerHTML = `<h3>Сборка готова? Отправьте её нам на расчёт</h3>
-    <p class="note" style="margin:0">Мы проверим актуальные цены на ваши даты, подберём рейсы и отели и пришлём точную стоимость.</p>
-    <div class="acts">
-      <a class="btn solid" href="${waLink(textEstimate())}" target="_blank" rel="noopener" data-act="sendcalc" id="sendBtn2">Отправить на расчёт в WhatsApp</a>
-      <a class="btn" href="https://t.me/${TG}" target="_blank" rel="noopener" data-act="sendtg" id="tgBtn2">Отправить в Telegram</a>
-      <a class="btn" href="#lead" data-act="tolead" id="toLead2">Оставить заявку с контактами</a>
-      <button type="button" class="btn" data-act="share" id="shareBtn2">Поделиться ссылкой</button>
-    </div>
-    <p class="note" style="margin:0">При отправке в Telegram расчёт копируется автоматически — вставьте его в сообщение. Телефоны: Екатерина <b>8-999-110-41-88</b>, Елена <b>8-950-230-25-55</b>.</p>`;
+  dom.getElementById("excursions").innerHTML = h;
 }
 function renderEst(R){
   const G = R.g;
@@ -1011,18 +596,18 @@ function renderEst(R){
   if (!G.exc.length) h += `<div class="ln"><span>Экскурсии не выбраны</span><a class="link" href="#excursions">добавить</a></div>`;
   h += `</div>
     <div class="actions">
-      <a class="btn solid" style="text-align:center" href="${waLink(textEstimate())}" target="_blank" rel="noopener" data-act="sendcalc" id="sendBtn">Отправить на расчёт</a>
+      <button type="button" class="btn solid" data-act="tolead" id="sendBtn">Получить точный расчёт</button>
       <div class="msg">
         <button type="button" class="btn" data-act="copy" id="copyBtn">Скопировать</button>
         <a class="btn" href="https://t.me/${TG}" target="_blank" rel="noopener" data-act="sendtg" id="tgBtn">Telegram</a>
       </div>
       <button type="button" class="btn" data-act="share" id="shareBtn">Поделиться ссылкой на сборку</button>
-      <a class="btn" href="#lead" style="text-align:center" data-act="tolead" id="toLead">Оставить заявку</a>
-      <div class="contact">Екатерина: <b>8-999-110-41-88</b><br>Елена: <b>8-950-230-25-55</b><br>MAX — по номеру телефона</div>
+      <a class="btn" href="${waLink(textEstimate())}" target="_blank" rel="noopener" data-act="sendcalc">Расчёт в WhatsApp</a>
+      <div class="contact">Екатерина: <b>8-999-110-41-88</b><br>Елена: <b>8-950-230-25-55</b><br><a href="https://max.ru/id583513901480_biz" target="_blank" rel="noopener">Написать в MAX</a></div>
       <div class="toast" id="toast"></div>
     </div>
     <div class="disclaim">Расчёт ориентировочный: цены на авиабилеты и отели меняются ежедневно и зависят от сезона. Месяц поездки влияет на предварительную оценку. Сумма рассчитана по заданным базовым тарифам; доступность мест и актуальные цены проверим отдельно. Точную цену подтвердим после вашей заявки.</div>`;
-  document.getElementById("est").innerHTML = h;
+  dom.getElementById("est").innerHTML = h;
 }
 const waLink = t => "https://wa.me/79502302555?text=" + encodeURIComponent(t);
 function textEstimate(){
@@ -1036,51 +621,48 @@ function textEstimate(){
   lines.push("");
   lines.push("Итого: " + fmt(R.total) + " (≈ " + fmt(Math.round(R.total/PAX/10)*10) + " на человека)");
   lines.push("Расчёт ориентировочный, цены меняются ежедневно.");
-  try { lines.push("Ссылка на сборку: " + shareUrl()); } catch(e){}
+  try { lines.push("Ссылка на сборку: " + shareUrl()); } catch {}
   return lines.join("\n");
 }
 
 /* ---------- events ---------- */
 const find = id => S.stops.find(s=>s.id===id);
-document.addEventListener("click", e=>{
-  const tabLink=e.target.closest("[data-tab-link]"); if(tabLink){e.preventDefault();setTab(tabLink.dataset.tabLink);document.getElementById("tab-"+tabLink.dataset.tabLink).scrollIntoView({behavior:"smooth",block:"start"});return;}
+dom.addEventListener("click", e=>{
+  const tabLink=e.target.closest("[data-tab-link]"); if(tabLink){e.preventDefault();setTab(tabLink.dataset.tabLink);dom.getElementById("tab-"+tabLink.dataset.tabLink).scrollIntoView({behavior:"smooth",block:"start"});return;}
   const el = e.target.closest("[data-act]"); if (!el) return;
   const act = el.dataset.act, s = el.dataset.id ? find(el.dataset.id) : null;
   if (el.tagName==="INPUT" || el.tagName==="SELECT") return;
   if (el.tagName==="A" && !["sendcalc","sendtg","tolead","ready-lead"].includes(act)) return;
-  if (act==="ready-lead"){
-    e.preventDefault();selectedReady=READY[+el.dataset.v];document.getElementById("lf-type").value="Готовый тур";document.getElementById("lf-ready").value=el.dataset.v;syncReadyChoice();document.getElementById("lead").scrollIntoView({behavior:"smooth",block:"start"});document.getElementById("lf-name").focus({preventScroll:true});return;
-  }
+  if (act==="ready-lead"){ e.preventDefault(); onRequest(readyEstimate(READY[+el.dataset.v])); return; }
   if (act==="nights" && s){ s.nights = Math.max(1, Math.min(14, s.nights + (+el.dataset.d))); render(); }
   else if (act==="move" && s){ const i=S.stops.indexOf(s), j=i+(+el.dataset.d); if(j>=0&&j<S.stops.length){ S.stops.splice(i,1); S.stops.splice(j,0,s); render(); } }
   else if (act==="del" && s && S.stops.length>1){ S.stops.splice(S.stops.indexOf(s),1); render(); }
-  else if (act==="add" && S.stops.length<8){ const c=document.getElementById("addCity").value; S.stops.push(mkStop(c, c==="fr"?1:3)); render(); }
+  else if (act==="add" && S.stops.length<8){ const c=dom.getElementById("addCity").value; S.stops.push(mkStop(c, c==="fr"?1:3)); render(); }
   else if (act==="reset"){ S=fromPreset(PRESETS[4]); render(); }
   else if (act==="preset"){ S = fromPreset(PRESETS[+el.dataset.v]); render(); }
-  else if (act==="similar"){ const r=READY[+el.dataset.v]; S = fromPreset({s:r.pre}); render(); setTab("build"); window.scrollTo({top:0}); }
+  else if (act==="similar"){ const r=READY[+el.dataset.v]; S = fromPreset({s:r.pre}); render(); setTab("build"); root.scrollIntoView({block:"start"}); }
   else if (act==="exctoggle" && s){ const v=+el.dataset.v; s.exc = s.exc.includes(v) ? s.exc.filter(x=>x!==v) : s.exc.concat(v); render(); }
-  else if (act==="more"){ const d=document.getElementById("det-"+el.dataset.v); if(d){ d.open=!d.open; el.textContent=d.open?"Свернуть":"Подробнее"; } }
+  else if (act==="more"){ const d=dom.getElementById("det-"+el.dataset.v); if(d){ d.open=!d.open; el.textContent=d.open?"Свернуть":"Подробнее"; } }
   else if (act==="exccity"){ S.excCity = el.dataset.c; render(); }
-  else if (act==="gocity"){ S.excCity = el.dataset.c; render(); document.getElementById("excursions").scrollIntoView({behavior:"smooth", block:"start"}); }
-  else if (act==="sendcalc" || act==="sendtg"){ goal(act==="sendcalc"?"send_calc_whatsapp":"send_calc_telegram"); try { navigator.clipboard && navigator.clipboard.writeText(textEstimate()).catch(()=>{}); } catch(err){} }
-  else if (act==="tolead"){document.getElementById("lf-type").value="Тур по моей сборке из конструктора";syncReadyChoice();goal("open_lead_form"); return; }
+  else if (act==="gocity"){ S.excCity = el.dataset.c; render(); dom.getElementById("excursions").scrollIntoView({behavior:"smooth", block:"start"}); }
+  else if (act==="sendcalc" || act==="sendtg"){ try { if (navigator.clipboard) navigator.clipboard.writeText(textEstimate()).catch(()=>{}); } catch {} }
+  else if (act==="tolead"){ e.preventDefault(); onRequest(textEstimate()); return; }
   else if (act==="share"){
-    goal("share_link");
-    const url = shareUrl(), toast = document.getElementById("toast");
-    try { history.replaceState(null, "", "#t"+packState()); } catch(err){}
-    const show = ok => { toast.innerHTML = (ok?"Ссылка скопирована. ":"Скопируйте ссылку: ") + `<input readonly value="${esc(url)}" style="width:100%;margin-top:6px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:6px;background:var(--surface);color:var(--ink)" onclick="this.select()">`; if(el.id==="shareBtn2") document.getElementById("est").scrollIntoView({behavior:"smooth"}); };
+    const url = shareUrl(), toast = dom.getElementById("toast");
+    try { history.replaceState(null, "", "#t"+packState()); } catch {}
+    const show = ok => { toast.innerHTML = (ok?"Ссылка скопирована. ":"Скопируйте ссылку: ") + `<input readonly value="${esc(url)}" style="width:100%;margin-top:6px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:6px;background:var(--surface);color:var(--ink)" onclick="this.select()">`; if(el.id==="shareBtn2") dom.getElementById("est").scrollIntoView({behavior:"smooth"}); };
     if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(()=>show(true)).catch(()=>show(false)); } else show(false);
   }
   else if (act==="copy"){
-    const txt = textEstimate(), toast = document.getElementById("toast");
-    const fallback = () => { const ta=document.createElement("textarea"); ta.value=txt; ta.setAttribute("readonly",""); ta.style.width="100%"; ta.style.height="160px"; toast.textContent="Выделите текст и скопируйте:"; toast.after(ta); ta.select(); };
+    const txt = textEstimate(), toast = dom.getElementById("toast");
+    const fallback = () => { const ta=dom.createElement("textarea"); ta.value=txt; ta.setAttribute("readonly",""); ta.style.width="100%"; ta.style.height="160px"; toast.textContent="Выделите текст и скопируйте:"; toast.after(ta); ta.select(); };
     if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>{ toast.textContent="Расчёт скопирован — вставьте его в сообщение агенту."; }).catch(fallback); } else fallback();
   }
 });
-document.getElementById("intlSeg").addEventListener("click", e=>{
+listen(dom.getElementById("intlSeg"), "click", e=>{
   const b = e.target.closest("button[data-intl]"); if (!b) return; S.intl = b.dataset.intl; render();
 });
-document.addEventListener("change", e=>{
+dom.addEventListener("change", e=>{
   const el = e.target;
   if (el.id==="month"){ S.month = el.value; render(); return; }
   const act = el.dataset.act; if (!act) return;
@@ -1096,49 +678,13 @@ document.addEventListener("change", e=>{
   else return;
   render();
 });
-document.addEventListener("toggle", e=>{
+dom.addEventListener("toggle", e=>{
   const d = e.target; if (d.matches && d.matches("details.more")){ const s=find(d.dataset.id); if(s) s.open = d.open; }
 }, true);
 
-document.getElementById("presets").insertAdjacentHTML("beforeend", PRESETS.map((p,i)=>`<button type="button" class="chip" data-act="preset" data-v="${i}" id="preset-${i}">${esc(p.t)}</button>`).join(""));
-document.querySelector(".tabs").addEventListener("click", e=>{ const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab); });
-document.getElementById("readyFilter").addEventListener("click", e=>{ const b=e.target.closest("button[data-f]"); if(b){ readyF=b.dataset.f; renderReady(); } });
-// Public enquiry API already used by the site. No customer details enter localStorage or share URLs.
-const isPreview = location.protocol === "file:" || document.documentElement.hasAttribute("data-preview");
-let chinaDirection = null;
-let submitting = false;
-let pendingLead = null;
-const form = document.getElementById("leadForm");
-const readySelect = document.getElementById("lf-ready");
-READY.forEach((tour, index) => {
-  const option = document.createElement("option");
-  option.value = String(index);
-  option.textContent = tour.t;
-  readySelect.appendChild(option);
-});
-function syncReadyChoice() {
-  const isReady = document.getElementById("lf-type").value === "Готовый тур";
-  document.getElementById("readyChoiceLabel").hidden = !isReady;
-  readySelect.required = isReady;
-  const value = readySelect.value;
-  selectedReady = isReady && value !== "" ? READY[Number(value)] : null;
-}
-document.getElementById("lf-type").addEventListener("change", syncReadyChoice);
-readySelect.addEventListener("change", syncReadyChoice);
-if (isPreview) {
-  const banner = document.createElement("div");
-  banner.className = "preview-banner";
-  banner.textContent = "Предпросмотр: расчёт и маршруты работают. Заявки из этого файла не отправляются.";
-  document.body.prepend(banner);
-} else {
-  fetch("/api/directions/", { signal: AbortSignal.timeout(8000), credentials: "omit" })
-    .then(response => response.ok ? response.json() : [])
-    .then(result => {
-      const list = Array.isArray(result) ? result : Array.isArray(result.results) ? result.results : [];
-      const china = list.find(item => typeof item.name === "string" && /китай/i.test(item.name));
-      if (Number.isInteger(china?.id)) chinaDirection = china.id;
-    }).catch(() => {});
-}
+dom.getElementById("presets").innerHTML = `<span>Быстрый старт:</span>` + PRESETS.map((p,i)=>`<button type="button" class="chip" data-act="preset" data-v="${i}" id="preset-${i}">${esc(p.t)}</button>`).join("");
+listen(dom.querySelector(".tabs"), "click", e=>{ const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab); });
+listen(dom.getElementById("readyFilter"), "click", e=>{ const b=e.target.closest("button[data-f]"); if(b){ readyF=b.dataset.f; renderReady(); } });
 function readyEstimate(tour) {
   return [
     "Заявка на готовую программу: «" + tour.t + "»",
@@ -1151,84 +697,13 @@ function readyEstimate(tour) {
     "Страница: " + (location.protocol === "file:" ? "https://flypenza.ru/tours/china-constructor" : location.origin + "/tours/china-constructor")
   ].join("\n");
 }
-form.addEventListener("input", () => { pendingLead = null; });
-form.addEventListener("change", () => { pendingLead = null; });
-form.addEventListener("submit", async event => {
-  event.preventDefault();
-  if (submitting) return;
-  const error = document.getElementById("lf-err");
-  const button = document.getElementById("lf-submit");
-  const fd = new FormData(form);
-  const name = String(fd.get("name") || "").trim();
-  const phone = String(fd.get("phone") || "").trim();
-  const digits = phone.replace(/\D/g, "");
-  error.textContent = "";
-  if (!name) { error.textContent = "Укажите, как к вам обращаться."; document.getElementById("lf-name").focus(); return; }
-  if (digits.length < 10 || digits.length > 15) { error.textContent = "Укажите телефон: от 10 до 15 цифр."; document.getElementById("lf-phone").focus(); return; }
-  if (!fd.get("ok")) { error.textContent = "Подтвердите согласие на обработку персональных данных."; document.getElementById("lf-ok").focus(); return; }
-  syncReadyChoice();
-  const kind = String(fd.get("type"));
-  if (kind === "Готовый тур" && !selectedReady) { error.textContent = "Выберите готовую программу."; readySelect.focus(); return; }
-  const lines = ["Заявка: онлайн-конструктор тура в Китай", "Как связаться: " + fd.get("way")];
-  if (String(fd.get("dates") || "").trim()) lines.push("Даты из заявки: " + String(fd.get("dates")).trim());
-  if (String(fd.get("pax") || "").trim()) lines.push("Состав туристов из заявки: " + String(fd.get("pax")).trim());
-  lines.push("Интересует: " + kind);
-  if (String(fd.get("msg") || "").trim()) lines.push("Пожелания: " + String(fd.get("msg")).trim());
-  if (kind === "Готовый тур") lines.push("", readyEstimate(selectedReady));
-  else if (kind !== "Подобрать тур с нуля") lines.push("", textEstimate());
-  else lines.push("Страница: https://flypenza.ru/tours/china-constructor");
-  const comment = lines.join("\n");
-  const payload = { name, phone, direction: chinaDirection, initial_comment: comment, consent: true, source: "site_form" };
-  // A timeout may happen after the server accepted a request. Retrying an identical payload is blocked until reload/manager contact.
-  const signature = JSON.stringify(payload);
-  if (pendingLead === signature) {
-    error.textContent = "Предыдущая отправка не получила подтверждения. Чтобы не создать повторную заявку, свяжитесь с нами по телефону +7 950 230-25-55.";
-    return;
-  }
-  if (isPreview) {
-    error.textContent = "Это предпросмотр. Заявка не отправлена. После публикации выбранная программа и ваши пожелания поступят менеджеру через сайт.";
-    return;
-  }
-  submitting = true;
-  button.disabled = true;
-  button.textContent = "Отправляем…";
-  form.setAttribute("aria-busy", "true");
-  try {
-    const response = await fetch("/api/leads/", {
-      method: "POST", credentials: "omit", headers: { "Content-Type": "application/json" },
-      body: signature, signal: AbortSignal.timeout(20000)
-    });
-    if (!response.ok) {
-      const details = await response.json().catch(() => null);
-      const fieldError = details && typeof details === "object" ? ["name", "phone", "consent", "detail", "non_field_errors"].map(key => details[key]).filter(Boolean).flat().filter(value => typeof value === "string").join(" ") : "";
-      error.textContent = fieldError || (response.status === 429 ? "Слишком много попыток. Подождите немного или свяжитесь с нами по телефону." : "Не удалось отправить заявку. Данные сохранены в форме — попробуйте ещё раз или позвоните нам.");
-      return;
-    }
-    const done = document.getElementById("leadDone");
-    done.innerHTML = `<b>Заявка отправлена!</b><p class="note" style="margin:0">Спасибо, ${esc(name)}. Мы получили ваши контакты и пожелания. Менеджер свяжется с вами, проверит наличие и подтвердит стоимость.</p><p class="note" style="margin:0">Отправка заявки не подтверждает бронирование и не требует оплаты.</p><div class="acts"><a class="btn" href="tel:+79502302555">Позвонить Елене</a><a class="btn" href="https://t.me/${TG}" target="_blank" rel="noopener">Написать в Telegram</a></div>`;
-    done.hidden = false;
-    form.hidden = true;
-    goal("lead_submit");
-    done.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  } catch {
-    pendingLead = signature;
-    error.textContent = "Не удалось подтвердить отправку. Данные остались в форме. Свяжитесь с нами по телефону +7 950 230-25-55 — проверим, получили ли заявку.";
-  } finally {
-    submitting = false;
-    button.disabled = false;
-    button.textContent = "Отправить заявку";
-    form.removeAttribute("aria-busy");
-  }
-});
 
 render(); renderReady();
 setTab(location.hash==="#ready" ? "ready" : "build");
-if(restoreProblem){const notice=document.getElementById("restoreNotice");notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}
-document.querySelector(".tabs").addEventListener("keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;event.preventDefault();const next=event.key==="Home"?"build":event.key==="End"?"ready":tab==="build"?"ready":"build";setTab(next);document.getElementById("tab-btn-"+next).focus();});
-document.addEventListener("click",event=>{const link=event.target.closest('a[href="#excursions"],a[href="#est"]');if(link&&tab!=="build")setTab("build");});
-window.addEventListener("hashchange",()=>{if(location.hash.startsWith("#t")&&location.hash.length>3){const notice=document.getElementById("restoreNotice");try{if(location.hash.length>16000)throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));notice.hidden=true;}catch{S=fromPreset(PRESETS[4]);notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}render();setTab("build");}});
-})();
-</script>
+if(restoreProblem){const notice=dom.getElementById("restoreNotice");notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}
+listen(dom.querySelector(".tabs"), "keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;event.preventDefault();const next=event.key==="Home"?"build":event.key==="End"?"ready":tab==="build"?"ready":"build";setTab(next);dom.getElementById("tab-btn-"+next).focus();});
+dom.addEventListener("click",event=>{const link=event.target.closest('a[href="#excursions"],a[href="#est"]');if(link&&tab!=="build")setTab("build");});
+listen(window, "hashchange",()=>{if(location.hash.startsWith("#t")&&location.hash.length>3){const notice=dom.getElementById("restoreNotice");try{if(location.hash.length>16000)throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));notice.hidden=true;}catch{S=fromPreset(PRESETS[4]);notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}render();setTab("build");}});
 
-<script type="module" src="/page-read-tracker-auto.js"></script>
-</body></html>
+return () => controller.abort();
+}
