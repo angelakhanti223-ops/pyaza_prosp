@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowDown, ArrowRight, Check, MapPin, Plane, SlidersHorizontal } from "lucide-react";
 import SiteCtaBlock from "@/components/cta/SiteCtaBlock";
 import OpenLeadFormButton from "@/components/lead-form/OpenLeadFormButton";
@@ -18,13 +19,17 @@ export default function ChinaTourConstructor() {
   const { open } = useLeadForm();
   const openRef = useRef(open);
   const [estimate, setEstimate] = useState(CUSTOM_REQUEST);
+  const [excursionSlot, setExcursionSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => { openRef.current = open; }, [open]);
   useEffect(() => {
     if (!root.current) return;
     return initChinaTourBuilder(root.current, {
       onRequest: comment => openRef.current(comment),
-      onChange: setEstimate,
+      onChange: comment => {
+        setEstimate(comment);
+        setExcursionSlot(root.current?.querySelector<HTMLElement>("#excursion-cta") ?? null);
+      },
     });
   }, []);
 
@@ -58,6 +63,17 @@ export default function ChinaTourConstructor() {
           <div><span>03</span><p><b>Получите точный расчёт</b>Менеджер проверит цены и наличие на ваши даты.</p></div>
         </div>
         <div id="china-builder" className={styles.builder} ref={root} dangerouslySetInnerHTML={builderHtml} />
+        {excursionSlot && createPortal(
+          <SiteCtaBlock
+            compact
+            eyebrow="Китай · Больше впечатлений"
+            title="Не нашли свои экскурсии или хотите большего?"
+            text="Оставьте заявку — подберём экскурсии под ваши интересы и добавим их в маршрут. Расскажите, что мечтаете увидеть: составим программу вместе."
+            primaryLabel="Подобрать мои экскурсии"
+            comment={`Хочу другие экскурсии или более насыщенную программу по Китаю. Мои пожелания:\n\nТекущая сборка:\n${estimate}`}
+          />,
+          excursionSlot,
+        )}
 
         <section id="china-request" className={styles.request} aria-label="Получить расчёт тура в Китай">
           <SiteCtaBlock

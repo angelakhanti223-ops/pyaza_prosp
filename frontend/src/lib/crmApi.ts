@@ -138,6 +138,11 @@ export type LeadDetail = LeadListItem & {
   uon_request_id: string;
   initial_comment: string;
   consent_personal_data_at: string | null;
+  site_application_consents?: {
+    version?: string;
+    submitted_at?: string;
+    consents?: { personal_data?: { accepted: boolean }; marketing?: { accepted: boolean } };
+  };
   updated_at: string;
   comments: LeadComment[];
   status_history: LeadStatusHistoryEntry[];

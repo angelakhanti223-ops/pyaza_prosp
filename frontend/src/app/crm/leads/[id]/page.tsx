@@ -366,6 +366,15 @@ export default function CrmLeadDetailPage() {
               <FieldLabel>Комментарий</FieldLabel>
               <textarea defaultValue={lead.initial_comment} onBlur={(e) => savePatch({ initial_comment: e.target.value }, "initial_comment")} rows={2} placeholder="Комментарий по заявке…" className="mt-1 w-full resize-none rounded-xl bg-blue-light/40 p-3 text-sm text-foreground/70 outline-none focus:ring-1 focus:ring-blue" />
             </div>
+            {lead.site_application_consents?.version && (
+              <details className="mt-4 rounded-xl bg-blue-light/40 p-3 text-xs leading-6 text-foreground/70">
+                <summary className="cursor-pointer font-semibold text-navy">Согласия из формы сайта</summary>
+                <p>Обработка данных для подбора и связи по заявке: {lead.site_application_consents.consents?.personal_data?.accepted ? "да" : "нет сведений"}.</p>
+                <p>Рассылки: {lead.site_application_consents.consents?.marketing?.accepted ? "согласие дано" : "согласие в этой заявке не дано"}.</p>
+                {lead.site_application_consents.submitted_at && <p>Получено: {new Date(lead.site_application_consents.submitted_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })} МСК.</p>}
+                <p>Версия: {lead.site_application_consents.version}.</p>
+              </details>
+            )}
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>

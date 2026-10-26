@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { ApiError, createLead } from "@/lib/api";
+import LeadConsentFields from "@/components/lead-form/LeadConsentFields";
+import { EMPTY_LEAD_CONSENTS, LEAD_CONSENT_VERSION } from "@/lib/leadConsents";
 
 type Step = {
   key: "name" | "phone" | "email" | "country" | "budget" | "group" | "dates" | "wishes";
@@ -82,7 +84,7 @@ export default function ChatWidget() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [inputValue, setInputValue] = useState("");
   const [phase, setPhase] = useState<Phase>("chatting");
-  const [consent, setConsent] = useState(false);
+  const [consents, setConsents] = useState({ ...EMPTY_LEAD_CONSENTS });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function ChatWidget() {
       setPhase("consent");
       setMessages((m) => [
         ...m,
-        { from: "bot", text: "Спасибо! Остался последний шаг — согласие на обработку персональных данных." },
+        { from: "bot", text: "Спасибо! Осталось согласие на обработку данных для подбора и ответа по заявке. Подписка на рассылки — только по вашему желанию." },
       ]);
       return;
     }
@@ -130,7 +132,7 @@ export default function ChatWidget() {
   }
 
   async function handleSubmit() {
-    if (!consent) return;
+    if (!consents.personalData || phase === "submitting") return;
     setPhase("submitting");
     try {
       await createLead({
@@ -139,6 +141,8 @@ export default function ChatWidget() {
         email: answers.email || undefined,
         initial_comment: buildSummary(answers),
         consent: true,
+        consent_marketing: consents.marketing,
+        consent_version: LEAD_CONSENT_VERSION,
         source: "chatbot",
       });
       setPhase("done");
@@ -228,44 +232,21 @@ export default function ChatWidget() {
               </div>
             )}
 
-            {phase === "consent" && (
+            {(phase === "consent" || phase === "error") && (
               <div className="flex flex-col gap-2">
-                <label className="flex items-start gap-2 text-xs text-foreground/70">
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    Согласен на обработку персональных данных в соответствии с{" "}
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
-                      политикой конфиденциальности
-                    </a>
-                  </span>
-                </label>
+                <LeadConsentFields value={consents} onChange={setConsents} />
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={!consent}
+                  disabled={!consents.personalData}
                   className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue disabled:opacity-50"
                 >
-                  Отправить заявку
+                  {phase === "error" ? "Попробовать снова" : "Отправить заявку"}
                 </button>
               </div>
             )}
 
             {phase === "submitting" && <p className="text-center text-xs text-foreground/40">Отправляем…</p>}
-
-            {phase === "error" && (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-full rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-blue"
-              >
-                Попробовать снова
-              </button>
-            )}
 
             {phase === "done" && (
               <p className="text-center text-xs text-foreground/40">Спасибо! Мы скоро свяжемся с вами.</p>

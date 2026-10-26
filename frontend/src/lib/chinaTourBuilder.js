@@ -37,7 +37,7 @@ const CITIES = {
       {t:"New World Beijing Hotel 5*", s:"Район Дунчэн, современные номера", p:16226}],
     tr:{ op:{p:usd(96), t:"Трансфер с русскоязычным гидом", s:"Встреча в аэропорту, автомобиль + гид"},
          ag:{p:3857, t:"Индивидуальный трансфер", s:"Автомобиль стандарт-класса"},
-         self:"Такси через приложение — около 2 000 ₽ в одну сторону, оплата на месте." },
+         self:"" },
     excT:"Экскурсии с личным русскоязычным гидом и трансфером", excPP:false,
     exc:[["Запретный город Гугун + Храм Неба",328],["Храм Неба + Ламаистский храм Юнхэгун",328],["Ботанический сад + Храм спящего Будды",345],["Великая стена + Летний дворец Ихэюань",345],["Усадьба принца Гуна + Храм Неба",345],["Великая стена + Запретный город Гугун",380],["Усадьба принца Гуна + зоопарк + океанариум",414],["Геологический парк в пещерах Шихуа",431],["Самая большая стеклянная смотровая площадка",449],["Стеклянный мост в Тяньюньшане",449],["Ущелье Лунцинся",518],["Губэй — город на воде",552],["ТВ-башня + Пекинский зоопарк и аквариум",656],["Парк Universal Beijing: билеты для двоих и трансфер туда и обратно",370]],
     partner:"https://experience.tripster.ru/experience/Beijing/" },
@@ -370,7 +370,7 @@ function normalizeState(value){
     if (!raw || !ORDER.includes(raw.city)) throw new Error("Invalid city");
     const city=CITIES[raw.city], st=mkStop(raw.city, Number.isInteger(raw.nights)?Math.max(1,Math.min(14,raw.nights)):3);
     st.hotel=Number.isInteger(raw.hotel)&&raw.hotel>=0&&raw.hotel<city.hotels.length?raw.hotel:0;
-    if (["op","ag","self"].includes(raw.tr) && city.tr[raw.tr]) st.tr=raw.tr;
+    if (["op","ag","self"].includes(raw.tr) && Object.hasOwn(city.tr, raw.tr)) st.tr=raw.tr;
     st.exc=Array.isArray(raw.exc)?[...new Set(raw.exc.filter(i=>Number.isInteger(i)&&i>=0&&i<city.exc.length))]:[];
     return st;
   });
@@ -384,7 +384,7 @@ let restoreProblem=false;
 let S = null;
 try { const raw=(localStorage.getItem("flypenza-china-builder-v1") || localStorage.getItem("cn-tour-v3")); if(raw) S=normalizeState(JSON.parse(raw)); } catch { S=null; }
 try { if(location.hash.startsWith("#t") && location.hash.length>3){ if(location.hash.length>16000) throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));} } catch { restoreProblem=true;S=null; }
-if(!S) S=fromPreset(PRESETS[4]);
+if(!S) S=fromPreset(PRESETS[0]);
 const save=()=>{try{localStorage.setItem("flypenza-china-builder-v1",JSON.stringify(S));}catch{}};
 /* ---------- calculation ---------- */
 function nodes(){
@@ -520,7 +520,7 @@ function cityHTML(s){
       <div class="tools">
         <button type="button" class="icon-btn" id="up-${s.id}" data-act="move" data-id="${s.id}" data-d="-1" aria-label="Переместить выше" ${idx===0?"disabled":""}>↑</button>
         <button type="button" class="icon-btn" id="down-${s.id}" data-act="move" data-id="${s.id}" data-d="1" aria-label="Переместить ниже" ${idx===n-1?"disabled":""}>↓</button>
-        <button type="button" class="icon-btn" id="del-${s.id}" data-act="del" data-id="${s.id}" aria-label="Удалить город" ${n===1?"disabled":""}>✕</button>
+        <button type="button" class="icon-btn remove-city" id="del-${s.id}" data-act="del" data-id="${s.id}" aria-label="Убрать город ${esc(c.name)}" ${n===1?"disabled":""}>✕ Убрать город</button>
       </div>
       <div class="city-blurb">${esc(c.blurb)}</div>
     </div>`;
@@ -543,7 +543,7 @@ function cityHTML(s){
     h += `<label class="opt ${on?"on":""}"><input type="radio" name="t-${s.id}" id="t-${s.id}-${k}" data-act="tr" data-id="${s.id}" data-v="${k}" ${on?"checked":""}><div><div class="t">${esc(t.t)}</div><div class="s">${esc(t.s)} · туда и обратно</div></div><div class="p num">${fmt(r10(t.p)*2)}</div></label>`;
   });
   { const on = s.tr==="self";
-    h += `<label class="opt ${on?"on":""}"><input type="radio" name="t-${s.id}" id="t-${s.id}-self" data-act="tr" data-id="${s.id}" data-v="self" ${on?"checked":""}><div><div class="t">Доберёмся сами</div><div class="s">${esc(c.tr.self)}</div></div><div class="p num">—</div></label>`; }
+    h += `<label class="opt ${on?"on":""}"><input type="radio" name="t-${s.id}" id="t-${s.id}-self" data-act="tr" data-id="${s.id}" data-v="self" ${on?"checked":""}><div><div class="t">Доберёмся сами</div>${c.tr.self?`<div class="s">${esc(c.tr.self)}</div>`:""}</div><div class="p num">—</div></label>`; }
   h += `</div></div>`;
   }
   // excursions (chosen in the excursions block)
@@ -638,7 +638,11 @@ dom.addEventListener("click", e=>{
   else if (act==="move" && s){ const i=S.stops.indexOf(s), j=i+(+el.dataset.d); if(j>=0&&j<S.stops.length){ S.stops.splice(i,1); S.stops.splice(j,0,s); render(); } }
   else if (act==="del" && s && S.stops.length>1){ S.stops.splice(S.stops.indexOf(s),1); render(); }
   else if (act==="add" && S.stops.length<8){ const c=dom.getElementById("addCity").value; S.stops.push(mkStop(c, c==="fr"?1:3)); render(); }
-  else if (act==="reset"){ S=fromPreset(PRESETS[4]); render(); }
+  else if (act==="reset"){ S=fromPreset(PRESETS[0]); render(); }
+  else if (act==="simplify"){
+    S.stops=["bj","sh"].map(city=>S.stops.find(stop=>stop.city===city)||mkStop(city,city==="bj"?4:3));
+    render();
+  }
   else if (act==="preset"){ S = fromPreset(PRESETS[+el.dataset.v]); render(); }
   else if (act==="similar"){ const r=READY[+el.dataset.v]; S = fromPreset({s:r.pre}); render(); setTab("build"); root.scrollIntoView({block:"start"}); }
   else if (act==="exctoggle" && s){ const v=+el.dataset.v; s.exc = s.exc.includes(v) ? s.exc.filter(x=>x!==v) : s.exc.concat(v); render(); }
@@ -703,7 +707,7 @@ setTab(location.hash==="#ready" ? "ready" : "build");
 if(restoreProblem){const notice=dom.getElementById("restoreNotice");notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}
 listen(dom.querySelector(".tabs"), "keydown",event=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;event.preventDefault();const next=event.key==="Home"?"build":event.key==="End"?"ready":tab==="build"?"ready":"build";setTab(next);dom.getElementById("tab-btn-"+next).focus();});
 dom.addEventListener("click",event=>{const link=event.target.closest('a[href="#excursions"],a[href="#est"]');if(link&&tab!=="build")setTab("build");});
-listen(window, "hashchange",()=>{if(location.hash.startsWith("#t")&&location.hash.length>3){const notice=dom.getElementById("restoreNotice");try{if(location.hash.length>16000)throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));notice.hidden=true;}catch{S=fromPreset(PRESETS[4]);notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}render();setTab("build");}});
+listen(window, "hashchange",()=>{if(location.hash.startsWith("#t")&&location.hash.length>3){const notice=dom.getElementById("restoreNotice");try{if(location.hash.length>16000)throw new Error("Large link");S=normalizeState(unpackState(location.hash.slice(2)));notice.hidden=true;}catch{S=fromPreset(PRESETS[0]);notice.hidden=false;notice.textContent="Не удалось восстановить маршрут по ссылке. Показана стартовая сборка — её можно изменить.";}render();setTab("build");}});
 
 return () => controller.abort();
 }

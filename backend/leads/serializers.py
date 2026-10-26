@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
@@ -18,6 +19,7 @@ from .models import (
     TourOperator,
     TourOperatorExchangeRate,
 )
+from .consents import PUBLIC_CONSENT_VERSION, consent_evidence
 
 
 TRAVEL_FIELDS = [
@@ -111,7 +113,7 @@ def _split_name(full_name: str):
     return '', '', ''
 
 
-def _sync_client_contact_from_lead(lead: Lead):
+def _sync_client_contact_from_lead(lead: Lead, *, marketing_consent=None):
     last_name, first_name, middle_name = _split_name(lead.name)
     defaults = {
         'last_name': last_name,
@@ -121,6 +123,10 @@ def _sync_client_contact_from_lead(lead: Lead):
         'phone_primary': lead.phone or '',
         'preferred_contact_method': lead.preferred_messenger or Contact.PreferredContactMethod.PHONE,
     }
+    # Public enquiries require an explicit opt-in. Internal CRM edits keep the existing permissions.
+    if marketing_consent is not None:
+        defaults['allow_email_marketing'] = marketing_consent and bool(lead.email)
+        defaults['allow_messenger_marketing'] = marketing_consent
 
     if lead.contact_id:
         Contact.objects.filter(id=lead.contact_id).update(**defaults)
@@ -177,11 +183,14 @@ class LeadTagSerializer(serializers.ModelSerializer):
 
 class LeadCreateSerializer(serializers.ModelSerializer):
     consent = serializers.BooleanField(write_only=True)
+    consent_marketing = serializers.BooleanField(write_only=True, required=False, default=False)
+    consent_version = serializers.ChoiceField(choices=[PUBLIC_CONSENT_VERSION], write_only=True)
     source = serializers.ChoiceField(choices=[Lead.Source.SITE_FORM, Lead.Source.CHATBOT], required=False)
 
     class Meta:
         model = Lead
-        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'consent', 'source']
+        fields = ['id', 'name', 'phone', 'email', 'direction', 'initial_comment', 'consent',
+                  'consent_marketing', 'consent_version', 'source']
         read_only_fields = ['id']
 
     def validate_consent(self, value):
@@ -196,10 +205,22 @@ class LeadCreateSerializer(serializers.ModelSerializer):
         from .tasks import create_new_lead_task
 
         validated_data.pop('consent')
+        validated_data.pop('consent_version')
+        marketing = validated_data.pop('consent_marketing')
         validated_data.setdefault('source', Lead.Source.SITE_FORM)
-        validated_data['consent_personal_data_at'] = timezone.now()
-        lead = super().create(validated_data)
-        _sync_client_contact_from_lead(lead)
+        now = timezone.now()
+        validated_data['consent_personal_data_at'] = now
+        validated_data['site_application_consents'] = consent_evidence(now=now, marketing=marketing)
+        with transaction.atomic():
+            lead = super().create(validated_data)
+            _sync_client_contact_from_lead(lead, marketing_consent=marketing)
+            if marketing and lead.email:
+                from emailing.models import EmailSubscriber
+                EmailSubscriber.objects.update_or_create(
+                    email=lead.email,
+                    defaults={'name': lead.name, 'is_active': True, 'consented_at': now,
+                              'unsubscribed_at': None, 'source_lead': lead},
+                )
 
         sync_lead_to_uon.delay(lead.id)
         send_lead_notification_task.delay(lead.id)
@@ -363,7 +384,8 @@ class LeadDetailSerializer(OperatorRateMixin, serializers.ModelSerializer):
             'source', 'source_display', 'direction', 'direction_name', 'status', 'status_display',
             'assigned_manager', 'deal_amount', 'commission', *TRAVEL_FIELDS, *PAYMENT_FIELDS,
             'tour_operator_details', *OPERATOR_RATE_FIELDS, 'uon_ticket_id', 'uon_request_id',
-            'initial_comment', 'gift_certificate_application', 'consent_personal_data_at', 'created_at', 'updated_at', 'comments',
+            'initial_comment', 'gift_certificate_application', 'site_application_consents',
+            'consent_personal_data_at', 'created_at', 'updated_at', 'comments',
             'status_history', 'attachments', 'tasks', 'uon_sync_logs', 'uon_lead', 'uon_request',
         ]
 

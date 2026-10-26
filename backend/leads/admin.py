@@ -75,7 +75,7 @@ class LeadAdmin(admin.ModelAdmin):
         'contact__phone_primary', 'contact__phone_secondary', 'contact__email_primary',
         'contact__email_secondary', 'contact__vk_profile',
     )
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'consent_personal_data_at', 'site_application_consents')
     filter_horizontal = ('tags',)
     inlines = [LeadCommentInline, LeadStatusHistoryInline, LeadAttachmentInline]
 
