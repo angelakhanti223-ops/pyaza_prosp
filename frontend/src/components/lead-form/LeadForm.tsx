@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ApiError, createLead, fetchDirections, type Direction } from "@/lib/api";
+import LeadConsentFields from "./LeadConsentFields";
+import { EMPTY_LEAD_CONSENTS, LEAD_CONSENT_VERSION } from "@/lib/leadConsents";
 
 type Props = {
   onSuccess?: () => void;
@@ -15,7 +17,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
   const [email, setEmail] = useState("");
   const [directionId, setDirectionId] = useState("");
   const [comment, setComment] = useState(initialComment ?? "");
-  const [consent, setConsent] = useState(false);
+  const [consents, setConsents] = useState({ ...EMPTY_LEAD_CONSENTS });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
@@ -25,6 +27,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (status === "submitting") return;
     setStatus("submitting");
     setErrors({});
     try {
@@ -34,7 +37,9 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         email: email || undefined,
         direction: directionId ? Number(directionId) : null,
         initial_comment: comment || undefined,
-        consent,
+        consent: consents.personalData,
+        consent_marketing: consents.marketing,
+        consent_version: LEAD_CONSENT_VERSION,
       });
       setStatus("success");
       onSuccess?.();
@@ -114,21 +119,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
           className="w-full resize-none rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
         />
       </div>
-      <label className="flex items-start gap-2 text-xs text-foreground/70">
-        <input
-          required
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5"
-        />
-        <span>
-          Я согласен на обработку персональных данных в соответствии с{" "}
-          <a href="/privacy" className="underline hover:text-blue">
-            политикой конфиденциальности
-          </a>
-        </span>
-      </label>
+      <LeadConsentFields value={consents} onChange={setConsents} errors={errors} />
       {status === "error" && !Object.keys(errors).length && (
         <p className="text-sm text-red-600">
           Не удалось отправить заявку. Попробуйте ещё раз.

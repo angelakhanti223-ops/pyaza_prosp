@@ -15,7 +15,10 @@ export default function LeadFormModal() {
       onClick={close}
     >
       <div
-        className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-xl sm:p-8"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Подобрать тур"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <button

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { ApiError, createLead } from "@/lib/api";
+import LeadConsentFields from "@/components/lead-form/LeadConsentFields";
+import { EMPTY_LEAD_CONSENTS, LEAD_CONSENT_VERSION } from "@/lib/leadConsents";
 
 type ResultKey = "beginner" | "family" | "scenic" | "active" | "freeride" | "premium";
 
@@ -126,7 +128,7 @@ export default function SkiSlopeQuizLeadFirst() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [consent, setConsent] = useState(false);
+  const [consents, setConsents] = useState({ ...EMPTY_LEAD_CONSENTS });
   const [started, setStarted] = useState(false);
   const [answers, setAnswers] = useState<(Option | null)[]>(Array(QUESTIONS.length).fill(null));
   const [leadCreated, setLeadCreated] = useState(false);
@@ -134,7 +136,7 @@ export default function SkiSlopeQuizLeadFirst() {
   const [status, setStatus] = useState<"idle" | "starting" | "submitting" | "success" | "error">("idle");
   const [errorText, setErrorText] = useState("");
 
-  const canStart = name.trim() && phone.trim() && consent;
+  const canStart = name.trim() && phone.trim() && consents.personalData;
   const isComplete = answers.every(Boolean);
 
   const resultKey = useMemo<ResultKey>(() => {
@@ -161,7 +163,9 @@ export default function SkiSlopeQuizLeadFirst() {
         name,
         phone,
         email: email || undefined,
-        consent,
+        consent: consents.personalData,
+        consent_marketing: consents.marketing,
+        consent_version: LEAD_CONSENT_VERSION,
         source: "site_form",
         initial_comment:
           "Клиент начал тест по горным склонам. Контакты сохранены до прохождения теста. Тема: подбор горнолыжного тура.",
@@ -189,7 +193,9 @@ export default function SkiSlopeQuizLeadFirst() {
         name,
         phone,
         email: email || undefined,
-        consent,
+        consent: consents.personalData,
+        consent_marketing: consents.marketing,
+        consent_version: LEAD_CONSENT_VERSION,
         source: "site_form",
         initial_comment: `Результат теста по горным склонам: ${result.title}.\n${result.cta}\n\nОтветы:\n${answerText}`,
       });
@@ -237,17 +243,7 @@ export default function SkiSlopeQuizLeadFirst() {
                 className="rounded-2xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
               />
             </div>
-            <label className="flex items-start gap-2 text-xs leading-5 text-foreground/70">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                Я согласен/согласна на обработку персональных данных. Контакты нужны, чтобы сохранить результат теста и подготовить подбор горного отдыха.
-              </span>
-            </label>
+            <LeadConsentFields value={consents} onChange={setConsents} />
             <button
               type="button"
               disabled={!canStart || status === "starting"}

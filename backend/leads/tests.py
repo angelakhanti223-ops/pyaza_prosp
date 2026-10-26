@@ -1,3 +1,4 @@
+from .consents import PUBLIC_CONSENT_VERSION
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -361,6 +362,7 @@ class LeadCreateSerializerDispatchesNewLeadTaskTests(TestCase):
     def test_create_dispatches_new_lead_task(self, mock_create_task, *_mocks):
         response = self.client.post('/api/leads/', {
             'name': 'Клиент', 'phone': '+79990000000', 'direction': self.direction.id, 'consent': True,
+            'consent_version': PUBLIC_CONSENT_VERSION,
         })
         self.assertEqual(response.status_code, 201)
         lead_id = response.json()['id']

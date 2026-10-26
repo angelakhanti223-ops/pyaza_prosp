@@ -49,6 +49,8 @@ export type LeadPayload = {
   direction?: number | null;
   initial_comment?: string;
   consent: boolean;
+  consent_marketing: boolean;
+  consent_version: string;
   source?: "site_form" | "chatbot";
 };
 

@@ -35,15 +35,19 @@ export const chinaTourBuilderMarkup = String.raw`
       </div>
       <div class="row">
         <h2>Маршрут</h2>
+        <button type="button" class="btn" data-act="simplify">Оставить Пекин и Шанхай</button>
         <div class="seg" role="group" aria-label="Перелёт из Москвы" id="intlSeg">
           <button type="button" data-intl="direct" id="intl-direct">Прямые рейсы</button>
           <button type="button" data-intl="transfer" id="intl-transfer">С пересадками</button>
         </div>
       </div>
+      <p class="note" style="margin-top:12px">Уберите ненужные остановки кнопкой «Убрать город». Отели, экскурсии и переезды автоматически пересчитаются для оставшегося маршрута.</p>
       <div class="route" id="route"></div>
       <div class="add" id="addRow"></div>
 
       <section class="excsec" id="excursions"></section>
+
+      <div class="excursion-cta" id="excursion-cta"></div>
 
       <section class="extras panel" id="extras"></section>
 

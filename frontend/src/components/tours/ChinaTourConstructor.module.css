@@ -71,6 +71,10 @@
 .builder :global(.stepper button){border:0;background:transparent;min-height:36px;width:34px;font-size:18px;color:var(--jade)}
 .builder :global(.stepper span){font-size:12px;min-width:65px;text-align:center;font-weight:600}
 .builder :global(.tools){display:flex;gap:4px;margin-left:auto}.builder :global(.icon-btn){background:white;border:1px solid var(--line);border-radius:9px;min-width:33px;min-height:36px;color:var(--muted)}
+.builder :global(.remove-city){width:auto;padding-inline:10px;font-size:11px;color:#a33434}
+.builder :global(.excursion-cta){margin-top:28px}
+.builder :global(.excursion-cta h2){color:white;font-size:23px;letter-spacing:-.02em}
+.builder :global(.excursion-cta button){color:#0a2047}
 .builder :global(.block){display:grid;gap:8px;margin:0 18px;min-width:0}
 .builder :global(.block-title){font-size:10px;letter-spacing:.08em;font-weight:700;text-transform:uppercase;color:var(--muted)}
 .builder :global(.opts){display:grid;gap:7px}
