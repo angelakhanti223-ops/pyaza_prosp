@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
 import ChinaTours2026 from "@/components/tours/ChinaTours2026";
-
 export const metadata: Metadata = {
-  title: "Туры в Китай 2026 — подборка от Слетать.ру",
-  description:
-    "10 авторских маршрутов по Китаю на 2026 год: Пекин, Шанхай, горы Аватара, панды, Гуйлинь, Гонконг, пляжный Хайнань. Цены от $917, подбор под ваши даты.",
+ title: "Экскурсионные туры в Китай — 51 маршрут | Слетать.ру",
+ description: "Пекин, Шанхай, панды, горы Аватара и Хайнань. 51 маршрут с фотографиями и программами, 10 предложений с расчётом на двоих. Подбор под ваши даты.",
+ alternates: { canonical: "/tours/china-november-2026" },
 };
-
-export default function ChinaTours2026Page() {
-  return <ChinaTours2026 />;
-}
+export default function ChinaToursPage() { return <ChinaTours2026 />; }
