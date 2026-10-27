@@ -65,6 +65,15 @@ export default async function BlogPage({ searchParams }: Props) {
         ))}
       </div>
 
+      {!category && pageNumber === 1 && (
+        <a href="/blog/bali-december.html" className="mt-8 block rounded-3xl bg-navy p-6 text-white transition hover:bg-blue sm:p-8">
+          <p className="text-xs uppercase tracking-widest text-gold">Декабрь на Бали</p>
+          <h2 className="mt-3 text-2xl font-bold">Поменять декабрьскую серость на Бали</h2>
+          <p className="mt-3 text-white/80">Путешествие, чтобы выдохнуть: впечатления острова и 10 отелей в Нуса-Дуа, Джимбаране и Сануре.</p>
+          <p className="mt-4 font-semibold">От 154 200 ₽ на двоих с перелётом · Читать статью →</p>
+        </a>
+      )}
+
       {articlesPage.results.length > 0 ? (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {articlesPage.results.map((article) => (
