@@ -21,6 +21,7 @@ PUBLIC_PAGES = {
     '/': 'Главная',
     '/tours': 'Туры и путёвки',
     '/tours/china-constructor': 'Конструктор тура в Китай',
+    '/tours/kaliningrad-newyear-2027': 'Калининград · Новый год 2027 · Семья 2+1',
     '/tours/russia-january-2027': 'Туры по России · январь 2027',
     '/tours/china-2026': 'Туры в Китай · 2026',
     '/tours/china-november-2026': 'Китай · ноябрь 2026',

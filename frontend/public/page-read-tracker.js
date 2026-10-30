@@ -1,7 +1,7 @@
 // Shared by App Router pages and the standalone China constructor.
 // Never persist a visitor ID, URL parameters, referrer, form data or document title.
 export const PUBLIC_PAGE_PATHS = [
-  '/', '/tours', '/tours/china-constructor', '/tours/russia-january-2027',
+  '/', '/tours', '/tours/china-constructor', '/tours/russia-january-2027', '/tours/kaliningrad-newyear-2027',
   '/tours/china-2026', '/tours/china-november-2026', '/tours/shanghai-beijing-constructor',
   '/directions', '/cruises', '/promotions', '/blog', '/blog/kakie-gory-i-sklon-vam-podoydut',
   '/middle-east', '/about', '/team', '/certificates', '/gift-certificates', '/contacts', '/privacy', '/terms',

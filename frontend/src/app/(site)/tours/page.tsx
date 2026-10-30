@@ -45,6 +45,13 @@ export default async function ToursPage() {
           comment="Заявка со страницы туров"
         />
 
+        <a href="/tours/kaliningrad-newyear-2027" className="mt-10 block rounded-3xl border border-gold/30 bg-cream p-6 transition hover:shadow-md sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue">Новый год 2027 · Семейные каникулы</p>
+          <h2 className="mt-3 text-2xl font-bold text-navy">Калининград: замки, праздничные города и зимнее море</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70">Подборка на 6–7 ночей для 2 взрослых и ребёнка 9 лет. Выберите даты и отель, сравните перелёты из Москвы, Саратова и Самары.</p>
+          <span className="mt-5 inline-block rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white">Выбрать семейную поездку →</span>
+        </a>
+
         <a
           href="/tours/russia-january-2027"
           className="mt-10 block rounded-3xl border border-navy/10 bg-blue-light p-6 transition hover:shadow-md sm:p-8"
