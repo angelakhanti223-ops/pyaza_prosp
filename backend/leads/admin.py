@@ -10,6 +10,7 @@ from .models import (
     LeadStatusHistory,
     LeadTag,
     MonthlyPlan,
+    OfficeGoals,
     TourOperator,
     TourOperatorExchangeRate,
     WorkShift,
@@ -138,3 +139,9 @@ class WorkShiftAdmin(admin.ModelAdmin):
     list_filter = ('manager',)
     date_hierarchy = 'date'
     ordering = ('date',)
+
+
+@admin.register(OfficeGoals)
+class OfficeGoalsAdmin(admin.ModelAdmin):
+    list_display = ('year', 'month', 'turnover_target', 'commission_receipts_target', 'commission_receipts_actual')
+    list_filter = ('year', 'month')

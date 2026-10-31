@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .dashboard import DashboardView, PlanView, WorkScheduleView, WorkSummaryView
 from .management_dashboard import ManagementDashboardView
+from .office_goals import OfficeGoalsView
 
 router = DefaultRouter()
 router.register('crm/leads', views.LeadViewSet, basename='crm-lead')
@@ -17,6 +18,7 @@ urlpatterns = [
     path('crm/contacts/', views.ContactListView.as_view(), name='crm-contacts'),
     path('crm/dashboard/', DashboardView.as_view(), name='crm-dashboard'),
     path('crm/management-dashboard/', ManagementDashboardView.as_view(), name='crm-management-dashboard'),
+    path('crm/office-goals/', OfficeGoalsView.as_view(), name='crm-office-goals'),
     path('crm/plan/', PlanView.as_view(), name='crm-plan'),
     path('crm/summary/', WorkSummaryView.as_view(), name='crm-work-summary'),
     path('crm/work-schedule/', WorkScheduleView.as_view(), name='crm-work-schedule'),
