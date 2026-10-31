@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { subscribe } from "@/lib/api";
+import { ApiError, subscribe } from "@/lib/api";
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [errorText, setErrorText] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (status === "submitting") return;
+    setErrorText("");
     if (!consent) {
       setStatus("error");
       return;
@@ -18,7 +21,8 @@ export default function NewsletterForm() {
     try {
       await subscribe({ email, consent });
       setStatus("success");
-    } catch {
+    } catch (error) {
+      setErrorText(error instanceof ApiError ? Object.values(error.fieldErrors).flat().join(" ") : "");
       setStatus("error");
     }
   }
@@ -53,15 +57,16 @@ export default function NewsletterForm() {
       <label className="mt-2 flex items-start gap-2 text-[11px] text-white/50">
         <input
           type="checkbox"
+          required
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
           className="mt-0.5"
         />
-        Согласен на получение рассылки и обработку персональных данных
+        <span>Согласен на получение рассылки и обработку персональных данных. <a href="/consents/marketing" target="_blank" rel="noopener noreferrer" className="underline">Условия рассылки</a></span>
       </label>
       {status === "error" && (
-        <p className="mt-1 text-xs text-red-300">
-          {consent ? "Не удалось подписаться. Попробуйте ещё раз." : "Подтвердите согласие на рассылку."}
+        <p role="alert" className="mt-1 text-xs text-red-300">
+          {consent ? errorText || "Не удалось подписаться. Попробуйте ещё раз." : "Подтвердите согласие на рассылку."}
         </p>
       )}
     </form>

@@ -63,15 +63,22 @@ export type SubscribePayload = {
 class ApiError extends Error {
   fieldErrors: Record<string, string[]>;
 
-  constructor(fieldErrors: Record<string, string[]>) {
+  constructor(data: unknown) {
     super("Ошибка отправки формы");
-    this.fieldErrors = fieldErrors;
+    const entries = data && typeof data === "object" && !Array.isArray(data)
+      ? Object.entries(data) : [];
+    this.fieldErrors = Object.fromEntries(entries.flatMap(([key, value]) => {
+      const messages = (Array.isArray(value) ? value : [value])
+        .filter((item): item is string => typeof item === "string" && item.length > 0);
+      return messages.length ? [[key, messages]] : [];
+    }));
   }
 }
 
 async function postJson<T>(path: string, payload: T): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
+    credentials: "omit",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });

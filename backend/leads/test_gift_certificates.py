@@ -136,6 +136,15 @@ class PublicApplicationSessionCsrfTests(TestCase):
         self.assertEqual(response.status_code, 400, response.content)
         self.assertFalse(Lead.objects.exists())
 
+    def test_anonymous_gift_and_tour_forms_with_csrf_enforcement(self):
+        from .consents import PUBLIC_CONSENT_VERSION
+        self.client.logout()
+        self.assertEqual(self.client.post('/api/gift-certificates/', self.payload, content_type='application/json').status_code, 201)
+        self.assertEqual(self.client.post('/api/leads/', dict(name='Тест тура', phone='+79991234567',
+                         consent=True, consent_marketing=False, consent_version=PUBLIC_CONSENT_VERSION),
+                         content_type='application/json').status_code, 201)
+        self.assertEqual(Lead.objects.count(), 2)
+
     def test_internal_crm_still_requires_csrf_for_session_requests(self):
         response = self.client.post('/api/crm/leads/', {'name':'Не создавать', 'phone':'+79991234567'},
                                     content_type='application/json')
