@@ -40,8 +40,17 @@ def _dt(year, month, day, h=0, m=0, s=0, us=0):
     return timezone.make_aware(datetime(year, month, day, h, m, s, us))
 
 
-def period_bounds(period):
+def period_bounds(period, *, year=None, month=None):
     """Calendar reporting periods for management dashboard."""
+    if year is not None or month is not None:
+        year, month = int(year), int(month)
+        last_day = monthrange(year, month)[1]
+        return (
+            _dt(year, month, 1),
+            _dt(year, month, last_day, 23, 59, 59, 999999),
+            f'{month:02d}.{year}',
+        )
+
     today = timezone.localdate()
 
     if period == 'current_week':
@@ -182,7 +191,17 @@ class ManagementDashboardView(APIView):
             return Response({'detail': 'Недостаточно прав'}, status=403)
 
         period_code = request.query_params.get('period') or 'current_month'
-        date_from, date_to, period_label = period_bounds(period_code)
+        year, month = request.query_params.get('year'), request.query_params.get('month')
+        if period_code == 'custom_month' or year is not None or month is not None:
+            if year is None or month is None:
+                return Response({'detail': 'Укажите год и месяц вместе.'}, status=400)
+            try:
+                date_from, date_to, period_label = period_bounds(period_code, year=year, month=month)
+            except (ValueError, TypeError, OverflowError):
+                return Response({'detail': 'Некорректный год или месяц.'}, status=400)
+            period_code = 'custom_month'
+        else:
+            date_from, date_to, period_label = period_bounds(period_code)
 
         all_leads = Lead.objects.select_related('assigned_manager', 'direction')
         period_leads = all_leads.filter(created_at__gte=date_from, created_at__lte=date_to)
@@ -227,6 +246,14 @@ class ManagementDashboardView(APIView):
             commission=Sum('commission'),
             deal_amount=Sum('deal_amount'),
             deals=Count('id'),
+        )
+        # Use the same complete RUB records for both sides of the rate.
+        commission_rate_totals = revenue_leads.filter(
+            commission__isnull=False, deal_amount__gt=0, tour_currency=Lead.Currency.RUB,
+        ).aggregate(commission=Sum('commission'), amount=Sum('deal_amount'), count=Count('id'))
+        commission_rate = (
+            round(float(commission_rate_totals['commission'] / commission_rate_totals['amount'] * 100), 2)
+            if commission_rate_totals['amount'] else None
         )
         incoming_count = period_leads.count()
         conversion = {
@@ -367,6 +394,8 @@ class ManagementDashboardView(APIView):
                 'deal_amount_total': money(money_totals['deal_amount']),
                 'deals_count': money_totals['deals'],
                 'active_period_count': active_period_leads.count(),
+                'commission_rate_percent': commission_rate,
+                'commission_rate_deals_count': commission_rate_totals['count'],
             },
             'manager_rows': sorted(manager_map.values(), key=lambda row: (row['commission'], row['active']), reverse=True),
             'status_rows': status_rows,

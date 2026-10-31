@@ -1,6 +1,6 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-export type ManagementPeriod = "current_week" | "current_month" | "last_month" | "current_year";
+export type ManagementPeriod = "current_week" | "current_month" | "last_month" | "current_year" | "custom_month";
 
 export type ManagementOperational = {
   tasks_today: number;
@@ -24,6 +24,8 @@ export type ManagementMoney = {
   deal_amount_total: number;
   deals_count: number;
   active_period_count: number;
+  commission_rate_percent?: number | null;
+  commission_rate_deals_count?: number;
 };
 
 export type ManagementConversion = {
@@ -122,8 +124,12 @@ export type ManagementDashboardData = {
   drilldowns: Record<ManagementDrilldownKey, ManagementDrilldown>;
 };
 
-export async function fetchManagementDashboard(period: ManagementPeriod): Promise<ManagementDashboardData> {
+export async function fetchManagementDashboard(period: ManagementPeriod, month?: { year: number; month: number }): Promise<ManagementDashboardData> {
   const qs = new URLSearchParams({ period });
+  if (month) {
+    qs.set("year", String(month.year));
+    qs.set("month", String(month.month));
+  }
   const res = await fetch(`${API_BASE_URL}/api/crm/management-dashboard/?${qs.toString()}`, { credentials: "include" });
   if (!res.ok) throw new Error("Не удалось загрузить управленческий дашборд");
   return res.json();

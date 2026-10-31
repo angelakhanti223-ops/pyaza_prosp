@@ -322,6 +322,34 @@ class WorkShift(models.Model):
         return f'{self.date}: {self.manager}'
 
 
+class OfficeGoals(models.Model):
+    """Office targets for one calendar month; cash receipts are distinct from booking commission."""
+
+    year = models.PositiveSmallIntegerField('Год')
+    month = models.PositiveSmallIntegerField('Месяц')
+    turnover_target = models.DecimalField('Стоимость туров, ₽', max_digits=12, decimal_places=2)
+    commission_receipts_target = models.DecimalField('Поступление комиссии, ₽', max_digits=12, decimal_places=2)
+    commission_receipts_actual = models.DecimalField('Факт поступления комиссии, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
+    commission_basis = models.CharField('Тип цели по комиссии', max_length=20, choices=[('cash_receipts', 'Поступления'), ('bookings', 'Комиссия по бронированиям')], default='cash_receipts')
+    leads_target = models.PositiveIntegerField('Лиды')
+    conversion_target = models.DecimalField('Конверсия, %', max_digits=5, decimal_places=2)
+    commission_rate_target = models.DecimalField('Комиссия по бронированиям, %', max_digits=5, decimal_places=2, null=True, blank=True)
+    russian_express_target = models.DecimalField('Русский Экспресс, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
+    resort_space_target = models.DecimalField('Резорт / Спейс, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
+    articles_target = models.PositiveSmallIntegerField('Количество статей', null=True, blank=True)
+    activities = models.JSONField('Задачи месяца', default=list, blank=True)
+
+    class Meta:
+        ordering = ['-year', '-month']
+        constraints = [
+            models.UniqueConstraint(fields=['year', 'month'], name='unique_office_goals_month'),
+            models.CheckConstraint(condition=models.Q(month__gte=1, month__lte=12), name='office_goals_valid_month'),
+        ]
+
+    def __str__(self):
+        return f'Цели офиса — {self.month:02d}.{self.year}'
+
+
 class LeadComment(models.Model):
     """Лента комментариев менеджера по ходу работы с заявкой."""
 
