@@ -92,3 +92,53 @@ class GiftCertificateApplicationTests(TestCase):
         frontend = Path(__file__).resolve().parents[2]/'frontend/src/content/giftConsents.json'
         if frontend.exists():
             self.assertEqual(json.loads(frontend.read_text()), CONSENTS)
+
+
+class PublicApplicationSessionCsrfTests(TestCase):
+    """Public forms must work even when this browser has an active CRM session."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from django.test import Client
+        self.client = Client(enforce_csrf_checks=True)
+        user = get_user_model().objects.create_user(username='gift-session-test', password='test-password')
+        self.client.force_login(user)
+        # A CRM tab may have already set the cookie; the public form sends no
+        # CSRF header. This reproduces "CSRF token missing" with real middleware.
+        self.client.cookies['csrftoken'] = 'a' * 32
+        for target in ('leads.tasks.create_new_lead_task.delay',
+                       'emailing.tasks.send_lead_notification_task.delay',
+                       'integrations.tasks.sync_lead_to_uon.delay'):
+            patcher = patch(target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.payload = dict(name='Тест сертификата', phone='+79991234567', amount=25000,
+                            consent_personal_data=True, consent_communication=True,
+                            consent_marketing=False, consent_version=CONSENTS['version'])
+
+    def test_gift_with_crm_session_and_no_csrf_token_is_created(self):
+        response = self.client.post('/api/gift-certificates/', self.payload, content_type='application/json')
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(Lead.objects.count(), 1)
+        self.assertTrue(Lead.objects.get().gift_certificate_application)
+
+    def test_public_tour_enquiry_with_crm_session_is_created(self):
+        from .consents import PUBLIC_CONSENT_VERSION
+        response = self.client.post('/api/leads/', dict(name='Тест тура', phone='+79991234567',
+                                    consent=True, consent_marketing=False,
+                                    consent_version=PUBLIC_CONSENT_VERSION), content_type='application/json')
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(Lead.objects.count(), 1)
+
+    def test_gift_validation_still_rejects_missing_consent(self):
+        response = self.client.post('/api/gift-certificates/', {**self.payload, 'consent_personal_data':False},
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertFalse(Lead.objects.exists())
+
+    def test_internal_crm_still_requires_csrf_for_session_requests(self):
+        response = self.client.post('/api/crm/leads/', {'name':'Не создавать', 'phone':'+79991234567'},
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertIn('CSRF', response.json()['detail'])
+        self.assertFalse(Lead.objects.exists())

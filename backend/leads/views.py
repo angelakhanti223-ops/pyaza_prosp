@@ -89,6 +89,9 @@ class LeadCreateView(generics.CreateAPIView):
     """Приём заявки с публичного сайта: создаёт Lead со статусом «Новая»."""
 
     serializer_class = LeadCreateSerializer
+    # Public intake never acts on behalf of the logged-in CRM user. Ignore an
+    # incidental session cookie so SessionAuthentication cannot require CSRF here.
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'lead_create'
