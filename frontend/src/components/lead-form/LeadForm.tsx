@@ -120,9 +120,9 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         />
       </div>
       <LeadConsentFields value={consents} onChange={setConsents} errors={errors} />
-      {status === "error" && !Object.keys(errors).length && (
-        <p className="text-sm text-red-600">
-          Не удалось отправить заявку. Попробуйте ещё раз.
+      {status === "error" && (
+        <p role="alert" className="text-sm text-red-600">
+          {Object.values(errors).flat().join(" ") || "Не удалось отправить заявку. Попробуйте ещё раз."}
         </p>
       )}
       <button

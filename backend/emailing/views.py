@@ -21,6 +21,7 @@ class SubscribeView(generics.CreateAPIView):
     """Подписка на email-рассылку с сайта (ТЗ 3.1, 9.2)."""
 
     serializer_class = SubscribeSerializer
+    authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'subscribe'

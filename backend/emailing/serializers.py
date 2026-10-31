@@ -11,6 +11,8 @@ class SubscribeSerializer(serializers.ModelSerializer):
         model = EmailSubscriber
         fields = ['id', 'email', 'name', 'consent']
         read_only_fields = ['id']
+        # Existing addresses are deliberately updated/reactivated in create().
+        extra_kwargs = {'email': {'validators': []}}
 
     def validate_consent(self, value):
         if not value:

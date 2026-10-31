@@ -1,0 +1,98 @@
+[
+  {
+    "path": "/",
+    "status": 200
+  },
+  {
+    "path": "/tours",
+    "status": 200
+  },
+  {
+    "path": "/directions",
+    "status": 200
+  },
+  {
+    "path": "/cruises",
+    "status": 200
+  },
+  {
+    "path": "/promotions",
+    "status": 200
+  },
+  {
+    "path": "/contacts",
+    "status": 200
+  },
+  {
+    "path": "/about",
+    "status": 200
+  },
+  {
+    "path": "/team",
+    "status": 200
+  },
+  {
+    "path": "/gift-certificates",
+    "status": 200
+  },
+  {
+    "path": "/consents/personal-data",
+    "status": 200
+  },
+  {
+    "path": "/consents/marketing",
+    "status": 200
+  },
+  {
+    "path": "/gift-certificates/personal-data",
+    "status": 200
+  },
+  {
+    "path": "/gift-certificates/communication",
+    "status": 200
+  },
+  {
+    "path": "/gift-certificates/marketing",
+    "status": 200
+  },
+  {
+    "path": "/blog/kakie-gory-i-sklon-vam-podoydut",
+    "status": 200
+  },
+  {
+    "path": "/tours/china-constructor",
+    "status": 200
+  },
+  {
+    "path": "/tours/shanghai-beijing-constructor",
+    "status": 200
+  },
+  {
+    "path": "/tours/china-2026",
+    "status": 200
+  },
+  {
+    "path": "/tours/china-november-2026",
+    "status": 200
+  },
+  {
+    "path": "/tours/russia-january-2027",
+    "status": 200
+  },
+  {
+    "path": "/tours/kaliningrad-newyear-2027",
+    "status": 200
+  },
+  {
+    "path": "/candidates",
+    "status": 200
+  },
+  {
+    "path": "/candidate-form.html",
+    "status": 200
+  },
+  {
+    "path": "/api/directions/",
+    "status": 200
+  }
+]

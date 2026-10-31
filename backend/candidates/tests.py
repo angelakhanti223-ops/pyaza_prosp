@@ -33,6 +33,14 @@ class CandidateWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         return Candidate.objects.get(pk=response.data['id'])
 
+    def test_public_submission_with_active_crm_session_and_csrf_enforcement(self):
+        self.client = APIClient(enforce_csrf_checks=True)
+        user = get_user_model().objects.create_user(username='candidate-csrf', password='test')
+        self.client.force_login(user)
+        self.client.cookies['csrftoken'] = 'a' * 32
+        self.assertEqual(self.submit().status_code, 201)
+        self.assertEqual(Candidate.objects.count(), 1)
+
     def test_submission_creates_complete_private_pdf_and_consent_snapshot(self):
         candidate = self.candidate()
         self.assertTrue(bytes(candidate.pdf_content).startswith(b'%PDF-'))
