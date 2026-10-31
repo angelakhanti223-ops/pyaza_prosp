@@ -116,17 +116,18 @@ def amount_sum(qs, field):
     return money(qs.aggregate(total=Sum(field))['total'])
 
 
-def recognized_revenue_dates(base_qs, date_from, date_to):
+def recognized_revenue_dates(base_qs, date_from, date_to, *, statuses=None):
     """Return {lead_id: recognized_at} by first transition to money status."""
+    statuses = MONEY_STATUSES if statuses is None else statuses
     candidate_ids = list(
         base_qs.filter(
-            Q(status__in=MONEY_STATUSES) | Q(status_history__new_status__in=MONEY_STATUSES),
+            Q(status__in=statuses) | Q(status_history__new_status__in=statuses),
         ).values_list('id', flat=True).distinct()
     )
 
     first_recognized_at = {}
     for lead_id, changed_at in (
-        LeadStatusHistory.objects.filter(lead_id__in=candidate_ids, new_status__in=MONEY_STATUSES)
+        LeadStatusHistory.objects.filter(lead_id__in=candidate_ids, new_status__in=statuses)
         .order_by('lead_id', 'changed_at')
         .values_list('lead_id', 'changed_at')
     ):
@@ -135,7 +136,7 @@ def recognized_revenue_dates(base_qs, date_from, date_to):
     recognized = {}
     for lead_id, status, updated_at in base_qs.filter(id__in=candidate_ids).values_list('id', 'status', 'updated_at'):
         recognized_at = first_recognized_at.get(lead_id)
-        if recognized_at is None and status in MONEY_STATUSES:
+        if recognized_at is None and status in statuses:
             recognized_at = updated_at
         if recognized_at is not None and date_from <= recognized_at <= date_to:
             recognized[lead_id] = recognized_at
