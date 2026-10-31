@@ -8,6 +8,7 @@ export type OfficeGoalsData = {
   commission_basis: "cash_receipts" | "bookings";
   commission_receipts_actual: number | null;
   activities: OfficeGoalActivity[];
+  operator_progress: { key: string; name: string; target: number; amount: number | null; bookings_count: number; counted_count: number; missing_count: number }[];
 };
 
 export async function fetchOfficeGoals(month: { year: number; month: number }): Promise<OfficeGoalsData> {

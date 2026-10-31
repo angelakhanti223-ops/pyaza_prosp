@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from .management_dashboard import can_view_management, money, period_bounds
 from .models import OfficeGoals
+from .operator_goals import operator_progress
 
 
 class OfficeGoalsUpdateSerializer(serializers.Serializer):
@@ -68,6 +69,7 @@ class OfficeGoalsView(APIView):
                 money(goals.commission_receipts_actual) if goals.commission_receipts_actual is not None else None
             ),
             'activities': goals.activities,
+            'operator_progress': operator_progress(goals),
         })
 
     def patch(self, request):

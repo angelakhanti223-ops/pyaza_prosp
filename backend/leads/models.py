@@ -336,6 +336,8 @@ class OfficeGoals(models.Model):
     commission_rate_target = models.DecimalField('Комиссия по бронированиям, %', max_digits=5, decimal_places=2, null=True, blank=True)
     russian_express_target = models.DecimalField('Русский Экспресс, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
     resort_space_target = models.DecimalField('Резорт / Спейс, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
+    resort_target = models.DecimalField('Резорт, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
+    space_target = models.DecimalField('Спейс, ₽', max_digits=12, decimal_places=2, null=True, blank=True)
     articles_target = models.PositiveSmallIntegerField('Количество статей', null=True, blank=True)
     activities = models.JSONField('Задачи месяца', default=list, blank=True)
 
