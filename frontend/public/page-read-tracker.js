@@ -5,6 +5,7 @@ export const PUBLIC_PAGE_PATHS = [
   '/tours/china-2026', '/tours/china-november-2026', '/tours/shanghai-beijing-constructor',
   '/directions', '/cruises', '/promotions', '/blog', '/blog/kakie-gory-i-sklon-vam-podoydut',
   '/middle-east', '/about', '/team', '/certificates', '/gift-certificates', '/contacts', '/request', '/privacy', '/terms',
+  '/travel-horoscope-2027',
 ];
 const MAX_ACTIVE_MS = 2 * 60 * 60 * 1000;
 

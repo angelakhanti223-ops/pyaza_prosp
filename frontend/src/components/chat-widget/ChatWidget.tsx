@@ -167,7 +167,7 @@ export default function ChatWidget() {
 
   const currentStep = STEPS[stepIndex];
 
-  if (pathname === "/request") return null;
+  if (pathname === "/request" || pathname === "/travel-horoscope-2027") return null;
 
   return (
     <>
