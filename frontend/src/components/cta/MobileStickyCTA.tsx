@@ -12,7 +12,9 @@ const EMAIL_LINK = "mailto:pnztour@mail.ru?subject=%D0%9F%D0%BE%D0%B4%D0%B1%D0%B
 const smallButton = "inline-flex items-center justify-center gap-1 rounded-full px-2 py-2 text-[11px] font-semibold";
 
 export default function MobileStickyCTA() {
-  const giftPage = usePathname() === "/gift-certificates";
+  const pathname = usePathname();
+  const giftPage = pathname === "/gift-certificates";
+  if (pathname === "/request") return null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-white/95 px-3 py-2 shadow-2xl backdrop-blur sm:hidden">
       <div className="mx-auto flex max-w-md flex-col gap-2 pr-16">
