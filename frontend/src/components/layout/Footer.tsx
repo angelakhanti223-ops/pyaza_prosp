@@ -74,6 +74,7 @@ export default function Footer() {
             <p>© Слетать.ру, г. Пенза. Все права защищены.</p>
             <div className="flex flex-wrap gap-4">
               <Link href="/request" className="hover:text-white/70">Оставить заявку</Link>
+              <Link href="/travel-horoscope-2027" className="hover:text-white/70">Звёздный маршрут — 2027</Link>
               <Link href="/gift-certificates" className="hover:text-white/70">Подарочные сертификаты</Link>
               <Link href="/privacy" className="hover:text-white/70">
                 Политика конфиденциальности

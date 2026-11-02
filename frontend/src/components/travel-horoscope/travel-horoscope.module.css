@@ -1,0 +1,157 @@
+.page { color: #122b52; background: #fbf8f2; }
+.hero { position: relative; overflow: hidden; color: #fff; background: #07152e; padding: 30px 24px 64px; }
+.sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: radial-gradient(ellipse at 76% 35%, #204a6f55, transparent 55%), radial-gradient(ellipse at 14% 100%, #55457e55, transparent 60%); }
+.starLayer { position: absolute; inset: -20px; animation: drift 65s ease-in-out infinite alternate; }
+.starLayer i { position: absolute; left: var(--x); top: var(--y); width: var(--size); height: var(--size); border-radius: 50%; background: #fff8d9; box-shadow: 0 0 6px #c0dbff88; animation: twinkle var(--duration) ease-in-out var(--delay) infinite alternate; }
+.orbit, .orbitInner { position: absolute; border: 1px solid #c9d8f01c; border-radius: 50%; width: 700px; height: 700px; right: -140px; top: -230px; transform: rotate(-25deg) scaleY(.6); }
+.orbitInner { width: 530px; height: 530px; right: -55px; top: -145px; }
+.planet { position: absolute; right: 12%; top: 150px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle at 27% 25%, #c8c0a8, #687989 35%, #182d48 69%, #07152e 85%); opacity: .27; box-shadow: 0 0 80px #879cc822; }
+.paused *, .paused { animation-play-state: paused !important; }
+@keyframes twinkle { from { opacity: .28; } to { opacity: .9; } }
+@keyframes drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-12px, 18px, 0); } }
+.heroContent { position: relative; max-width: 1120px; margin: auto; }
+.heroTop { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-bottom: 32px; border-bottom: 1px solid #ffffff16; }
+.eyebrow, .sectionLabel, .cardEyebrow { font-size: 10px; font-weight: 650; letter-spacing: .14em; }
+.eyebrow { display: flex; align-items: center; gap: 10px; color: #e9ca8d; }
+.motion { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: #d1dae8; font-size: 11px; cursor: pointer; }
+.motion:disabled { cursor: default; opacity: .7; }
+.heroGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 410px); gap: 80px; align-items: center; padding-top: 48px; }
+.heroCopy h1 { font-size: clamp(42px, 4.8vw, 64px); line-height: 1.09; font-weight: 550; letter-spacing: -.045em; }
+.heroCopy h1 em { color: #e9ca8d; font-family: Georgia, serif; font-weight: normal; }
+.heroCopy > p { max-width: 420px; margin-top: 28px; font-size: 16px; line-height: 1.7; color: #c2cddd; }
+.heroFoot { display: block; font-size: 11px; color: #aab8cd; margin-top: 38px; letter-spacing: .04em; }
+.dateCard { border: 1px solid #ffffff27; border-radius: 22px; padding: 30px; background: #0d2139eb; box-shadow: 0 18px 80px #0002; min-width: 0; }
+.cardEyebrow { color: #bfcadb; font-size: 9px; letter-spacing: .1em; }
+.dateCard h2 { margin: 14px 0 26px; font-size: 27px; font-weight: 550; letter-spacing: -.035em; }
+.dateCard label { display: block; font-size: 13px; margin-bottom: 9px; color: #e2e8ef; }
+.dateCard input { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 11px; background: white; color: #122b52; font-size: 17px; border: 2px solid transparent; color-scheme: light; }
+.dateCard input:focus { outline: 2px solid #e9ca8d; outline-offset: 3px; }
+.dateCard input[aria-invalid=true] { border-color: #f8a1a1; }
+.hint { color: #aebed0; font-size: 11px; line-height: 1.6; margin-top: 12px; }
+.detected { display: flex; gap: 12px; align-items: center; min-height: 80px; margin: 20px 0 8px; padding: 14px; border: 1px solid #ffffff19; border-radius: 12px; color: #d3deeb; font-size: 12px; }
+.detected > span:first-child:not(:last-child) { font-family: Georgia, serif; font-size: 34px; color: #e9ca8d; }
+.detected svg { color: #d9bb86; flex-shrink: 0; }
+.detected strong { display: block; font-size: 15px; font-weight: 550; color: #fff; }
+.detected small { display: block; font-size: 11px; line-height: 1.5; margin-top: 4px; }
+.error { font-size: 12px; color: #ffc5c5; line-height: 1.5; }
+.error:not(:empty) { margin: 10px 0; }
+.primary { display: inline-flex; gap: 12px; align-items: center; justify-content: center; min-height: 54px; padding: 14px 22px; border-radius: 12px; background: #e0b15a; color: #0c2343; font-size: 14px; font-weight: 650; transition: background .2s; cursor: pointer; }
+.primary:hover { background: #edc77f; }
+.primary svg { flex-shrink: 0; }
+.dateCard > .primary { width: 100%; margin-top: 10px; }
+.calendarNote { font-size: 10px; line-height: 1.6; color: #aebed0; margin-top: 14px; }
+.page button:focus-visible, .page a:focus-visible, .result:focus-visible { outline: 3px solid #b2873f; outline-offset: 4px; }
+.body { max-width: 1120px; margin: auto; padding: 32px 24px 56px; }
+.choose > p { font-size: 14px; font-weight: 550; margin-bottom: 16px; }
+.choose > p span { color: #708093; font-weight: 400; margin-left: 6px; }
+.signs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.signs button { min-width: 0; display: flex; align-items: center; gap: 8px; justify-content: center; min-height: 48px; border: 1px solid #e6e0d6; border-radius: 10px; color: #526078; background: #fff8; font-size: 12px; cursor: pointer; }
+.signs button span { font-family: Georgia, serif; font-size: 22px; color: #967541; }
+.signs button:hover, .signs button[aria-pressed=true] { color: #fff; background: #122e54; border-color: #122e54; }
+.signs button[aria-pressed=true] span, .signs button:hover span { color: #e9ca8d; }
+.result { margin-top: 36px; padding: 40px; background: #fff; border: 1px solid #eae4da; border-radius: 22px; scroll-margin-top: 110px; }
+.resultHead { display: flex; gap: 22px; align-items: center; }
+.seal { width: 86px; height: 86px; flex-shrink: 0; display: grid; place-items: center; font-size: 48px; font-family: Georgia, serif; background: #f6f0e5; color: #927039; border-radius: 50%; border: 1px solid #e9dcc3; }
+.sectionLabel { color: #94743e; }
+.result h2 { font-size: 33px; letter-spacing: -.035em; font-weight: 600; line-height: 1.2; margin-top: 10px; }
+.result h2 span { font-size: 25px; font-family: Georgia, serif; font-style: italic; font-weight: 400; color: #8d7650; }
+.dates { color: #758092; font-size: 12px; margin-top: 9px; }
+.resultIntro { font-size: 17px; line-height: 1.8; color: #526078; margin: 28px 0; max-width: 850px; }
+.window { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-radius: 12px; background: #f6f1e7; color: #85662f; }
+.window svg { flex-shrink: 0; }
+.window h3 { font-size: 11px; font-weight: 500; }
+.window p { margin-top: 5px; font-size: 17px; color: #183357; }
+.routeHeading { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin: 36px 0 6px; }
+.routeHeading h3 { font-size: 22px; font-weight: 550; letter-spacing: -.02em; }
+.routeHeading > span { font-size: 11px; color: #7b8490; }
+.routes li { display: flex; gap: 24px; padding: 24px 0; border-bottom: 1px solid #edf0f3; }
+.routeNumber { width: 24px; color: #b28a48; font-size: 13px; padding-top: 3px; flex-shrink: 0; }
+.routes h4 { font-size: 17px; font-weight: 550; line-height: 1.5; }
+.routes p { color: #647082; font-size: 14px; line-height: 1.7; margin-top: 7px; max-width: 800px; }
+.routeCta { display: inline-flex; align-items: center; gap: 6px; color: #1a5fc8; min-height: 44px; margin-top: 4px; font-size: 12px; font-weight: 550; cursor: pointer; }
+.details { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 30px; }
+.details h3 { font-size: 12px; color: #967541; }
+.details p { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #526078; }
+.tip { margin-top: 28px; padding-top: 24px; border-top: 1px solid #edf0f3; font-size: 13px; color: #647082; line-height: 1.7; }
+.tip strong { color: #183357; font-weight: 550; }
+.resultCta { display: flex; gap: 24px; align-items: center; justify-content: space-between; margin-top: 30px; padding: 26px; border-radius: 14px; background: #eff4fa; }
+.resultCta h3 { font-size: 18px; font-weight: 550; }
+.resultCta p { font-size: 13px; line-height: 1.6; color: #647082; max-width: 440px; margin-top: 8px; }
+.resultCta button { flex-shrink: 0; }
+.empty { display: flex; align-items: center; justify-content: center; gap: 18px; text-align: left; padding: 44px 20px; border: 1px dashed #d7c9af; border-radius: 16px; margin-top: 32px; color: #967541; }
+.empty p { font-size: 14px; line-height: 1.8; color: #5f6e82; }
+.empty strong { font-weight: 500; color: #183357; }
+.eclipse { display: flex; align-items: center; gap: 30px; margin-top: 36px; padding: 32px; border: 1px solid #e6dfd3; border-radius: 18px; }
+.eclipseIcon { width: 72px; height: 72px; border-radius: 50%; background: #0d203c; box-shadow: 0 0 0 2px #c99e57, 0 0 28px #d9b66a55; flex-shrink: 0; }
+.eclipse h2 { font-size: 22px; line-height: 1.35; font-weight: 550; margin-top: 8px; }
+.eclipse p:not(.sectionLabel) { margin-top: 10px; font-size: 13px; line-height: 1.7; color: #647082; max-width: 750px; }
+.eclipse a { min-height: 36px; display: inline-flex; gap: 5px; align-items: center; font-size: 11px; color: #1a5fc8; margin-top: 8px; }
+.editorial { margin: 28px auto 0; color: #748091; font-size: 11px; line-height: 1.8; }
+.editorial p + p { margin-top: 12px; }
+.editorial a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 900px) {
+  .heroGrid { gap: 36px; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
+  .heroCopy h1 { font-size: 43px; }
+  .dateCard { padding: 24px; }
+}
+@media (max-width: 767px) {
+  .hero { padding: 16px 16px 30px; }
+  .heroTop { gap: 8px; align-items: start; padding-bottom: 16px; }
+  .eyebrow { font-size: 8px; letter-spacing: .08em; gap: 6px; padding-top: 10px; }
+  .eyebrow svg { width: 13px; }
+  .motion { max-width: 100px; font-size: 9px; line-height: 1.5; text-align: left; }
+  .heroGrid { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-top: 28px; }
+  .heroCopy h1 { font-size: 43px; line-height: 1.08; }
+  .heroCopy > p { font-size: 14px; line-height: 1.65; margin-top: 20px; }
+  .heroFoot { margin-top: 16px; font-size: 10px; }
+  .dateCard { padding: 22px 20px; border-radius: 18px; }
+  .dateCard h2 { font-size: 25px; margin-bottom: 22px; }
+  .planet { right: -30px; top: 190px; }
+  .body { padding: 24px 16px 36px; }
+  .choose > p { font-size: 12px; line-height: 1.8; }
+  .choose > p span { display: block; margin: 0; }
+  .signs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .signs button { gap: 5px; font-size: 11px; }
+  .signs button span { font-size: 20px; }
+  .result { padding: 24px 18px; border-radius: 16px; margin-top: 24px; }
+  .resultHead { gap: 14px; align-items: start; }
+  .seal { width: 56px; height: 56px; font-size: 34px; }
+  .resultHead .sectionLabel { font-size: 8px; line-height: 1.6; letter-spacing: .07em; }
+  .result h2 { font-size: 27px; margin-top: 7px; }
+  .result h2 span { display: block; margin-top: 5px; font-size: 21px; }
+  .dates { font-size: 10px; line-height: 1.6; }
+  .resultIntro { font-size: 14px; line-height: 1.8; margin: 22px 0; }
+  .window { padding: 16px 14px; gap: 12px; }
+  .window p { font-size: 15px; }
+  .routeHeading { margin-top: 28px; }
+  .routeHeading h3 { font-size: 20px; }
+  .routeHeading > span { display: none; }
+  .routes li { gap: 12px; padding: 20px 0; }
+  .routeNumber { width: 18px; font-size: 11px; }
+  .routes h4 { font-size: 15px; }
+  .routes p { font-size: 13px; }
+  .details { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .details p { font-size: 13px; }
+  .resultCta { flex-direction: column; align-items: stretch; padding: 20px 16px; gap: 18px; }
+  .resultCta h3 { font-size: 18px; }
+  .empty { padding: 28px 18px; gap: 12px; }
+  .empty svg { flex-shrink: 0; }
+  .empty p { font-size: 12px; }
+  .eclipse { padding: 24px 20px; align-items: start; gap: 18px; }
+  .eclipseIcon { width: 40px; height: 40px; margin-top: 5px; }
+  .eclipse h2 { font-size: 18px; }
+  .eclipse .sectionLabel { font-size: 8px; }
+  .eclipse p:not(.sectionLabel) { font-size: 12px; }
+}
+@media (max-width: 359px) {
+  .heroCopy h1 { font-size: 36px; }
+  .dateCard { padding: 22px 16px; }
+  .eyebrow { max-width: 165px; }
+  .cardEyebrow { font-size: 8px; }
+  .signs button { font-size: 10px; }
+  .result { padding: 22px 14px; }
+  .primary { font-size: 13px; padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky, .sky *, .primary { animation: none !important; transition: none !important; }
+}

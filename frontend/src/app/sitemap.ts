@@ -19,6 +19,7 @@ const STATIC_PATHS = [
   "/gift-certificates",
   "/contacts",
   "/request",
+  "/travel-horoscope-2027",
   "/privacy",
   "/terms",
 ];
