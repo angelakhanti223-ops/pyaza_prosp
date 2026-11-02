@@ -18,6 +18,7 @@ const STATIC_PATHS = [
   "/certificates",
   "/gift-certificates",
   "/contacts",
+  "/request",
   "/privacy",
   "/terms",
 ];

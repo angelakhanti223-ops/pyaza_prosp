@@ -1,0 +1,60 @@
+.page { background: #fbf8f2; color: #0f2c5c; padding: 52px 24px 64px; }
+.layout { max-width: 1120px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: 64px; align-items: start; }
+.intro { min-width: 0; padding-top: 12px; }
+.eyebrow, .cardHeading { font-size: 11px; font-weight: 650; letter-spacing: .13em; }
+.eyebrow { margin-bottom: 24px; color: #84662e; }
+.intro h1 { font-size: clamp(32px, 3.7vw, 49px); font-weight: 650; line-height: 1.12; letter-spacing: -.045em; }
+.intro h1 span { color: #a77825; }
+.description { margin: 22px 0 28px; max-width: 420px; color: #5c6b7b; font-size: 16px; line-height: 1.65; }
+.photo { position: relative; height: 280px; border-radius: 20px; overflow: hidden; background: #bee0df; }
+.photo::after { content: ''; position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, #092942a6); }
+.photo span { position: absolute; left: 22px; right: 18px; bottom: 20px; z-index: 1; color: white; font-size: 13px; }
+.office { display: flex; align-items: start; gap: 10px; margin-top: 24px; font-size: 13px; line-height: 1.6; }
+.office svg { margin-top: 3px; color: #a77825; flex-shrink: 0; }
+.office small { color: #647182; font-size: 12px; }
+.card { min-width: 0; border: 1px solid #ece7dc; border-radius: 24px; background: white; padding: 32px; box-shadow: 0 12px 50px #0f2c5c06; }
+.cardHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #8b733f; }
+.cardHeading svg { flex-shrink: 0; }
+.card h2 { font-size: 29px; font-weight: 650; letter-spacing: -.035em; margin-top: 14px; }
+.formIntro { font-size: 14px; line-height: 1.6; color: #647182; margin: 10px 0 24px; }
+.form input:not([type=checkbox]), .form select, .form textarea { min-height: 52px; font-size: 16px; border-color: #dce2ea; background: #fff; }
+.form input:focus, .form select:focus, .form textarea:focus { outline: 2px solid #1a5fc833; outline-offset: 1px; }
+.form textarea { min-height: 120px; }
+.form input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; }
+.form label:has(input[type=checkbox]) { gap: 10px; padding: 3px 0; cursor: pointer; }
+.form button[type=submit] { min-height: 54px; background: #d9a441; color: #0a2047; font-size: 16px; border-radius: 13px; }
+.form button[type=submit]:hover { background: #c99739; }
+.form button:focus-visible, .form summary:focus-visible, .direct a:focus-visible { outline: 3px solid #1a5fc8; outline-offset: 4px; }
+.note { margin-top: 14px; font-size: 11px; line-height: 1.6; color: #6b7582; text-align: center; }
+.direct { border-top: 1px solid #edf0f4; margin-top: 24px; padding-top: 20px; text-align: center; }
+.direct p { font-size: 12px; color: #6b7582; }
+.direct a { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; font-size: 17px; font-weight: 600; }
+.steps { max-width: 1120px; margin: 52px auto 0; border-top: 1px solid #e6e0d5; padding-top: 28px; }
+.steps > h2 { font-size: 19px; font-weight: 600; }
+.steps ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin-top: 24px; }
+.steps li { display: flex; gap: 14px; }
+.steps li > span { color: #a77825; font-size: 13px; padding-top: 3px; }
+.steps h3 { font-size: 15px; font-weight: 600; }
+.steps li p { margin-top: 6px; font-size: 13px; line-height: 1.6; color: #647182; }
+@media (max-width: 767px) {
+  .page { padding: 24px 16px 36px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .intro { padding: 0; }
+  .eyebrow { margin-bottom: 12px; font-size: 10px; }
+  .intro h1 { font-size: 34px; max-width: 420px; }
+  .description { margin: 14px 0 18px; font-size: 14px; line-height: 1.55; }
+  .photo { height: 144px; border-radius: 16px; }
+  .photo span { font-size: 11px; left: 16px; bottom: 13px; }
+  .office { display: none; }
+  .card { border-radius: 18px; padding: 22px 18px; }
+  .cardHeading { font-size: 9px; letter-spacing: .1em; }
+  .card h2 { font-size: 27px; margin-top: 9px; }
+  .formIntro { margin: 8px 0 20px; }
+  .steps { margin-top: 32px; padding-top: 22px; }
+  .steps ol { grid-template-columns: minmax(0, 1fr); gap: 22px; margin-top: 20px; }
+}
+@media (max-width: 359px) {
+  .intro h1 { font-size: 29px; }
+  .card { padding: 20px 14px; }
+  .form summary { font-size: 12px; }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ApiError, createLead, fetchDirections, type Direction } from "@/lib/api";
 import LeadConsentFields from "./LeadConsentFields";
 import { EMPTY_LEAD_CONSENTS, LEAD_CONSENT_VERSION } from "@/lib/leadConsents";
@@ -8,9 +8,13 @@ import { EMPTY_LEAD_CONSENTS, LEAD_CONSENT_VERSION } from "@/lib/leadConsents";
 type Props = {
   onSuccess?: () => void;
   initialComment?: string;
+  compact?: boolean;
+  submissionContext?: string;
+  submitLabel?: string;
 };
 
-export default function LeadForm({ onSuccess, initialComment }: Props) {
+export default function LeadForm({ onSuccess, initialComment, compact = false, submissionContext, submitLabel = "Отправить заявку" }: Props) {
+  const formId = useId();
   const [directions, setDirections] = useState<Direction[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -36,7 +40,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         phone,
         email: email || undefined,
         direction: directionId ? Number(directionId) : null,
-        initial_comment: comment || undefined,
+        initial_comment: [submissionContext, comment].filter(Boolean).join("\n\n") || undefined,
         consent: consents.personalData,
         consent_marketing: consents.marketing,
         consent_version: LEAD_CONSENT_VERSION,
@@ -53,7 +57,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
 
   if (status === "success") {
     return (
-      <div className="rounded-2xl bg-blue-light p-8 text-center">
+      <div role="status" className="rounded-2xl bg-blue-light p-8 text-center">
         <p className="text-lg font-semibold text-navy">Заявка отправлена!</p>
         <p className="mt-2 text-sm text-foreground/70">
           Спасибо, {name}. Наш менеджер свяжется с вами в ближайшее время.
@@ -62,32 +66,14 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
     );
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+  const optionalFields = (
+    <>
       <div>
+        <label htmlFor={`${formId}-email`} className={compact ? "mb-2 block text-sm font-medium text-navy" : "sr-only"}>Email (необязательно)</label>
         <input
-          required
-          type="text"
-          placeholder="Ваше имя"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
-        />
-        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name[0]}</p>}
-      </div>
-      <div>
-        <input
-          required
-          type="tel"
-          placeholder="Телефон"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
-        />
-        {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone[0]}</p>}
-      </div>
-      <div>
-        <input
+          id={`${formId}-email`}
+          name="email"
+          autoComplete="email"
           type="email"
           placeholder="Email (необязательно)"
           value={email}
@@ -97,7 +83,10 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email[0]}</p>}
       </div>
       <div>
+        <label htmlFor={`${formId}-direction`} className={compact ? "mb-2 block text-sm font-medium text-navy" : "sr-only"}>Направление (необязательно)</label>
         <select
+          id={`${formId}-direction`}
+          name="direction"
           value={directionId}
           onChange={(e) => setDirectionId(e.target.value)}
           className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
@@ -111,14 +100,42 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         </select>
       </div>
       <div>
+        <label htmlFor={`${formId}-comment`} className={compact ? "mb-2 block text-sm font-medium text-navy" : "sr-only"}>Пожелания к поездке (необязательно)</label>
         <textarea
-          placeholder="Комментарий (необязательно)"
+          id={`${formId}-comment`}
+          name="comment"
+          placeholder={compact ? "Куда и когда хотите поехать, кто едет и какой бюджет рассматриваете" : "Комментарий (необязательно)"}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           className="w-full resize-none rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue"
         />
       </div>
+    </>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4" aria-busy={status === "submitting"}>
+      <div>
+        <label htmlFor={`${formId}-name`} className={compact ? "mb-2 block text-sm font-medium text-navy" : "sr-only"}>Ваше имя</label>
+        <input id={`${formId}-name`} name="name" autoComplete="name" required type="text" placeholder={compact ? "Как к вам обращаться?" : "Ваше имя"}
+          value={name} onChange={(e) => setName(e.target.value)} aria-invalid={!!errors.name}
+          className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue" />
+        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name[0]}</p>}
+      </div>
+      <div>
+        <label htmlFor={`${formId}-phone`} className={compact ? "mb-2 block text-sm font-medium text-navy" : "sr-only"}>Телефон</label>
+        <input id={`${formId}-phone`} name="phone" autoComplete="tel" inputMode="tel" required type="tel" placeholder={compact ? "+7 999 123-45-67" : "Телефон"}
+          value={phone} onChange={(e) => setPhone(e.target.value)} aria-invalid={!!errors.phone}
+          className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-blue" />
+        {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone[0]}</p>}
+      </div>
+      {compact ? (
+        <details className="rounded-xl border border-black/10 px-4 py-3">
+          <summary className="cursor-pointer py-1 text-sm font-medium text-navy">Добавить пожелания к поездке</summary>
+          <div className="mt-4 flex flex-col gap-4">{optionalFields}</div>
+        </details>
+      ) : optionalFields}
       <LeadConsentFields value={consents} onChange={setConsents} errors={errors} />
       {status === "error" && (
         <p role="alert" className="text-sm text-red-600">
@@ -130,7 +147,7 @@ export default function LeadForm({ onSuccess, initialComment }: Props) {
         disabled={status === "submitting"}
         className="rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue disabled:opacity-60"
       >
-        {status === "submitting" ? "Отправляем…" : "Отправить заявку"}
+        {status === "submitting" ? "Отправляем…" : submitLabel}
       </button>
     </form>
   );

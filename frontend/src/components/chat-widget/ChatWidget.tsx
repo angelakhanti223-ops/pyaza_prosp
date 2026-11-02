@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { MessageCircle, Send, X } from "lucide-react";
 import { ApiError, createLead } from "@/lib/api";
 import LeadConsentFields from "@/components/lead-form/LeadConsentFields";
@@ -77,6 +78,7 @@ function buildSummary(answers: Record<string, string>): string {
 }
 
 export default function ChatWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -164,6 +166,8 @@ export default function ChatWidget() {
   }
 
   const currentStep = STEPS[stepIndex];
+
+  if (pathname === "/request") return null;
 
   return (
     <>
