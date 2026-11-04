@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from . import views
+from .agent_api import AgentTodayQueueView
 from .dashboard import DashboardView, PlanView, WorkScheduleView, WorkSummaryView
 from .management_dashboard import ManagementDashboardView
 from .office_goals import OfficeGoalsView
@@ -10,6 +11,7 @@ router = DefaultRouter()
 router.register('crm/leads', views.LeadViewSet, basename='crm-lead')
 
 urlpatterns = [
+    path('agent/v1/today-queue/', AgentTodayQueueView.as_view(), name='agent-today-queue'),
     path('gift-certificates/', views.GiftCertificateCreateView.as_view(), name='gift-certificate-create'),
     path('leads/', views.LeadCreateView.as_view(), name='lead-create'),
     path('directions/', views.DirectionListView.as_view(), name='direction-list'),
