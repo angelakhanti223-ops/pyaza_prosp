@@ -39,6 +39,9 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
+# Dedicated Bearer token for the read-only Telegram agent API; empty disables it.
+AGENT_API_TOKEN = env('AGENT_API_TOKEN', default='')
+
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost:3000'])
 
 
