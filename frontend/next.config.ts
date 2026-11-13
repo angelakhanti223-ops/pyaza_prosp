@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/candidates", destination: "/candidate-form.html" },
+      { source: "/tours/egypt-cairo-sharm", destination: "/egypt-cairo-sharm.html" },
     ];
   },
   async redirects() {
