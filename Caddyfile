@@ -1,3 +1,7 @@
+www.flypenza.ru {
+	redir https://flypenza.ru{uri} permanent
+}
+
 {$DOMAIN} {
 	# Django doesn't serve /media itself when DEBUG=False, so Caddy serves it
 	# directly from the shared backend_media volume — faster than proxying
