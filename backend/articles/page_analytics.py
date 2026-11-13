@@ -22,6 +22,7 @@ PUBLIC_PAGES = {
     '/tours': 'Туры и путёвки',
     '/tours/china-constructor': 'Конструктор тура в Китай',
     '/tours/kaliningrad-newyear-2027': 'Калининград · Новый год 2027 · Семья 2+1',
+    '/tours/egypt-cairo-sharm': 'Новый год в Египте · Каир и Шарм-эш-Шейх',
     '/tours/russia-january-2027': 'Туры по России · январь 2027',
     '/tours/china-2026': 'Туры в Китай · 2026',
     '/tours/china-november-2026': 'Китай · ноябрь 2026',
@@ -42,7 +43,10 @@ PUBLIC_PAGES = {
     '/privacy': 'Политика конфиденциальности',
     '/terms': 'Пользовательское соглашение',
 }
-ALIASES = {'/china-tour-builder.html': '/tours/china-constructor'}
+ALIASES = {
+    '/china-tour-builder.html': '/tours/china-constructor',
+    '/egypt-cairo-sharm.html': '/tours/egypt-cairo-sharm',
+}
 BLOG_PATH = re.compile(r'^/blog/([a-zA-Z0-9_-]{1,255})$')
 
 

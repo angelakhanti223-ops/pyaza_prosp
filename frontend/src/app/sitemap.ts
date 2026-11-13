@@ -9,6 +9,7 @@ const STATIC_PATHS = [
   "/tours/china-constructor",
   "/tours/russia-january-2027",
   "/tours/kaliningrad-newyear-2027",
+  "/tours/egypt-cairo-sharm",
   "/directions",
   "/cruises",
   "/promotions",
