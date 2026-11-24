@@ -51,6 +51,7 @@ export const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
 ];
 
 export type LeadTaskFilter = "today" | "overdue";
+export type LeadMonthFilter = "sales" | "failures";
 
 export type LeadTravelFields = {
   departure_city: string;
@@ -245,11 +246,12 @@ export async function listManagers(): Promise<CrmUser[]> {
   return apiJson<CrmUser[]>("/api/managers/");
 }
 
-export async function listLeads(params: { status?: string; search?: string; task_filter?: LeadTaskFilter } = {}): Promise<LeadListItem[]> {
+export async function listLeads(params: { status?: string; search?: string; task_filter?: LeadTaskFilter; month_filter?: LeadMonthFilter } = {}): Promise<LeadListItem[]> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.search) qs.set("search", params.search);
   if (params.task_filter) qs.set("task_filter", params.task_filter);
+  if (params.month_filter) qs.set("month_filter", params.month_filter);
   const query = qs.toString() ? `?${qs.toString()}` : "";
   const data = await apiJson<LeadListItem[] | { results: LeadListItem[] }>(`/api/crm/leads/${query}`);
   return Array.isArray(data) ? data : data.results;
