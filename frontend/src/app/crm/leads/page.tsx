@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
-import { listLeads, updateLead, STATUS_OPTIONS, type LeadListItem, type LeadStatus, type LeadTaskFilter } from "@/lib/crmApi";
+import { listLeads, updateLead, STATUS_OPTIONS, type LeadListItem, type LeadStatus, type LeadTaskFilter, type LeadMonthFilter } from "@/lib/crmApi";
 import StatusBadge from "@/components/crm/StatusBadge";
 import NewLeadModal from "@/components/crm/NewLeadModal";
 import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStatusInfo";
@@ -11,7 +11,7 @@ import { getLeadStatusHint, getLeadStatusLabel } from "@/components/crm/LeadStat
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 type RateDirection = "higher" | "lower" | "same" | "missing";
-type TaskQuickFilter = "" | LeadTaskFilter;
+type QuickFilter = "" | LeadTaskFilter | LeadMonthFilter;
 
 type LeadTag = {
   id: number;
@@ -106,6 +106,16 @@ function quickFilterButtonClass(active: boolean, danger = false) {
   return "rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-foreground/60 transition hover:border-blue hover:text-navy";
 }
 
+function monthFilterButtonClass(active: boolean, failures = false) {
+  const base = "min-h-10 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2";
+  if (failures) return `${base} focus-visible:outline-[#a76666] ${active
+    ? "border-[#c69b9b] bg-[#f3dede] text-[#784747] ring-1 ring-[#c69b9b]"
+    : "border-[#ead6d6] bg-[#fbf2f2] text-[#835656] hover:bg-[#f5e6e6]"}`;
+  return `${base} focus-visible:outline-[#63846b] ${active
+    ? "border-[#9fbaa7] bg-[#dcece0] text-[#31543d] ring-1 ring-[#9fbaa7]"
+    : "border-[#d5e5da] bg-[#f0f7f2] text-[#45664f] hover:bg-[#e5f0e8]"}`;
+}
+
 export default function CrmLeadsPage() {
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [allTags, setAllTags] = useState<LeadTag[]>([]);
@@ -113,7 +123,7 @@ export default function CrmLeadsPage() {
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("");
-  const [taskFilter, setTaskFilter] = useState<TaskQuickFilter>("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [savingTagLeadId, setSavingTagLeadId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -128,7 +138,8 @@ export default function CrmLeadsPage() {
       listLeads({
         status: status || undefined,
         search: search || undefined,
-        task_filter: taskFilter || undefined,
+        task_filter: quickFilter === "today" || quickFilter === "overdue" ? quickFilter : undefined,
+        month_filter: quickFilter === "sales" || quickFilter === "failures" ? quickFilter : undefined,
       }).then((data) => {
         if (!active) return;
         setLeads(data);
@@ -143,7 +154,7 @@ export default function CrmLeadsPage() {
       active = false;
       clearTimeout(timeout);
     };
-  }, [status, search, taskFilter]);
+  }, [status, search, quickFilter]);
 
   const filterTags = useMemo(() => {
     const byId = new Map<number, LeadTag>();
@@ -162,9 +173,13 @@ export default function CrmLeadsPage() {
   const overdueContacts = useMemo(() => displayedLeads.filter((lead) => isPast(lead.next_contact_at)).length, [displayedLeads]);
   const overduePayments = useMemo(() => displayedLeads.filter((lead) => isPast(lead.full_payment_due_at)).length, [displayedLeads]);
   const selectedStatusHint = status ? getLeadStatusHint(status as LeadStatus) : "Выберите статус, чтобы увидеть подсказку по этапу работы с заявкой.";
-  const controlHint = taskFilter === "today"
+  const controlHint = quickFilter === "sales"
+    ? "Продажи за текущий календарный месяц: заявки, комиссия по которым учитывается в плане и дашборде по первому переходу в предоплату, оплату или успешное закрытие. Дата создания заявки не влияет. Дополнительные фильтры сужают список."
+    : quickFilter === "failures"
+      ? "Провалы за текущий календарный месяц: заявки в статусах «Провалена» и «Неуспешная» по последнему переходу в текущий статус. Возвращенные в работу и нецелевые обращения не включены. Дополнительные фильтры сужают список."
+    : quickFilter === "today"
     ? "Показаны заявки, где следующий контакт сегодня или есть невыполненная задача со сроком сегодня."
-    : taskFilter === "overdue"
+    : quickFilter === "overdue"
       ? "Показаны заявки, где просрочен следующий контакт или есть невыполненная задача с истёкшим сроком."
       : selectedStatusHint;
 
@@ -256,22 +271,42 @@ export default function CrmLeadsPage() {
         <span className="text-xs font-medium text-foreground/45">Быстрые фильтры:</span>
         <button
           type="button"
-          onClick={() => setTaskFilter((value) => value === "today" ? "" : "today")}
-          className={quickFilterButtonClass(taskFilter === "today")}
+          onClick={() => setQuickFilter(value => value === "sales" ? "" : "sales")}
+          aria-pressed={quickFilter === "sales"}
+          title="Комиссия в расчете текущего месяца: с первого по последний день, по московскому времени"
+          className={monthFilterButtonClass(quickFilter === "sales")}
+        >
+          Продажи за месяц
+        </button>
+        <button
+          type="button"
+          onClick={() => setQuickFilter(value => value === "failures" ? "" : "failures")}
+          aria-pressed={quickFilter === "failures"}
+          title="Провалы с первого по последний день текущего месяца, по московскому времени"
+          className={monthFilterButtonClass(quickFilter === "failures", true)}
+        >
+          Провалы за месяц
+        </button>
+        <button
+          type="button"
+          onClick={() => setQuickFilter((value) => value === "today" ? "" : "today")}
+          aria-pressed={quickFilter === "today"}
+          className={quickFilterButtonClass(quickFilter === "today")}
         >
           Задачи на сегодня
         </button>
         <button
           type="button"
-          onClick={() => setTaskFilter((value) => value === "overdue" ? "" : "overdue")}
-          className={quickFilterButtonClass(taskFilter === "overdue", true)}
+          onClick={() => setQuickFilter((value) => value === "overdue" ? "" : "overdue")}
+          aria-pressed={quickFilter === "overdue"}
+          className={quickFilterButtonClass(quickFilter === "overdue", true)}
         >
           Просроченные задачи
         </button>
-        {taskFilter && (
+        {quickFilter && (
           <button
             type="button"
-            onClick={() => setTaskFilter("")}
+            onClick={() => setQuickFilter("")}
             className="rounded-full px-3 py-2 text-xs font-semibold text-foreground/45 transition hover:text-navy"
           >
             Сбросить

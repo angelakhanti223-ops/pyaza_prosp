@@ -13,6 +13,7 @@ from telegrambot.tasks import notify_lead_assignment, notify_lead_status_change
 from .auto_tags import AUTO_TAG_NAMES, sync_automatic_lead_tags
 from .gift_certificates import GiftCertificateSerializer
 from .models import Contact, Direction, Lead, LeadStatusHistory, LeadTag, TourOperator
+from .monthly_filters import filter_current_month
 from .serializers import (
     ContactSerializer,
     DirectionSerializer,
@@ -134,6 +135,10 @@ class LeadViewSet(
         tag_param = self.request.query_params.get('tag')
         if tag_param:
             qs = qs.filter(tags__id=tag_param)
+
+        month_filter = self.request.query_params.get('month_filter')
+        if self.action == 'list' and month_filter:
+            qs = filter_current_month(qs, month_filter)
 
         task_filter = self.request.query_params.get('task_filter')
         if task_filter:
