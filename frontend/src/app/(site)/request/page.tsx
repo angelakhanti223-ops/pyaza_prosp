@@ -10,7 +10,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "/request" },
 };
 
-export default function TourRequestPage() {
+export default async function TourRequestPage({ searchParams }: {
+  searchParams: Promise<{ cruise?: string | string[]; departure?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const cruiseNames = ["Orchestra", "Lirica", "World Europa", "Preziosa", "Fantasia", "Seaview", "Magnifica"];
+  const cruise = typeof params.cruise === "string" && cruiseNames.includes(params.cruise) ? params.cruise : null;
+  const departure = typeof params.departure === "string" && /^(?:[6-9]|1[0-9])$/.test(params.departure) ? Number(params.departure) : null;
+  const nights = cruise === "Magnifica" ? 10 : 7;
+  const cruiseComment = cruise && departure
+    ? `Интересует морской круиз MSC ${cruise}, ${departure}–${departure + nights} декабря 2027, ${nights} ночей, 2 взрослых. Прошу уточнить наличие кают и итоговую стоимость.`
+    : undefined;
   return (
     <div className={styles.page}>
       <div className={styles.layout}>
@@ -30,7 +40,7 @@ export default function TourRequestPage() {
           <h2 id="form-title">Куда отправимся?</h2>
           <p className={styles.formIntro}>Оставьте контакты — обсудим ваши пожелания и подберём варианты тура.</p>
           <div className={styles.form}>
-            <LeadForm compact submissionContext="Заявка на подбор тура со страницы /request" submitLabel="Подобрать мне тур" />
+            <LeadForm compact initialComment={cruiseComment} submissionContext="Заявка на подбор тура со страницы /request" submitLabel="Подобрать мне тур" />
           </div>
           <p className={styles.note}>Это заявка на подбор. Даты, отель и стоимость согласуем с вами до бронирования.</p>
           <div className={styles.direct}>

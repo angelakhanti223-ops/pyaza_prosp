@@ -7,6 +7,7 @@ export const PUBLIC_PAGE_PATHS = [
   '/middle-east', '/about', '/team', '/certificates', '/gift-certificates', '/contacts', '/request', '/privacy', '/terms',
   '/travel-horoscope-2027',
   '/tours/egypt-cairo-sharm',
+  '/tours/cruises-december-2027',
 ];
 const MAX_ACTIVE_MS = 2 * 60 * 60 * 1000;
 
@@ -15,6 +16,7 @@ export function publicPagePath(value) {
   let path = value.split('?')[0].split('#')[0].replace(/\/+$/, '') || '/';
   if (path === '/china-tour-builder.html') path = '/tours/china-constructor';
   if (path === '/egypt-cairo-sharm.html') path = '/tours/egypt-cairo-sharm';
+  if (path === '/cruises-december-2027.html') path = '/tours/cruises-december-2027';
   return PUBLIC_PAGE_PATHS.includes(path) || /^\/blog\/[a-zA-Z0-9_-]{1,255}$/.test(path) ? path : null;
 }
 
