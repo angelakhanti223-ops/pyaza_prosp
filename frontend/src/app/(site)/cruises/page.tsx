@@ -48,6 +48,16 @@ export default async function CruisesPage() {
           comment="Заявка со страницы круизов"
         />
 
+        <a href="/tours/cruises-december-2027" className="mb-10 block overflow-hidden rounded-3xl border border-gold/30 bg-cream transition hover:shadow-md">
+          <img src="/cruise-assets/december-2027/world-europa.jpg" alt="Иллюстрация MSC World Europa и обзорная карта маршрута" width={1448} height={1086} loading="lazy" className="max-h-80 w-full object-contain bg-navy" />
+          <div className="p-6 sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-blue">MSC Cruises · Декабрь 2027</p>
+            <h2 className="mt-3 text-2xl font-bold text-navy">Декабрь с видом на море</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70">Семь лайнеров, круизы на 7–10 ночей и программы по дням. Сравните маршруты, выберите даты и отправьте заявку на подбор каюты.</p>
+            <span className="mt-5 inline-block rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white">Смотреть круизы декабря</span>
+          </div>
+        </a>
+
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {CRUISE_TYPES.map((c) => (
             <div key={c.title} className="rounded-2xl border border-black/5 bg-white p-6 shadow-sm">

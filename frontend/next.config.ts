@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/candidates", destination: "/candidate-form.html" },
       { source: "/tours/egypt-cairo-sharm", destination: "/egypt-cairo-sharm.html" },
+      { source: "/tours/cruises-december-2027", destination: "/cruises-december-2027.html" },
     ];
   },
   async redirects() {
