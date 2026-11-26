@@ -56,6 +56,7 @@ export type LeadMonthFilter = "sales" | "failures";
 export type LeadTravelFields = {
   departure_city: string;
   departure_date: string | null;
+  return_date: string | null;
   nights: number | null;
   adults: number | null;
   children_count: number | null;
@@ -262,6 +263,7 @@ export async function getLead(id: number): Promise<LeadDetail> {
 }
 
 type LeadInputExtras = Partial<{
+  return_date: string | null;
   departure_city: string;
   departure_date: string | null;
   nights: number | null;
@@ -318,7 +320,7 @@ export async function updateLead(
     method: "PATCH",
     body: JSON.stringify(data),
   });
-  if (["next_contact_at", "assigned_manager", "preferred_messenger", "status"].some(key => key in data)) notifyTaskChange();
+  if (["next_contact_at", "assigned_manager", "preferred_messenger", "status", "departure_date", "return_date", "nights"].some(key => key in data)) notifyTaskChange();
   return lead;
 }
 
