@@ -23,7 +23,7 @@ from .consents import PUBLIC_CONSENT_VERSION, consent_evidence
 
 
 TRAVEL_FIELDS = [
-    'departure_city', 'departure_date', 'nights', 'adults', 'children_count', 'children_ages',
+    'departure_city', 'departure_date', 'return_date', 'nights', 'adults', 'children_count', 'children_ages',
     'budget_from', 'budget_to', 'meal_type', 'hotel_wishes', 'next_contact_at',
 ]
 
@@ -352,7 +352,7 @@ class LeadListSerializer(OperatorRateMixin, serializers.ModelSerializer):
             'preferred_messenger', 'preferred_messenger_display', 'tags',
             'status', 'status_display', 'source', 'source_display', 'direction', 'direction_name',
             'assigned_manager', 'deal_amount', 'commission', 'next_contact_at', 'departure_city',
-            'departure_date', 'nights', 'budget_from', 'budget_to', 'prepayment_amount', 'paid_amount',
+            'departure_date', 'return_date', 'nights', 'budget_from', 'budget_to', 'prepayment_amount', 'paid_amount',
             'balance_due', 'full_payment_due_at', 'tour_operator', 'tour_operator_ref', 'tour_operator_details',
             'tour_currency', 'payment_exchange_rate', *OPERATOR_RATE_FIELDS,
             'booking_number', 'failure_reason', 'created_at',

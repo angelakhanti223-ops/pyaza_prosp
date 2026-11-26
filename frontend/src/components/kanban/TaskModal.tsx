@@ -33,6 +33,7 @@ type Props = {
   // проверяется отдельно ниже), сама связь после создания уже не меняется.
   presetLead?: { id: number; name: string } | null;
   presetUonRecord?: { kind: "request" | "lead"; id: string; label: string } | null;
+  presetAssigneeId?: number;
 };
 
 export default function TaskModal({
@@ -43,13 +44,14 @@ export default function TaskModal({
   onSaved,
   presetLead,
   presetUonRecord,
+  presetAssigneeId,
 }: Props) {
   const isEdit = Boolean(task);
   const { user } = useCrmAuth();
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [assigneeId, setAssigneeId] = useState<string>(task?.assignee ? String(task.assignee.id) : task ? "" : String(user?.id ?? ""));
+  const [assigneeId, setAssigneeId] = useState<string>(task?.assignee ? String(task.assignee.id) : task ? "" : String(presetAssigneeId ?? user?.id ?? ""));
   const [deadline, setDeadline] = useState(toLocalTaskTime(task?.deadline ?? null));
   const [managers, setManagers] = useState<CrmUser[]>([]);
   const [leadQuery, setLeadQuery] = useState(task?.lead_name ?? presetLead?.name ?? "");

@@ -228,6 +228,7 @@ class Lead(models.Model):
 
     departure_city = models.CharField('Город вылета', max_length=100, blank=True)
     departure_date = models.DateField('Дата вылета', null=True, blank=True)
+    return_date = models.DateField('Дата прилета / возвращения', null=True, blank=True)
     nights = models.PositiveSmallIntegerField('Количество ночей', null=True, blank=True)
     adults = models.PositiveSmallIntegerField('Взрослых', null=True, blank=True)
     children_count = models.PositiveSmallIntegerField('Детей', null=True, blank=True)

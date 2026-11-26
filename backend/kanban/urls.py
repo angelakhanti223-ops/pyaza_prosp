@@ -3,11 +3,13 @@ from rest_framework.routers import SimpleRouter
 
 from . import views
 from .push_views import PushConfigView, PushPreviewView, PushSubscriptionView, PushTestView
+from .operations import OperationsDashboardView
 
 router = SimpleRouter()
 router.register('crm/kanban/tasks', views.TaskViewSet, basename='crm-kanban-task')
 
 urlpatterns = [
+    path('crm/operations/', OperationsDashboardView.as_view(), name='crm-operations'),
     path('crm/task-push/config/', PushConfigView.as_view()),
     path('crm/task-push/subscription/', PushSubscriptionView.as_view()),
     path('crm/task-push/preview/', PushPreviewView.as_view()),
