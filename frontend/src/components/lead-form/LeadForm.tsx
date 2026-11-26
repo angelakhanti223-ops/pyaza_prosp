@@ -9,11 +9,12 @@ type Props = {
   onSuccess?: () => void;
   initialComment?: string;
   compact?: boolean;
+  openDetails?: boolean;
   submissionContext?: string;
   submitLabel?: string;
 };
 
-export default function LeadForm({ onSuccess, initialComment, compact = false, submissionContext, submitLabel = "Отправить заявку" }: Props) {
+export default function LeadForm({ onSuccess, initialComment, compact = false, openDetails = false, submissionContext, submitLabel = "Отправить заявку" }: Props) {
   const formId = useId();
   const [directions, setDirections] = useState<Direction[]>([]);
   const [name, setName] = useState("");
@@ -131,7 +132,7 @@ export default function LeadForm({ onSuccess, initialComment, compact = false, s
         {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone[0]}</p>}
       </div>
       {compact ? (
-        <details className="rounded-xl border border-black/10 px-4 py-3">
+        <details open={openDetails} className="rounded-xl border border-black/10 px-4 py-3">
           <summary className="cursor-pointer py-1 text-sm font-medium text-navy">Добавить пожелания к поездке</summary>
           <div className="mt-4 flex flex-col gap-4">{optionalFields}</div>
         </details>
