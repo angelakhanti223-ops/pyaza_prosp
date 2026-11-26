@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { ArrowUpRight, MapPin, Phone } from "lucide-react";
 import LeadForm from "@/components/lead-form/LeadForm";
+import { busTourRequestComment } from "@/lib/busTourRequest";
 import styles from "./request.module.css";
 
 export const metadata: Metadata = {
@@ -11,9 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TourRequestPage({ searchParams }: {
-  searchParams: Promise<{ cruise?: string | string[]; departure?: string | string[] }>;
+  searchParams: Promise<{ cruise?: string | string[]; departure?: string | string[]; bus_tour?: string | string[] }>;
 }) {
   const params = await searchParams;
+  const busComment = busTourRequestComment(params.bus_tour);
   const cruiseNames = ["Orchestra", "Lirica", "World Europa", "Preziosa", "Fantasia", "Seaview", "Magnifica"];
   const cruise = typeof params.cruise === "string" && cruiseNames.includes(params.cruise) ? params.cruise : null;
   const departure = typeof params.departure === "string" && /^(?:[6-9]|1[0-9])$/.test(params.departure) ? Number(params.departure) : null;
@@ -40,7 +42,7 @@ export default async function TourRequestPage({ searchParams }: {
           <h2 id="form-title">Куда отправимся?</h2>
           <p className={styles.formIntro}>Оставьте контакты — обсудим ваши пожелания и подберём варианты тура.</p>
           <div className={styles.form}>
-            <LeadForm compact initialComment={cruiseComment} submissionContext="Заявка на подбор тура со страницы /request" submitLabel="Подобрать мне тур" />
+            <LeadForm key={busComment ?? cruiseComment ?? "general"} compact openDetails={Boolean(busComment)} initialComment={busComment ?? cruiseComment} submissionContext="Заявка на подбор тура со страницы /request" submitLabel="Подобрать мне тур" />
           </div>
           <p className={styles.note}>Это заявка на подбор. Даты, отель и стоимость согласуем с вами до бронирования.</p>
           <div className={styles.direct}>

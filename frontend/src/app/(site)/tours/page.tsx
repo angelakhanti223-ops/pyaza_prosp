@@ -45,6 +45,13 @@ export default async function ToursPage() {
           comment="Заявка со страницы туров"
         />
 
+        <a href="/tours/winter-bus-2026-2027" className="mt-10 block rounded-3xl border border-gold/30 bg-cream p-6 transition hover:shadow-md sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue">Автобусные туры из Пензы · Зима 2026–2027</p>
+          <h2 className="mt-3 text-2xl font-bold text-navy">Зимние путешествия: Новый год и рождественские каникулы</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-foreground/70">80 предложений: праздничные города, горы, театры и семейные экскурсии. Посмотрите программу и оставьте заявку на выбранный тур.</p>
+          <span className="mt-5 inline-block rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white">Выбрать автобусный тур</span>
+        </a>
+
         <a href="/tours/egypt-cairo-sharm" className="mt-10 block rounded-3xl border border-gold/30 bg-cream p-6 transition hover:shadow-md sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue">Египет · Семейный Новый год</p>
           <h2 className="mt-3 text-2xl font-bold text-navy">Каир и Шарм-эш-Шейх: от пирамид к Красному морю</h2>
